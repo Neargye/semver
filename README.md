@@ -1,2 +1,2 @@
 # SemverCpp
-C++11 library compare and manipulate versions are available as extensions to the Major.Minor.Patch-PreReleaseType.PreReleaseVersion format complying with [Semantic Versioning 2.0.0(semver.org)
+C++11 library compare and manipulate versions are available as extensions to the Major.Minor.Patch-PreReleaseType.PreReleaseVersion format complying with [Semantic Versioning 2.0.0](semver.org)
