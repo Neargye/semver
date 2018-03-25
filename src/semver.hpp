@@ -157,7 +157,7 @@ constexpr bool operator>(const Version& v1, const Version& v2) {
                       v1.patch > v2.patch)
                          ? true
                          : (v1.major == v2.major &&
-                            v1.minor <= v2.minor &&
+                            v1.minor == v2.minor &&
                             v1.patch == v2.patch &&
                             v1.pre_release_type > v2.pre_release_type)
                                ? true
