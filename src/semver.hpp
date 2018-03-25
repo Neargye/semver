@@ -33,7 +33,7 @@
 
 namespace semver {
 
-constexpr size_t kBufferSize = 27;
+constexpr size_t kVersionStringLength = 27;
 
 #pragma pack(push, 1)
 struct Version {
@@ -66,7 +66,7 @@ struct Version {
 
   Version(const char* s);
 
-  void ToString(char* s, const size_t length = kBufferSize) const;
+  void ToString(char* s, const size_t length = kVersionStringLength) const;
 
   std::string ToString() const;
 
@@ -88,7 +88,7 @@ struct Version {
 };
 #pragma pack(pop)
 
-inline size_t ToString(const Version& v, char* s, const size_t length = kBufferSize);
+inline size_t ToString(const Version& v, char* s, const size_t length = kVersionStringLength);
 
 inline std::string ToString(const Version& v);
 
@@ -132,7 +132,7 @@ inline void Version::FromString(const char* s) {
 }
 
 inline void Version::FromString(const std::string& s) {
-  semver::FromString(this, s.c_str());
+  semver::FromString(this, s);
 }
 
 constexpr bool operator==(const Version& v1, const Version& v2) {
@@ -237,7 +237,7 @@ inline size_t ToString(const Version& v, char* s, const size_t length) {
 }
 
 inline std::string ToString(const Version& v) {
-  std::string s(kBufferSize, 0);
+  std::string s(kVersionStringLength, 0);
   const size_t size = ToString(v, &s[0], s.length());
   s.resize(size);
   s.shrink_to_fit();
