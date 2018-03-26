@@ -25,7 +25,7 @@
 #include <iostream>
 
 int main() {
-  constexpr semver::Version v_default{};
+  constexpr semver::Version v_default;
   static_assert(v_default == semver::Version(0, 1, 0, semver::Version::PreReleaseType::None, 0), "");
 
   std::cout << v_default.ToString() << std::endl; // 0.1.0
@@ -43,4 +43,6 @@ int main() {
   v_s.pre_release_version = 0;
   const std::string s2 = v_s.ToString(); // 1.2.3-rc
   std::cout << s2 << std::endl;
+
+  return 0;
 }
