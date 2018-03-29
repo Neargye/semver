@@ -26,13 +26,13 @@
 
 int main() {
   constexpr semver::Version v_default;
-  static_assert(v_default == semver::Version(0, 1, 0, semver::Version::PreReleaseType::None, 0), "");
+  static_assert(v_default == semver::Version(0, 1, 0, semver::Version::PreReleaseType::kNone, 0), "");
 
   std::cout << v_default.ToString() << std::endl; // 0.1.0
 
   constexpr semver::Version v1(1, 4, 3);
   std::cout << v1.ToString() << std::endl; // 1.4.3
-  constexpr semver::Version v2(1, 2, 4, semver::Version::PreReleaseType::Alpha, 10);
+  constexpr semver::Version v2(1, 2, 4, semver::Version::PreReleaseType::kAlpha, 10);
   std::cout << v2.ToString() << std::endl; // 1.2.4-alpha.10
   static_assert(v1 > v2, "");
 

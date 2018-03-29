@@ -36,23 +36,23 @@ TEST_CASE("constexpr") {
     static_assert(v_default.major == 0 &&
                   v_default.minor == 1 &&
                   v_default.patch == 0 &&
-                  v_default.pre_release_type == Version::PreReleaseType::None &&
+                  v_default.pre_release_type == Version::PreReleaseType::kNone &&
                   v_default.pre_release_version == 0, "");
   }
 
   SECTION("operator ==") {
-    constexpr Version v1(1, 2, 3, Version::PreReleaseType::ReleaseCandidate, 4);
-    constexpr Version v2(1, 2, 3, Version::PreReleaseType::ReleaseCandidate, 4);
+    constexpr Version v1(1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4);
+    constexpr Version v2(1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4);
     static_assert(v1 == v2, "");
   }
 
   SECTION("operator >") {
-    constexpr Version v1(1, 0, 0, Version::PreReleaseType::Alpha, 0);
-    constexpr Version v2(1, 1, 0, Version::PreReleaseType::Alpha, 0);
-    constexpr Version v3(1, 0, 1, Version::PreReleaseType::Alpha, 0);
-    constexpr Version v4(1, 0, 0, Version::PreReleaseType::Alpha, 1);
-    constexpr Version v5(1, 0, 0, Version::PreReleaseType::None, 0);
-    constexpr Version v6(2, 0, 0, Version::PreReleaseType::None, 0);
+    constexpr Version v1(1, 0, 0, Version::PreReleaseType::kAlpha, 0);
+    constexpr Version v2(1, 1, 0, Version::PreReleaseType::kAlpha, 0);
+    constexpr Version v3(1, 0, 1, Version::PreReleaseType::kAlpha, 0);
+    constexpr Version v4(1, 0, 0, Version::PreReleaseType::kAlpha, 1);
+    constexpr Version v5(1, 0, 0, Version::PreReleaseType::kNone, 0);
+    constexpr Version v6(2, 0, 0, Version::PreReleaseType::kNone, 0);
     static_assert(v2 > v1, "");
     static_assert(v3 > v1, "");
     static_assert(v4 > v1, "");
@@ -65,7 +65,7 @@ TEST_CASE("ToString")
 {
   SECTION("std::string")
   {
-    Version v(1, 2, 3, Version::PreReleaseType::ReleaseCandidate, 4);
+    Version v(1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4);
 
     std::string s = v.ToString();
     REQUIRE(std::strcmp(s.c_str(), "1.2.3-rc.4") == 0);
@@ -73,7 +73,7 @@ TEST_CASE("ToString")
 
   SECTION("char*")
   {
-    Version v(1, 2, 3, Version::PreReleaseType::ReleaseCandidate, 4);
+    Version v(1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4);
 
     char s1[kVersionStringLength];
     v.ToString(s1);
@@ -86,7 +86,7 @@ TEST_CASE("ToString")
 }
 
 TEST_CASE("FromString") {
-  constexpr Version v(1, 2, 3, Version::PreReleaseType::ReleaseCandidate, 4);
+  constexpr Version v(1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4);
 
   SECTION("std::string")
   {

@@ -38,10 +38,10 @@ constexpr size_t kVersionStringLength = 27;
 #pragma pack(push, 1)
 struct Version {
   enum class PreReleaseType : uint8_t {
-    Alpha = 0,
-    Betha = 1,
-    ReleaseCandidate = 2,
-    None = 3,
+    kAlpha = 0,
+    kBetha = 1,
+    kReleaseCandidate = 2,
+    kNone = 3,
   };
 
   uint16_t major;
@@ -53,7 +53,7 @@ struct Version {
   constexpr Version(const uint16_t major,
                     const uint16_t minor,
                     const uint16_t patch,
-                    const PreReleaseType pre_release_type = PreReleaseType::None,
+                    const PreReleaseType pre_release_type = PreReleaseType::kNone,
                     const uint8_t pre_release_version = static_cast<uint8_t>(0));
 
   constexpr Version();
@@ -105,7 +105,7 @@ constexpr Version::Version(const uint16_t major,
       minor{minor},
       patch{patch},
       pre_release_type{pre_release_type},
-      pre_release_version{pre_release_type == PreReleaseType::None ? static_cast<uint8_t>(0) : pre_release_version} {}
+      pre_release_version{pre_release_type == PreReleaseType::kNone ? static_cast<uint8_t>(0) : pre_release_version} {}
 
 constexpr Version::Version() : Version(0, 1, 0) {
   // https://semver.org/#how-should-i-deal-with-revisions-in-the-0yz-initial-development-phase
@@ -186,7 +186,7 @@ inline size_t ToString(const Version& v, char* s, const size_t length) {
   size_t size = 0;
 
   switch (v.pre_release_type) {
-    case Version::PreReleaseType::Alpha: {
+    case Version::PreReleaseType::kAlpha: {
       if (v.pre_release_version == 0) {
         size = std::snprintf(s, length,
                              "%" PRIu16 ".%" PRIu16 ".%" PRIu16 "-alpha",
@@ -198,7 +198,7 @@ inline size_t ToString(const Version& v, char* s, const size_t length) {
       }
       break;
     }
-    case Version::PreReleaseType::Betha: {
+    case Version::PreReleaseType::kBetha: {
       if (v.pre_release_version == 0) {
         size = std::snprintf(s, length,
                              "%" PRIu16 ".%" PRIu16 ".%" PRIu16 "-betha",
@@ -210,7 +210,7 @@ inline size_t ToString(const Version& v, char* s, const size_t length) {
       }
       break;
     }
-    case Version::PreReleaseType::ReleaseCandidate: {
+    case Version::PreReleaseType::kReleaseCandidate: {
       if (v.pre_release_version == 0) {
         size =
             std::snprintf(s, length,
@@ -223,7 +223,7 @@ inline size_t ToString(const Version& v, char* s, const size_t length) {
       }
       break;
     }
-    case Version::PreReleaseType::None: {
+    case Version::PreReleaseType::kNone: {
       size = std::snprintf(s, length,
                            "%" PRIu16 ".%" PRIu16 ".%" PRIu16,
                            v.major, v.minor, v.patch);
@@ -251,13 +251,13 @@ inline void FromString(Version* v, const char* s) {
               &v->pre_release_version);
 
   if (std::strncmp(pre_release_type_str, "alpha", 5) == 0) {
-    v->pre_release_type = Version::PreReleaseType::Alpha;
+    v->pre_release_type = Version::PreReleaseType::kAlpha;
   } else if (std::strncmp(pre_release_type_str, "betha", 5) == 0) {
-    v->pre_release_type = Version::PreReleaseType::Betha;
+    v->pre_release_type = Version::PreReleaseType::kBetha;
   } else if (std::strncmp(pre_release_type_str, "rc", 2) == 0) {
-    v->pre_release_type = Version::PreReleaseType::ReleaseCandidate;
+    v->pre_release_type = Version::PreReleaseType::kReleaseCandidate;
   } else {
-    v->pre_release_type = Version::PreReleaseType::None;
+    v->pre_release_type = Version::PreReleaseType::kNone;
     v->pre_release_version = 0;
   }
 }
