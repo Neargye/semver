@@ -1,5 +1,5 @@
 // semver c++11 https://github.com/Terik23/semver
-// Vesion 0.1.0-alpha
+// Vesion 0.1.0
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // Copyright (c) 2018 Terik23 <neargye@gmail.com>.
@@ -23,7 +23,6 @@
 // SOFTWARE.
 
 #pragma once
-
 #include <cstdint>
 #include <cstddef>
 #include <cinttypes>
