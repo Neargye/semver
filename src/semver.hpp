@@ -246,7 +246,7 @@ inline std::string ToString(const Version& v) {
 
 inline void FromString(Version* v, const char* s) {
   char pre_release_type_str[6] = {0};
-  std::sscanf(s, "%" PRIu16 ".%" PRIu16 ".%" PRIu16 "-%[^0-9]%" PRIu8,
+  std::sscanf(s, "%" SCNu16 ".%" SCNu16 ".%" SCNu16 "-%[^0-9]%" SCNu8,
               &v->major, &v->minor, &v->patch, pre_release_type_str,
               &v->pre_release_version);
 
