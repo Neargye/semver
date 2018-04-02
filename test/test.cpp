@@ -32,18 +32,45 @@ using namespace semver;
 
 TEST_CASE("constexpr") {
   SECTION("default") {
-    constexpr Version v_default;
-    static_assert(v_default.major == 0 &&
-                  v_default.minor == 1 &&
-                  v_default.patch == 0 &&
-                  v_default.pre_release_type == Version::PreReleaseType::kNone &&
-                  v_default.pre_release_version == 0, "");
+    constexpr Version v;
+    static_assert(v.major == 0 &&
+                  v.minor == 1 &&
+                  v.patch == 0 &&
+                  v.pre_release_type == Version::PreReleaseType::kNone &&
+                  v.pre_release_version == 0, "");
+
+    REQUIRE((v.major == 0 &&
+             v.minor == 1 &&
+             v.patch == 0 &&
+             v.pre_release_type == Version::PreReleaseType::kNone &&
+             v.pre_release_version == 0));
   }
 
   SECTION("operator ==") {
     constexpr Version v1(1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4);
     constexpr Version v2(1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4);
+
     static_assert(v1 == v2, "");
+    REQUIRE(v1 == v2);
+  }
+  SECTION("operator !=") {
+    constexpr Version v1(1, 0, 0, Version::PreReleaseType::kAlpha, 0);
+    constexpr Version v2(1, 1, 0, Version::PreReleaseType::kAlpha, 0);
+    constexpr Version v3(1, 0, 1, Version::PreReleaseType::kAlpha, 0);
+    constexpr Version v4(1, 0, 0, Version::PreReleaseType::kAlpha, 1);
+    constexpr Version v5(1, 0, 0, Version::PreReleaseType::kNone, 0);
+    constexpr Version v6(2, 0, 0, Version::PreReleaseType::kNone, 0);
+
+    static_assert(v1 != v2, "");
+    REQUIRE(v1 != v2);
+    static_assert(v1 != v3, "");
+    REQUIRE(v1 != v3);
+    static_assert(v1 != v4, "");
+    REQUIRE(v1 != v4);
+    static_assert(v1 != v5, "");
+    REQUIRE(v1 != v5);
+    static_assert(v1 != v6, "");
+    REQUIRE(v1 != v6);
   }
 
   SECTION("operator >") {
@@ -53,11 +80,59 @@ TEST_CASE("constexpr") {
     constexpr Version v4(1, 0, 0, Version::PreReleaseType::kAlpha, 1);
     constexpr Version v5(1, 0, 0, Version::PreReleaseType::kNone, 0);
     constexpr Version v6(2, 0, 0, Version::PreReleaseType::kNone, 0);
+
     static_assert(v2 > v1, "");
+    REQUIRE(v2 > v1);
     static_assert(v3 > v1, "");
+    REQUIRE(v3 > v1);
     static_assert(v4 > v1, "");
+    REQUIRE(v4 > v1);
     static_assert(v5 > v1, "");
+    REQUIRE(v5 > v1);
     static_assert(v6 > v1, "");
+    REQUIRE(v6 > v1);
+  }
+
+  SECTION("operator >=") {
+    constexpr Version v1(1, 0, 0, Version::PreReleaseType::kNone, 0);
+    constexpr Version v2(1, 0, 0, Version::PreReleaseType::kNone, 0);
+    constexpr Version v3(2, 0, 0, Version::PreReleaseType::kNone, 0);
+
+    static_assert(v2 >= v1, "");
+    REQUIRE(v2 >= v1);
+    static_assert(v3 >= v1, "");
+    REQUIRE(v3 >= v1);
+  }
+
+  SECTION("operator <") {
+    constexpr Version v1(1, 0, 0, Version::PreReleaseType::kAlpha, 0);
+    constexpr Version v2(1, 1, 0, Version::PreReleaseType::kAlpha, 0);
+    constexpr Version v3(1, 0, 1, Version::PreReleaseType::kAlpha, 0);
+    constexpr Version v4(1, 0, 0, Version::PreReleaseType::kAlpha, 1);
+    constexpr Version v5(1, 0, 0, Version::PreReleaseType::kNone, 0);
+    constexpr Version v6(2, 0, 0, Version::PreReleaseType::kNone, 0);
+
+    static_assert(v1 < v2, "");
+    REQUIRE(v1 < v2);
+    static_assert(v1 < v3, "");
+    REQUIRE(v1 < v3);
+    static_assert(v1 < v4, "");
+    REQUIRE(v1 < v4);
+    static_assert(v1 < v5, "");
+    REQUIRE(v1 < v5);
+    static_assert(v1 < v6, "");
+    REQUIRE(v1 < v6);
+  }
+
+  SECTION("operator <=") {
+    constexpr Version v1(1, 0, 0, Version::PreReleaseType::kNone, 0);
+    constexpr Version v2(1, 0, 0, Version::PreReleaseType::kNone, 0);
+    constexpr Version v3(2, 0, 0, Version::PreReleaseType::kNone, 0);
+
+    static_assert(v1 <= v2, "");
+    REQUIRE(v1 <= v2);
+    static_assert(v1 <= v3, "");
+    REQUIRE(v1 <= v3);
   }
 }
 

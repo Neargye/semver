@@ -158,15 +158,24 @@ inline constexpr bool operator>(const Version& v1, const Version& v2) {
 }
 
 inline constexpr bool operator>=(const Version& v1, const Version& v2) {
-  return v1 == v2 || v1 > v2;
+  return !(v1 < v2);
 }
 
 inline constexpr bool operator<(const Version& v1, const Version& v2) {
-  return !(v1 >= v2);
+  // https://semver.org/#spec-item-11
+  return (v1.major != v2.major)
+           ? v1.major < v2.major
+           : (v1.minor != v2.minor)
+                 ? (v1.minor < v2.minor)
+                 : (v1.patch != v2.patch)
+                       ? (v1.patch < v2.patch)
+                       : (v1.pre_release_type != v2.pre_release_type)
+                             ? (v1.pre_release_type < v2.pre_release_type)
+                             : (v1.pre_release_version < v2.pre_release_version);
 }
 
 inline constexpr bool operator<=(const Version& v1, const Version& v2) {
-  return v1 == v2 || v1 < v2;
+  return !(v1 > v2);
 }
 
 inline std::size_t ToString(const Version& v, char* s, const std::size_t length) {
