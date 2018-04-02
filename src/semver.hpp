@@ -146,27 +146,15 @@ inline constexpr bool operator!=(const Version& v1, const Version& v2) {
 
 inline constexpr bool operator>(const Version& v1, const Version& v2) {
   // https://semver.org/#spec-item-11
-  return (v1.major > v2.major)
-             ? true
-             : (v1.major == v2.major &&
-                v1.minor > v2.minor)
-                   ? true
-                   : (v1.major == v2.major &&
-                      v1.minor == v2.minor &&
-                      v1.patch > v2.patch)
-                         ? true
-                         : (v1.major == v2.major &&
-                            v1.minor == v2.minor &&
-                            v1.patch == v2.patch &&
-                            v1.pre_release_type > v2.pre_release_type)
-                               ? true
-                               : (v1.major == v2.major &&
-                                  v1.minor == v2.minor &&
-                                  v1.patch == v2.patch &&
-                                  v1.pre_release_type == v2.pre_release_type &&
-                                  v1.pre_release_version > v2.pre_release_version)
-                                     ? true
-                                     : false;
+  return (v1.major != v2.major)
+           ? v1.major > v2.major
+           : (v1.minor != v2.minor)
+                 ? (v1.minor > v2.minor)
+                 : (v1.patch != v2.patch)
+                       ? (v1.patch > v2.patch)
+                       : (v1.pre_release_type != v2.pre_release_type)
+                             ? (v1.pre_release_type > v2.pre_release_type)
+                             : (v1.pre_release_version > v2.pre_release_version);
 }
 
 inline constexpr bool operator>=(const Version& v1, const Version& v2) {
