@@ -29,6 +29,8 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <ostream>
+#include <istream>
 
 namespace semver {
 
@@ -72,6 +74,10 @@ struct Version {
   void FromString(const char* s);
 
   void FromString(const std::string& s);
+
+  friend std::ostream& operator<<(std::ostream& os, const Version& v);
+
+  friend std::istream& operator>>(std::istream& is, Version& v);
 
   constexpr friend bool operator==(const Version& v1, const Version& v2);
 
@@ -132,6 +138,20 @@ inline void Version::FromString(const char* s) {
 
 inline void Version::FromString(const std::string& s) {
   semver::FromString(this, s);
+}
+
+inline std::ostream& operator<<(std::ostream& os, const Version& v) {
+  char version[kVersionStringLength] = {0};
+  v.ToString(version);
+  os << version;
+  return os;
+}
+
+inline std::istream& operator>>(std::istream& is, Version& v) {
+  char version[kVersionStringLength] = {0};
+  is >> version;
+  v.FromString(version);
+  return is;
 }
 
 inline constexpr bool operator==(const Version& v1, const Version& v2) {
