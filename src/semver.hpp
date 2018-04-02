@@ -1,4 +1,4 @@
-// semver c++11 https://github.com/Terik23/semver
+// semver c++11 https://github.com/Neargye/semver
 // Vesion 0.1.0
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
