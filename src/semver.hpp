@@ -1,5 +1,5 @@
 // semver c++11 https://github.com/Neargye/semver
-// Vesion 0.1.0
+// Vesion 0.1.1
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // Copyright (c) 2018 Daniil Goncharov <neargye@gmail.com>.
@@ -32,28 +32,28 @@
 
 namespace semver {
 
-constexpr size_t kVersionStringLength = 27;
+constexpr std::size_t kVersionStringLength = 27;
 
 #pragma pack(push, 1)
 struct Version {
-  enum class PreReleaseType : uint8_t {
+  enum class PreReleaseType : std::uint8_t {
     kAlpha = 0,
     kBetha = 1,
     kReleaseCandidate = 2,
     kNone = 3,
   };
 
-  uint16_t major;
-  uint16_t minor;
-  uint16_t patch;
+  std::uint16_t major;
+  std::uint16_t minor;
+  std::uint16_t patch;
   PreReleaseType pre_release_type;
-  uint8_t pre_release_version;
+  std::uint8_t pre_release_version;
 
-  constexpr Version(const uint16_t major,
-                    const uint16_t minor,
-                    const uint16_t patch,
+  constexpr Version(const std::uint16_t major,
+                    const std::uint16_t minor,
+                    const std::uint16_t patch,
                     const PreReleaseType pre_release_type = PreReleaseType::kNone,
-                    const uint8_t pre_release_version = static_cast<uint8_t>(0));
+                    const std::uint8_t pre_release_version = static_cast<std::uint8_t>(0));
 
   constexpr Version();
 
@@ -65,7 +65,7 @@ struct Version {
 
   Version(const char* s);
 
-  void ToString(char* s, const size_t length = kVersionStringLength) const;
+  void ToString(char* s, const std::size_t length = kVersionStringLength) const;
 
   std::string ToString() const;
 
@@ -87,7 +87,7 @@ struct Version {
 };
 #pragma pack(pop)
 
-inline size_t ToString(const Version& v, char* s, const size_t length = kVersionStringLength);
+inline std::size_t ToString(const Version& v, char* s, const std::size_t length = kVersionStringLength);
 
 inline std::string ToString(const Version& v);
 
@@ -95,18 +95,18 @@ inline void FromString(Version* v, const char* s);
 
 inline void FromString(Version* v, const std::string& s);
 
-constexpr Version::Version(const uint16_t major,
-                           const uint16_t minor,
-                           const uint16_t patch,
-                           const PreReleaseType pre_release_type,
-                           const uint8_t pre_release_version)
+inline constexpr Version::Version(const std::uint16_t major,
+                                  const std::uint16_t minor,
+                                  const std::uint16_t patch,
+                                  const PreReleaseType pre_release_type,
+                                  const std::uint8_t pre_release_version)
     : major{major},
       minor{minor},
       patch{patch},
       pre_release_type{pre_release_type},
-      pre_release_version{pre_release_type == PreReleaseType::kNone ? static_cast<uint8_t>(0) : pre_release_version} {}
+      pre_release_version{pre_release_type == PreReleaseType::kNone ? static_cast<std::uint8_t>(0) : pre_release_version} {}
 
-constexpr Version::Version() : Version(0, 1, 0) {
+inline constexpr Version::Version() : Version(0, 1, 0) {
   // https://semver.org/#how-should-i-deal-with-revisions-in-the-0yz-initial-development-phase
 }
 
@@ -118,7 +118,7 @@ inline Version::Version(const char* s) : Version(0, 0, 0) {
   semver::FromString(this, s);
 }
 
-inline void Version::ToString(char* s, const size_t length) const {
+inline void Version::ToString(char* s, const std::size_t length) const {
   semver::ToString(*this, s, length);
 }
 
@@ -134,17 +134,17 @@ inline void Version::FromString(const std::string& s) {
   semver::FromString(this, s);
 }
 
-constexpr bool operator==(const Version& v1, const Version& v2) {
+inline constexpr bool operator==(const Version& v1, const Version& v2) {
   return v1.major == v2.major && v1.minor == v2.minor && v1.patch == v2.patch &&
          v1.pre_release_type == v2.pre_release_type &&
          v1.pre_release_version == v2.pre_release_version;
 }
 
-constexpr bool operator!=(const Version& v1, const Version& v2) {
+inline constexpr bool operator!=(const Version& v1, const Version& v2) {
   return !(v1 == v2);
 }
 
-constexpr bool operator>(const Version& v1, const Version& v2) {
+inline constexpr bool operator>(const Version& v1, const Version& v2) {
   // https://semver.org/#spec-item-11
   return (v1.major > v2.major)
              ? true
@@ -169,20 +169,20 @@ constexpr bool operator>(const Version& v1, const Version& v2) {
                                      : false;
 }
 
-constexpr bool operator>=(const Version& v1, const Version& v2) {
+inline constexpr bool operator>=(const Version& v1, const Version& v2) {
   return v1 == v2 || v1 > v2;
 }
 
-constexpr bool operator<(const Version& v1, const Version& v2) {
+inline constexpr bool operator<(const Version& v1, const Version& v2) {
   return !(v1 >= v2);
 }
 
-constexpr bool operator<=(const Version& v1, const Version& v2) {
+inline constexpr bool operator<=(const Version& v1, const Version& v2) {
   return v1 == v2 || v1 < v2;
 }
 
-inline size_t ToString(const Version& v, char* s, const size_t length) {
-  size_t size = 0;
+inline std::size_t ToString(const Version& v, char* s, const std::size_t length) {
+  std::size_t size = 0;
 
   switch (v.pre_release_type) {
     case Version::PreReleaseType::kAlpha: {
@@ -237,7 +237,7 @@ inline size_t ToString(const Version& v, char* s, const size_t length) {
 
 inline std::string ToString(const Version& v) {
   std::string s(kVersionStringLength, 0);
-  const size_t size = ToString(v, &s[0], s.length());
+  const std::size_t size = ToString(v, &s[0], s.length());
   s.resize(size);
   s.shrink_to_fit();
   return s;
