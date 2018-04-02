@@ -27,10 +27,11 @@
 #include <semver.hpp>
 #include <cstring>
 #include <string>
+#include <sstream>
 
 using namespace semver;
 
-TEST_CASE("constexpr") {
+TEST_CASE("constructors") {
   SECTION("default") {
     constexpr Version v;
     static_assert(v.major == 0 &&
@@ -45,7 +46,23 @@ TEST_CASE("constexpr") {
              v.pre_release_type == Version::PreReleaseType::kNone &&
              v.pre_release_version == 0));
   }
+  SECTION("constructor") {
+    constexpr Version v(1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4);
+    static_assert(v.major == 1 &&
+                  v.minor == 2 &&
+                  v.patch == 3 &&
+                  v.pre_release_type == Version::PreReleaseType::kReleaseCandidate &&
+                  v.pre_release_version == 4, "");
 
+    REQUIRE((v.major == 1 &&
+             v.minor == 2 &&
+             v.patch == 3 &&
+             v.pre_release_type == Version::PreReleaseType::kReleaseCandidate &&
+             v.pre_release_version == 4));
+  }
+}
+
+TEST_CASE("operators") {
   SECTION("operator ==") {
     constexpr Version v1(1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4);
     constexpr Version v2(1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4);
@@ -133,6 +150,23 @@ TEST_CASE("constexpr") {
     REQUIRE(v1 <= v2);
     static_assert(v1 <= v3, "");
     REQUIRE(v1 <= v3);
+  }
+
+  SECTION("operator <<") {
+    constexpr Version v(1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4);
+
+    std::stringstream os;
+    os << v;
+    REQUIRE(std::strcmp(os.str().c_str(), "1.2.3-rc.4") == 0);
+  }
+
+  SECTION("operator >>") {
+    constexpr Version v(1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4);
+    std::stringstream is("1.2.3-rc.4");
+
+    Version vi;
+    is >> vi;
+    REQUIRE(v == vi);
   }
 }
 
