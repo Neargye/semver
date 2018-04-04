@@ -1,5 +1,7 @@
-﻿include_directories(${CMAKE_SOURCE_DIR}/src)
+﻿include_directories(${CMAKE_SOURCE_DIR}/include)
 
-set(SRC example.cpp)
+set(SOURCE_EXAMPLE
+    ${CMAKE_SOURCE_DIR}/include/semver.hpp
+    example.cpp)
 
-add_executable(${PROJECT_NAME}_example ${SRC})
+add_executable(${PROJECT_NAME}_example ${SOURCE_EXAMPLE})

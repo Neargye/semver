@@ -4,7 +4,7 @@ C++ library compare and manipulate versions are available as extensions to the `
 
 Branch | Linux/OSX | Windows
 -------|-----------|---------
-master |[![Build Status](https://travis-ci.org/Neargye/semver.svg?branch=master)](https://travis-ci.org/Neargye/semver)|[![Build status](https://ci.appveyor.com/api/projects/status/74dwt15di5564tos/branch/master?svg=true)](https://ci.appveyor.com/project/Terik23/semver/branch/master)
+master |[![Build Status](https://travis-ci.org/Neargye/semver.svg?branch=master)](https://travis-ci.org/Neargye/semver)|[![Build status](https://ci.appveyor.com/api/projects/status/5k62fhf7u1v5h1st/branch/master?svg=true)](https://ci.appveyor.com/project/Neargye/semver/branch/master)
 
 ## Features
 

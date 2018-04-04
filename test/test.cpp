@@ -172,16 +172,14 @@ TEST_CASE("operators") {
 
 TEST_CASE("ToString")
 {
-  SECTION("std::string")
-  {
+  SECTION("std::string") {
     Version v(1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4);
 
     std::string s = v.ToString();
     REQUIRE(std::strcmp(s.c_str(), "1.2.3-rc.4") == 0);
   }
 
-  SECTION("char*")
-  {
+  SECTION("char*") {
     Version v(1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4);
 
     char s1[kVersionStringLength];
@@ -197,8 +195,7 @@ TEST_CASE("ToString")
 TEST_CASE("FromString") {
   constexpr Version v(1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4);
 
-  SECTION("std::string")
-  {
+  SECTION("std::string") {
     const std::string s("1.2.3-rc.4");
 
     Version v1(s);
@@ -213,8 +210,7 @@ TEST_CASE("FromString") {
     REQUIRE(v == v3);
   }
 
-  SECTION("char*")
-  {
+  SECTION("char*") {
     const char s[] = "1.2.3-rc.4";
 
     Version v1(s);

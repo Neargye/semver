@@ -281,4 +281,5 @@ inline void FromString(Version* v, const char* s) {
 inline void FromString(Version* v, const std::string& s) {
   FromString(v, s.c_str());
 }
-}
+
+} // namespace semver
