@@ -1,4 +1,4 @@
-// semver c++11 example
+// semver c++ example
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // Copyright (c) 2018 Daniil Goncharov <neargye@gmail.com>.
@@ -22,6 +22,7 @@
 // SOFTWARE.
 
 #include <semver.hpp>
+
 #include <iostream>
 
 int main() {
@@ -34,7 +35,12 @@ int main() {
   std::cout << v1 << std::endl; // 1.4.3
   constexpr semver::Version v2(1, 2, 4, semver::Version::PreReleaseType::kAlpha, 10);
   std::cout << v2 << std::endl; // 1.2.4-alpha.10
+  static_assert(v1 != v2, "");
+  static_assert(!(v1 == v2), "");
   static_assert(v1 > v2, "");
+  static_assert(v1 >= v2, "");
+  static_assert(!(v1 < v2), "");
+  static_assert(!(v1 <= v2), "");
 
   semver::Version v_s;
   v_s.FromString("1.2.3-rc.1");

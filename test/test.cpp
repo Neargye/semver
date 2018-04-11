@@ -1,4 +1,4 @@
-// semver c++11 test
+// semver c++ test
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // Copyright (c) 2018 Daniil Goncharov <neargye@gmail.com>.
@@ -22,9 +22,10 @@
 // SOFTWARE.
 
 #define CATCH_CONFIG_MAIN
-
 #include <catch.hpp>
+
 #include <semver.hpp>
+
 #include <cstring>
 #include <string>
 #include <sstream>
@@ -63,6 +64,14 @@ TEST_CASE("constructors") {
 }
 
 TEST_CASE("operators") {
+  SECTION("operator =") {
+    constexpr Version v1 = Version(1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4);
+    constexpr Version v2 = v1;
+
+    static_assert(v1 == v2, "");
+    REQUIRE(v1 == v2);
+  }
+
   SECTION("operator ==") {
     constexpr Version v1(1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4);
     constexpr Version v2(1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4);

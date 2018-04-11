@@ -1,5 +1,17 @@
-// semver c++11 https://github.com/Neargye/semver
-// Vesion 0.1.1
+//          _____                            _   _
+//         / ____|                          | | (_)
+//        | (___   ___ _ __ ___   __ _ _ __ | |_ _  ___
+//         \___ \ / _ \ '_ ` _ \ / _` | '_ \| __| |/ __|
+//         ____) |  __/ | | | | | (_| | | | | |_| | (__
+//        |_____/ \___|_| |_| |_|\__,_|_| |_|\__|_|\___|
+// __      __           _             _                _____
+// \ \    / /          (_)           (_)              / ____|_     _
+//  \ \  / /__ _ __ ___ _  ___  _ __  _ _ __   __ _  | |   _| |_ _| |_
+//   \ \/ / _ \ '__/ __| |/ _ \| '_ \| | '_ \ / _` | | |  |_   _|_   _|
+//    \  /  __/ |  \__ \ | (_) | | | | | | | | (_| | | |____|_|   |_|
+//     \/ \___|_|  |___/_|\___/|_| |_|_|_| |_|\__, |  \_____|
+// https://github.com/Neargye/semver           __/ |
+// vesion 0.1.2                               |___/
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // Copyright (c) 2018 Daniil Goncharov <neargye@gmail.com>.
@@ -23,6 +35,7 @@
 // SOFTWARE.
 
 #pragma once
+
 #include <cstdint>
 #include <cstddef>
 #include <cinttypes>
@@ -63,9 +76,9 @@ struct Version {
 
   constexpr Version(Version&& v) = default;
 
-  Version(const std::string& s);
+  explicit Version(const std::string& s);
 
-  Version(const char* s);
+  explicit Version(const char* s);
 
   void ToString(char* s, const std::size_t length = kVersionStringLength) const;
 
@@ -74,10 +87,6 @@ struct Version {
   void FromString(const char* s);
 
   void FromString(const std::string& s);
-
-  friend std::ostream& operator<<(std::ostream& os, const Version& v);
-
-  friend std::istream& operator>>(std::istream& is, Version& v);
 
   constexpr friend bool operator==(const Version& v1, const Version& v2);
 
@@ -90,6 +99,10 @@ struct Version {
   constexpr friend bool operator<(const Version& v1, const Version& v2);
 
   constexpr friend bool operator<=(const Version& v1, const Version& v2);
+
+  friend std::ostream& operator<<(std::ostream& os, const Version& v);
+
+  friend std::istream& operator>>(std::istream& is, Version& v);
 };
 #pragma pack(pop)
 
@@ -140,20 +153,6 @@ inline void Version::FromString(const std::string& s) {
   semver::FromString(this, s);
 }
 
-inline std::ostream& operator<<(std::ostream& os, const Version& v) {
-  char version[kVersionStringLength] = {0};
-  v.ToString(version);
-  os << version;
-  return os;
-}
-
-inline std::istream& operator>>(std::istream& is, Version& v) {
-  char version[kVersionStringLength] = {0};
-  is >> version;
-  v.FromString(version);
-  return is;
-}
-
 inline constexpr bool operator==(const Version& v1, const Version& v2) {
   return v1.major == v2.major && v1.minor == v2.minor && v1.patch == v2.patch &&
          v1.pre_release_type == v2.pre_release_type &&
@@ -196,6 +195,20 @@ inline constexpr bool operator<(const Version& v1, const Version& v2) {
 
 inline constexpr bool operator<=(const Version& v1, const Version& v2) {
   return !(v1 > v2);
+}
+
+inline std::ostream& operator<<(std::ostream& os, const Version& v) {
+  char version[kVersionStringLength] = {0};
+  v.ToString(version);
+  os << version;
+  return os;
+}
+
+inline std::istream& operator>>(std::istream& is, Version& v) {
+  char version[kVersionStringLength] = {0};
+  is >> version;
+  v.FromString(version);
+  return is;
 }
 
 inline std::size_t ToString(const Version& v, char* s, const std::size_t length) {
