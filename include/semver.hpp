@@ -212,7 +212,7 @@ inline std::istream& operator>>(std::istream& is, Version& v) {
 }
 
 inline std::size_t ToString(const Version& v, char* s, const std::size_t length) {
-  std::size_t size = 0;
+  int size = 0;
 
   switch (v.pre_release_type) {
     case Version::PreReleaseType::kAlpha: {
@@ -262,15 +262,23 @@ inline std::size_t ToString(const Version& v, char* s, const std::size_t length)
       break;
   }
 
-  return size;
+  if (size > 0) {
+    return static_cast<std::size_t>(size);
+  }
+
+  return 0;
 }
 
 inline std::string ToString(const Version& v) {
-  std::string s(kVersionStringLength, 0);
+  std::string s(kVersionStringLength, '\0');
   const std::size_t size = ToString(v, &s[0], s.length());
-  s.resize(size);
-  s.shrink_to_fit();
-  return s;
+  if (size > 0) {
+    s.resize(size);
+    s.shrink_to_fit();
+    return s;
+  }
+
+  return std::string{};
 }
 
 inline void FromString(Version* v, const char* s) {
