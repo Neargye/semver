@@ -306,15 +306,21 @@ inline bool FromString(Version* v, const char* s) {
       c = static_cast<char>(std::tolower(c));
     }
 
-    if (std::strncmp(pre_release_type_str.data(), "alpha", 5) == 0 ||
-        std::strncmp(pre_release_type_str.data(), "alpha.", 6) == 0) {
+    if (std::strncmp(pre_release_type_str.data(), "alpha.", 6) == 0) {
       v->pre_release_type = Version::PreReleaseType::kAlpha;
-    } else if (std::strncmp(pre_release_type_str.data(), "betha", 5) == 0 ||
-               std::strncmp(pre_release_type_str.data(), "betha.", 6) == 0) {
+    } else if (std::strncmp(pre_release_type_str.data(), "alpha", 5) == 0) {
+      v->pre_release_type = Version::PreReleaseType::kAlpha;
+      v->pre_release_version = 0;
+    } else if (std::strncmp(pre_release_type_str.data(), "betha.", 6) == 0) {
       v->pre_release_type = Version::PreReleaseType::kBetha;
-    } else if (std::strncmp(pre_release_type_str.data(), "rc", 2) == 0 ||
-               std::strncmp(pre_release_type_str.data(), "rc.", 3) == 0) {
+    } else if (std::strncmp(pre_release_type_str.data(), "betha", 5) == 0) {
+      v->pre_release_type = Version::PreReleaseType::kBetha;
+      v->pre_release_version = 0;
+    } else if (std::strncmp(pre_release_type_str.data(), "rc.", 3) == 0) {
       v->pre_release_type = Version::PreReleaseType::kReleaseCandidate;
+    } else if(std::strncmp(pre_release_type_str.data(), "rc", 2) == 0) {
+      v->pre_release_type = Version::PreReleaseType::kReleaseCandidate;
+      v->pre_release_version = 0;
     } else if (std::strncmp(pre_release_type_str.data(), "\0\0\0\0\0\0\0", 7) == 0) {
       v->pre_release_type = Version::PreReleaseType::kNone;
       v->pre_release_version = 0;
