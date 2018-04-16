@@ -81,7 +81,7 @@ struct Version {
 
   explicit Version(const char* s);
 
-  void ToString(char* s, const std::size_t length = kVersionStringLength) const;
+  std::size_t ToString(char* s, const std::size_t length = kVersionStringLength) const;
 
   std::string ToString() const;
 
@@ -138,8 +138,8 @@ inline Version::Version(const char* s) : Version(0, 0, 0) {
   semver::FromString(this, s);
 }
 
-inline void Version::ToString(char* s, const std::size_t length) const {
-  semver::ToString(*this, s, length);
+inline std::size_t Version::ToString(char* s, const std::size_t length) const {
+  return semver::ToString(*this, s, length);
 }
 
 inline std::string Version::ToString() const {
