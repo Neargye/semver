@@ -44,6 +44,7 @@
 #include <string>
 #include <ostream>
 #include <istream>
+#include <array>
 
 namespace semver {
 
@@ -198,16 +199,16 @@ inline constexpr bool operator<=(const Version& v1, const Version& v2) {
 }
 
 inline std::ostream& operator<<(std::ostream& os, const Version& v) {
-  char version[kVersionStringLength] = {0};
-  v.ToString(version);
-  os << version;
+  std::array<char, kVersionStringLength> version = {'\0'};
+  v.ToString(version.data());
+  os << version.data();
   return os;
 }
 
 inline std::istream& operator>>(std::istream& is, Version& v) {
-  char version[kVersionStringLength] = {0};
-  is >> version;
-  v.FromString(version);
+  std::array<char, kVersionStringLength> version = {'\0'};
+  is >> version.data();
+  v.FromString(version.data());
   return is;
 }
 
