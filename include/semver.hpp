@@ -219,6 +219,10 @@ inline std::istream& operator>>(std::istream& is, Version& v) {
 }
 
 inline std::size_t ToString(const Version& v, char* s, const std::size_t length) {
+  if (s == nullptr) {
+    return 0;
+  }
+
   int size = 0;
 
   switch (v.pre_release_type) {
@@ -289,6 +293,10 @@ inline std::string ToString(const Version& v) {
 }
 
 inline bool FromString(Version* v, const char* s) {
+  if (s == nullptr) {
+    return false;
+  }
+
   std::array<char, 7> pre_release_type_str = {'\0'};
   int num = std::sscanf(s, "%" SCNu16 ".%" SCNu16 ".%" SCNu16 "-%[^0-9]%" SCNu8,
                         &v->major, &v->minor, &v->patch, pre_release_type_str.data(),
