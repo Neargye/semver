@@ -45,6 +45,7 @@
 #include <ostream>
 #include <istream>
 #include <array>
+#include <cctype>
 
 #if defined(_MSC_VER)
 #pragma warning(push)
@@ -90,9 +91,9 @@ struct Version {
 
   std::string ToString() const;
 
-  void FromString(const char* s);
+  bool FromString(const char* s);
 
-  void FromString(const std::string& s);
+  bool FromString(const std::string& s);
 
   constexpr friend bool operator==(const Version& v1, const Version& v2);
 
@@ -116,9 +117,9 @@ inline std::size_t ToString(const Version& v, char* s, const std::size_t length 
 
 inline std::string ToString(const Version& v);
 
-inline void FromString(Version* v, const char* s);
+inline bool FromString(Version* v, const char* s);
 
-inline void FromString(Version* v, const std::string& s);
+inline bool FromString(Version* v, const std::string& s);
 
 inline constexpr Version::Version(const std::uint16_t major,
                                   const std::uint16_t minor,
@@ -136,11 +137,11 @@ inline constexpr Version::Version() : Version(0, 1, 0) {
 }
 
 inline Version::Version(const std::string& s) : Version(0, 0, 0) {
-  semver::FromString(this, s);
+  (void)semver::FromString(this, s);
 }
 
 inline Version::Version(const char* s) : Version(0, 0, 0) {
-  semver::FromString(this, s);
+  (void)semver::FromString(this, s);
 }
 
 inline std::size_t Version::ToString(char* s, const std::size_t length) const {
@@ -151,12 +152,12 @@ inline std::string Version::ToString() const {
   return semver::ToString(*this);
 }
 
-inline void Version::FromString(const char* s) {
-  semver::FromString(this, s);
+inline bool Version::FromString(const char* s) {
+  return semver::FromString(this, s);
 }
 
-inline void Version::FromString(const std::string& s) {
-  semver::FromString(this, s);
+inline bool Version::FromString(const std::string& s) {
+  return semver::FromString(this, s);
 }
 
 inline constexpr bool operator==(const Version& v1, const Version& v2) {
@@ -287,26 +288,40 @@ inline std::string ToString(const Version& v) {
   return std::string{};
 }
 
-inline void FromString(Version* v, const char* s) {
-  char pre_release_type_str[6] = {0};
-  std::sscanf(s, "%" SCNu16 ".%" SCNu16 ".%" SCNu16 "-%[^0-9]%" SCNu8,
-              &v->major, &v->minor, &v->patch, pre_release_type_str,
-              &v->pre_release_version);
+inline bool FromString(Version* v, const char* s) {
+  std::array<char, 7> pre_release_type_str = {'\0'};
+  int num = std::sscanf(s, "%" SCNu16 ".%" SCNu16 ".%" SCNu16 "-%[^0-9]%" SCNu8,
+                        &v->major, &v->minor, &v->patch, pre_release_type_str.data(),
+                        &v->pre_release_version);
+  if (num > 3) {
+    for(auto& c : pre_release_type_str){
+      c = static_cast<char>(std::tolower(c));
+    }
 
-  if (std::strncmp(pre_release_type_str, "alpha", 5) == 0) {
-    v->pre_release_type = Version::PreReleaseType::kAlpha;
-  } else if (std::strncmp(pre_release_type_str, "betha", 5) == 0) {
-    v->pre_release_type = Version::PreReleaseType::kBetha;
-  } else if (std::strncmp(pre_release_type_str, "rc", 2) == 0) {
-    v->pre_release_type = Version::PreReleaseType::kReleaseCandidate;
-  } else {
-    v->pre_release_type = Version::PreReleaseType::kNone;
-    v->pre_release_version = 0;
+    if (std::strncmp(pre_release_type_str.data(), "alpha", 5) == 0 ||
+        std::strncmp(pre_release_type_str.data(), "alpha.", 6) == 0) {
+      v->pre_release_type = Version::PreReleaseType::kAlpha;
+    } else if (std::strncmp(pre_release_type_str.data(), "betha", 5) == 0 ||
+               std::strncmp(pre_release_type_str.data(), "betha.", 6) == 0) {
+      v->pre_release_type = Version::PreReleaseType::kBetha;
+    } else if (std::strncmp(pre_release_type_str.data(), "rc", 2) == 0 ||
+               std::strncmp(pre_release_type_str.data(), "rc.", 3) == 0) {
+      v->pre_release_type = Version::PreReleaseType::kReleaseCandidate;
+    } else if (std::strncmp(pre_release_type_str.data(), "\0\0\0\0\0\0\0", 7) == 0) {
+      v->pre_release_type = Version::PreReleaseType::kNone;
+      v->pre_release_version = 0;
+    } else {
+      return false;
+    }
+
+    return true;
   }
+
+  return false;
 }
 
-inline void FromString(Version* v, const std::string& s) {
-  FromString(v, s.c_str());
+inline bool FromString(Version* v, const std::string& s) {
+  return FromString(v, s.c_str());
 }
 
 } // namespace semver
