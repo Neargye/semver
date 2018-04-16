@@ -21,7 +21,7 @@ Branch | Linux/OSX | Windows | Codacy
 -------|-----------|---------|-------
 master |[![Build Status](https://travis-ci.org/Neargye/semver.svg?branch=master)](https://travis-ci.org/Neargye/semver)|[![Build status](https://ci.appveyor.com/api/projects/status/5k62fhf7u1v5h1st/branch/master?svg=true)](https://ci.appveyor.com/project/Neargye/semver/branch/master)|[![Codacy Badge](https://api.codacy.com/project/badge/Grade/04b3ef8b2be24f72b670af76855307cc)](https://www.codacy.com/app/Neargye/semver?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=Neargye/semver&amp;utm_campaign=Badge_Grade)
 
-C++ library compare and manipulate versions are available as extensions to the `<major>.<minor>.<patch>[-<prerel>]` format complying with [Semantic Versioning 2.0.0](semver.org)
+C++ library compare and manipulate versions are available as extensions to the `<major>.<minor>.<patch>-<prerelease>.<prereleaseversion>` format complying with [Semantic Versioning 2.0.0](semver.org)
 
 ## Features
 

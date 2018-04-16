@@ -54,7 +54,7 @@
 
 namespace semver {
 
-constexpr std::size_t kVersionStringLength = 27;
+constexpr std::size_t kVersionStringLength = 22; // 3(<major>) + 1(.) + 3(<minor>) + 1(.) + 3(<patch>) + 1(-) + 5(<prerelease>) + 1(.) + 3(<prereleaseversion>) + 1('\0') = 27
 
 #pragma pack(push, 1)
 struct Version {
@@ -65,15 +65,15 @@ struct Version {
     kNone = 3,
   };
 
-  std::uint16_t major;
-  std::uint16_t minor;
-  std::uint16_t patch;
+  std::uint8_t major;
+  std::uint8_t minor;
+  std::uint8_t patch;
   PreReleaseType pre_release_type;
   std::uint8_t pre_release_version;
 
-  constexpr Version(const std::uint16_t major,
-                    const std::uint16_t minor,
-                    const std::uint16_t patch,
+  constexpr Version(const std::uint8_t major,
+                    const std::uint8_t minor,
+                    const std::uint8_t patch,
                     const PreReleaseType pre_release_type = PreReleaseType::kNone,
                     const std::uint8_t pre_release_version = static_cast<std::uint8_t>(0));
 
@@ -121,9 +121,9 @@ inline bool FromString(Version* v, const char* s);
 
 inline bool FromString(Version* v, const std::string& s);
 
-inline constexpr Version::Version(const std::uint16_t major,
-                                  const std::uint16_t minor,
-                                  const std::uint16_t patch,
+inline constexpr Version::Version(const std::uint8_t major,
+                                  const std::uint8_t minor,
+                                  const std::uint8_t patch,
                                   const PreReleaseType pre_release_type,
                                   const std::uint8_t pre_release_version)
     : major{major},
@@ -229,11 +229,11 @@ inline std::size_t ToString(const Version& v, char* s, const std::size_t length)
     case Version::PreReleaseType::kAlpha: {
       if (v.pre_release_version == 0) {
         size = std::snprintf(s, length,
-                             "%" PRIu16 ".%" PRIu16 ".%" PRIu16 "-alpha",
+                             "%" PRIu8 ".%" PRIu8 ".%" PRIu8 "-alpha",
                              v.major, v.minor, v.patch);
       } else {
         size = std::snprintf(s, length,
-                             "%" PRIu16 ".%" PRIu16 ".%" PRIu16 "-alpha.%" PRIu8,
+                             "%" PRIu8 ".%" PRIu8 ".%" PRIu8 "-alpha.%" PRIu8,
                              v.major, v.minor, v.patch, v.pre_release_version);
       }
       break;
@@ -241,11 +241,11 @@ inline std::size_t ToString(const Version& v, char* s, const std::size_t length)
     case Version::PreReleaseType::kBetha: {
       if (v.pre_release_version == 0) {
         size = std::snprintf(s, length,
-                             "%" PRIu16 ".%" PRIu16 ".%" PRIu16 "-betha",
+                             "%" PRIu8 ".%" PRIu8 ".%" PRIu8 "-betha",
                              v.major, v.minor, v.patch);
       } else {
         size = std::snprintf(s, length,
-                             "%" PRIu16 ".%" PRIu16 ".%" PRIu16 "-betha.%" PRIu8,
+                             "%" PRIu8 ".%" PRIu8 ".%" PRIu8 "-betha.%" PRIu8,
                              v.major, v.minor, v.patch, v.pre_release_version);
       }
       break;
@@ -254,18 +254,18 @@ inline std::size_t ToString(const Version& v, char* s, const std::size_t length)
       if (v.pre_release_version == 0) {
         size =
             std::snprintf(s, length,
-                          "%" PRIu16 ".%" PRIu16 ".%" PRIu16 "-rc",
+                          "%" PRIu8 ".%" PRIu8 ".%" PRIu8 "-rc",
                           v.major, v.minor, v.patch);
       } else {
         size = std::snprintf(s, length,
-                             "%" PRIu16 ".%" PRIu16 ".%" PRIu16 "-rc.%" PRIu8,
+                             "%" PRIu8 ".%" PRIu8 ".%" PRIu8 "-rc.%" PRIu8,
                              v.major, v.minor, v.patch, v.pre_release_version);
       }
       break;
     }
     case Version::PreReleaseType::kNone: {
       size = std::snprintf(s, length,
-                           "%" PRIu16 ".%" PRIu16 ".%" PRIu16,
+                           "%" PRIu8 ".%" PRIu8 ".%" PRIu8,
                            v.major, v.minor, v.patch);
       break;
     }
@@ -297,8 +297,8 @@ inline bool FromString(Version* v, const char* s) {
     return false;
   }
 
-  std::array<char, 7> pre_release_type_str = {'\0'};
-  int num = std::sscanf(s, "%" SCNu16 ".%" SCNu16 ".%" SCNu16 "-%[^0-9]%" SCNu8,
+  std::array<char, 7> pre_release_type_str = {'\0'}; // 5(<prerelease>) + 1(.) + 1('\0') = 7
+  int num = std::sscanf(s, "%" SCNu8 ".%" SCNu8 ".%" SCNu8 "-%[^0-9]%" SCNu8,
                         &v->major, &v->minor, &v->patch, pre_release_type_str.data(),
                         &v->pre_release_version);
   if (num > 3) {
