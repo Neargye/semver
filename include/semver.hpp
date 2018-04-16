@@ -46,6 +46,11 @@
 #include <istream>
 #include <array>
 
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#endif
+
 namespace semver {
 
 constexpr std::size_t kVersionStringLength = 27;
@@ -305,3 +310,7 @@ inline void FromString(Version* v, const std::string& s) {
 }
 
 } // namespace semver
+
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
