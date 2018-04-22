@@ -83,6 +83,10 @@ struct Version {
 
   constexpr Version(Version&& v) = default;
 
+  Version& operator=(const Version&) = default;
+
+  Version& operator=(Version&&) = default;
+
   explicit Version(const std::string& s);
 
   explicit Version(const char* s);
