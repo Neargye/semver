@@ -41,11 +41,12 @@
 #include <cinttypes>
 #include <cstdio>
 #include <cstring>
+#include <cctype>
+#include <array>
+#include <algorithm>
 #include <string>
 #include <ostream>
 #include <istream>
-#include <array>
-#include <cctype>
 
 #if defined(_MSC_VER)
 #pragma warning(push)
@@ -92,6 +93,7 @@ struct Version {
   Version& operator=(const Version&) = default;
 
   Version& operator=(Version&&) = default;
+
   std::size_t ToString(char* s, const std::size_t length = kVersionStringLength) const;
 
   std::string ToString() const;
@@ -302,37 +304,39 @@ inline bool FromString(Version* v, const char* s) {
     return false;
   }
 
-  std::array<char, 7> pre_release_type_str = {'\0'}; // 5(<prerelease>) + 1(.) + 1('\0') = 7
-  int num = std::sscanf(s, "%" SCNu8 ".%" SCNu8 ".%" SCNu8 "-%[^0-9]%" SCNu8,
-                        &v->major, &v->minor, &v->patch, pre_release_type_str.data(),
-                        &v->pre_release_version);
-  if (num > 3) {
-    for(auto& c : pre_release_type_str){
-      c = static_cast<char>(std::tolower(c));
-    }
+  Version temp{0, 0, 0};
+  std::array<char, 7> prerelease = {{'\0'}}; // 5(<prerelease>) + 1(.) + 1('\0') = 7
+  const int num = std::sscanf(s, "%" SCNu8 ".%" SCNu8 ".%" SCNu8 "-%[^0-9]%" SCNu8,
+                              &(temp.major), &(temp.minor), &(temp.patch),
+                              prerelease.data(), &(temp.pre_release_version));
 
-    if (std::strncmp(pre_release_type_str.data(), "alpha.", 6) == 0) {
-      v->pre_release_type = Version::PreReleaseType::kAlpha;
-    } else if (std::strncmp(pre_release_type_str.data(), "alpha", 5) == 0) {
-      v->pre_release_type = Version::PreReleaseType::kAlpha;
-      v->pre_release_version = 0;
-    } else if (std::strncmp(pre_release_type_str.data(), "betha.", 6) == 0) {
-      v->pre_release_type = Version::PreReleaseType::kBetha;
-    } else if (std::strncmp(pre_release_type_str.data(), "betha", 5) == 0) {
-      v->pre_release_type = Version::PreReleaseType::kBetha;
-      v->pre_release_version = 0;
-    } else if (std::strncmp(pre_release_type_str.data(), "rc.", 3) == 0) {
-      v->pre_release_type = Version::PreReleaseType::kReleaseCandidate;
-    } else if(std::strncmp(pre_release_type_str.data(), "rc", 2) == 0) {
-      v->pre_release_type = Version::PreReleaseType::kReleaseCandidate;
-      v->pre_release_version = 0;
-    } else if (std::strncmp(pre_release_type_str.data(), "\0\0\0\0\0\0\0", 7) == 0) {
-      v->pre_release_type = Version::PreReleaseType::kNone;
-      v->pre_release_version = 0;
+  if (num >= 3 && num <= 5) {
+    std::transform(prerelease.begin(), prerelease.end(), prerelease.begin(),
+                   [](char c) { return static_cast<char>(std::tolower(c)); });
+
+    if (std::strncmp(prerelease.data(), "alpha.", 6) == 0) {
+      temp.pre_release_type = Version::PreReleaseType::kAlpha;
+    } else if (std::strncmp(prerelease.data(), "alpha", 5) == 0) {
+      temp.pre_release_type = Version::PreReleaseType::kAlpha;
+      temp.pre_release_version = 0;
+    } else if (std::strncmp(prerelease.data(), "betha.", 6) == 0) {
+      temp.pre_release_type = Version::PreReleaseType::kBetha;
+    } else if (std::strncmp(prerelease.data(), "betha", 5) == 0) {
+      temp.pre_release_type = Version::PreReleaseType::kBetha;
+      temp.pre_release_version = 0;
+    } else if (std::strncmp(prerelease.data(), "rc.", 3) == 0) {
+      temp.pre_release_type = Version::PreReleaseType::kReleaseCandidate;
+    } else if(std::strncmp(prerelease.data(), "rc", 2) == 0) {
+      temp.pre_release_type = Version::PreReleaseType::kReleaseCandidate;
+      temp.pre_release_version = 0;
+    } else if (std::strncmp(prerelease.data(), "\0\0\0\0\0\0\0", 7) == 0) {
+      temp.pre_release_type = Version::PreReleaseType::kNone;
+      temp.pre_release_version = 0;
     } else {
       return false;
     }
 
+    (*v) = temp;
     return true;
   }
 
