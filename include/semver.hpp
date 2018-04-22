@@ -83,14 +83,15 @@ struct Version {
 
   constexpr Version(Version&& v) = default;
 
-  Version& operator=(const Version&) = default;
-
-  Version& operator=(Version&&) = default;
-
   explicit Version(const std::string& s);
 
   explicit Version(const char* s);
 
+  ~Version() = default;
+
+  Version& operator=(const Version&) = default;
+
+  Version& operator=(Version&&) = default;
   std::size_t ToString(char* s, const std::size_t length = kVersionStringLength) const;
 
   std::string ToString() const;
