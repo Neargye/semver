@@ -212,14 +212,14 @@ inline constexpr bool operator<=(const Version& v1, const Version& v2) {
 }
 
 inline std::ostream& operator<<(std::ostream& os, const Version& v) {
-  std::array<char, kVersionStringLength> version = {'\0'};
+  std::array<char, kVersionStringLength> version = {{'\0'}};
   v.ToString(version.data());
   os << version.data();
   return os;
 }
 
 inline std::istream& operator>>(std::istream& is, Version& v) {
-  std::array<char, kVersionStringLength> version = {'\0'};
+  std::array<char, kVersionStringLength> version = {{'\0'}};
   is >> version.data();
   v.FromString(version.data());
   return is;
