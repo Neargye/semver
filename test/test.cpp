@@ -40,197 +40,257 @@ TEST_CASE("constructors") {
                   v.patch == 0 &&
                   v.pre_release_type == Version::PreReleaseType::kNone &&
                   v.pre_release_version == 0, "");
-
-    REQUIRE((v.major == 0 &&
-             v.minor == 1 &&
-             v.patch == 0 &&
-             v.pre_release_type == Version::PreReleaseType::kNone &&
-             v.pre_release_version == 0));
   }
   SECTION("constructor") {
-    constexpr Version v(1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4);
-    static_assert(v.major == 1 &&
-                  v.minor == 2 &&
-                  v.patch == 3 &&
-                  v.pre_release_type == Version::PreReleaseType::kReleaseCandidate &&
-                  v.pre_release_version == 4, "");
+    constexpr Version v1(1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4);
+    static_assert(v1.major == 1 &&
+                  v1.minor == 2 &&
+                  v1.patch == 3 &&
+                  v1.pre_release_type == Version::PreReleaseType::kReleaseCandidate &&
+                  v1.pre_release_version == 4, "");
 
-    REQUIRE((v.major == 1 &&
-             v.minor == 2 &&
-             v.patch == 3 &&
-             v.pre_release_type == Version::PreReleaseType::kReleaseCandidate &&
-             v.pre_release_version == 4));
+    constexpr Version v2(1, 2, 3, Version::PreReleaseType::kNone, 4);
+    static_assert(v2.major == 1 &&
+                  v2.minor == 2 &&
+                  v2.patch == 3 &&
+                  v2.pre_release_type == Version::PreReleaseType::kNone &&
+                  v2.pre_release_version == 0, "");
   }
 }
 
 TEST_CASE("operators") {
-  SECTION("operator =") {
-    constexpr Version v1 = Version(1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4);
-    constexpr Version v2 = v1;
+  constexpr Version v1_0_0(1, 0, 0, Version::PreReleaseType::kNone, 0);
+  constexpr Version v1_0_0_a(1, 0, 0, Version::PreReleaseType::kAlpha, 0);
+  constexpr Version v1_0_0_a_1(1, 0, 0, Version::PreReleaseType::kAlpha, 1);
+  constexpr Version v1_0_1_a(1, 0, 1, Version::PreReleaseType::kAlpha, 0);
+  constexpr Version v1_1_0_a(1, 1, 0, Version::PreReleaseType::kAlpha, 0);
+  constexpr Version v2_0_0(2, 0, 0, Version::PreReleaseType::kNone, 0);
 
-    static_assert(v1 == v2, "");
-    REQUIRE(v1 == v2);
+  SECTION("operator =") {
+    constexpr Version v = v1_0_0;
+    static_assert(v == v1_0_0, "");
   }
 
   SECTION("operator ==") {
-    constexpr Version v1(1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4);
-    constexpr Version v2(1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4);
-
-    static_assert(v1 == v2, "");
-    REQUIRE(v1 == v2);
+    constexpr Version v = v1_0_0;
+    static_assert(v == v1_0_0, "");
   }
-  SECTION("operator !=") {
-    constexpr Version v1(1, 0, 0, Version::PreReleaseType::kAlpha, 0);
-    constexpr Version v2(1, 1, 0, Version::PreReleaseType::kAlpha, 0);
-    constexpr Version v3(1, 0, 1, Version::PreReleaseType::kAlpha, 0);
-    constexpr Version v4(1, 0, 0, Version::PreReleaseType::kAlpha, 1);
-    constexpr Version v5(1, 0, 0, Version::PreReleaseType::kNone, 0);
-    constexpr Version v6(2, 0, 0, Version::PreReleaseType::kNone, 0);
 
-    static_assert(v1 != v2, "");
-    REQUIRE(v1 != v2);
-    static_assert(v1 != v3, "");
-    REQUIRE(v1 != v3);
-    static_assert(v1 != v4, "");
-    REQUIRE(v1 != v4);
-    static_assert(v1 != v5, "");
-    REQUIRE(v1 != v5);
-    static_assert(v1 != v6, "");
-    REQUIRE(v1 != v6);
+  SECTION("operator !=") {
+    static_assert(v1_0_0 != v1_0_0_a, "");
+
+    static_assert(v1_0_0 != v1_1_0_a, "");
+
+    static_assert(v1_0_0 != v1_0_1_a, "");
+
+    static_assert(v1_0_0 != v1_0_0_a_1, "");
+
+    static_assert(v1_0_0 != v2_0_0, "");
+
   }
 
   SECTION("operator >") {
-    constexpr Version v1(1, 0, 0, Version::PreReleaseType::kAlpha, 0);
-    constexpr Version v2(1, 1, 0, Version::PreReleaseType::kAlpha, 0);
-    constexpr Version v3(1, 0, 1, Version::PreReleaseType::kAlpha, 0);
-    constexpr Version v4(1, 0, 0, Version::PreReleaseType::kAlpha, 1);
-    constexpr Version v5(1, 0, 0, Version::PreReleaseType::kNone, 0);
-    constexpr Version v6(2, 0, 0, Version::PreReleaseType::kNone, 0);
+    static_assert(v2_0_0 > v1_0_0, "");
 
-    static_assert(v2 > v1, "");
-    REQUIRE(v2 > v1);
-    static_assert(v3 > v1, "");
-    REQUIRE(v3 > v1);
-    static_assert(v4 > v1, "");
-    REQUIRE(v4 > v1);
-    static_assert(v5 > v1, "");
-    REQUIRE(v5 > v1);
-    static_assert(v6 > v1, "");
-    REQUIRE(v6 > v1);
+    static_assert(v1_0_0 > v1_0_0_a, "");
+
+    static_assert(v1_0_0 > v1_0_0_a_1, "");
+
+    static_assert(v1_0_0_a_1 > v1_0_0_a, "");
+
+    static_assert(v1_0_1_a > v1_0_0_a, "");
+
+    static_assert(v1_0_1_a > v1_0_0_a_1, "");
+
+    static_assert(v1_1_0_a > v1_0_0_a, "");
+
+    static_assert(v1_1_0_a > v1_0_0_a_1, "");
   }
 
   SECTION("operator >=") {
-    constexpr Version v1(1, 0, 0, Version::PreReleaseType::kNone, 0);
-    constexpr Version v2(1, 0, 0, Version::PreReleaseType::kNone, 0);
-    constexpr Version v3(2, 0, 0, Version::PreReleaseType::kNone, 0);
+    static_assert(v2_0_0 >= v1_0_0, "");
 
-    static_assert(v2 >= v1, "");
-    REQUIRE(v2 >= v1);
-    static_assert(v3 >= v1, "");
-    REQUIRE(v3 >= v1);
+    static_assert(v1_0_0 >= v1_0_0_a, "");
+
+    static_assert(v1_0_0 >= v1_0_0_a_1, "");
+
+    static_assert(v1_0_0_a_1 >= v1_0_0_a, "");
+
+    static_assert(v1_0_1_a >= v1_0_0_a, "");
+
+    static_assert(v1_0_1_a >= v1_0_0_a_1, "");
+
+
+    static_assert(v1_1_0_a >= v1_0_0_a, "");
+
+    static_assert(v1_1_0_a >= v1_0_0_a_1, "");
+
+    constexpr Version v = v1_0_0;
+    static_assert(v1_0_0 >= v, "");
   }
 
   SECTION("operator <") {
-    constexpr Version v1(1, 0, 0, Version::PreReleaseType::kAlpha, 0);
-    constexpr Version v2(1, 1, 0, Version::PreReleaseType::kAlpha, 0);
-    constexpr Version v3(1, 0, 1, Version::PreReleaseType::kAlpha, 0);
-    constexpr Version v4(1, 0, 0, Version::PreReleaseType::kAlpha, 1);
-    constexpr Version v5(1, 0, 0, Version::PreReleaseType::kNone, 0);
-    constexpr Version v6(2, 0, 0, Version::PreReleaseType::kNone, 0);
+    static_assert(v1_0_0 < v2_0_0, "");
 
-    static_assert(v1 < v2, "");
-    REQUIRE(v1 < v2);
-    static_assert(v1 < v3, "");
-    REQUIRE(v1 < v3);
-    static_assert(v1 < v4, "");
-    REQUIRE(v1 < v4);
-    static_assert(v1 < v5, "");
-    REQUIRE(v1 < v5);
-    static_assert(v1 < v6, "");
-    REQUIRE(v1 < v6);
+    static_assert(v1_0_0_a < v1_0_0, "");
+
+    static_assert(v1_0_0_a_1 < v1_0_0, "");
+
+    static_assert(v1_0_0_a < v1_0_0_a_1, "");
+
+    static_assert(v1_0_0_a < v1_0_1_a, "");
+
+    static_assert(v1_0_0_a_1 < v1_0_1_a, "");
+
+    static_assert(v1_0_0_a < v1_1_0_a, "");
+
+    static_assert(v1_0_0_a_1 < v1_1_0_a, "");
   }
 
   SECTION("operator <=") {
-    constexpr Version v1(1, 0, 0, Version::PreReleaseType::kNone, 0);
-    constexpr Version v2(1, 0, 0, Version::PreReleaseType::kNone, 0);
-    constexpr Version v3(2, 0, 0, Version::PreReleaseType::kNone, 0);
+    static_assert(v1_0_0 <= v2_0_0, "");
 
-    static_assert(v1 <= v2, "");
-    REQUIRE(v1 <= v2);
-    static_assert(v1 <= v3, "");
-    REQUIRE(v1 <= v3);
+    static_assert(v1_0_0_a <= v1_0_0, "");
+
+    static_assert(v1_0_0_a_1 <= v1_0_0, "");
+
+    static_assert(v1_0_0_a <= v1_0_0_a_1, "");
+
+    static_assert(v1_0_0_a <= v1_0_1_a, "");
+
+    static_assert(v1_0_0_a_1 <= v1_0_1_a, "");
+
+    static_assert(v1_0_0_a <= v1_1_0_a, "");
+
+    static_assert(v1_0_0_a_1 <= v1_1_0_a, "");
+
+    constexpr Version v = v1_0_0;
+    static_assert(v1_0_0 <= v, "");
+  }
+}
+
+
+TEST_CASE("from/to string") {
+  const std::size_t versions_length = 19;
+  std::array<Version, versions_length> versions = {{
+      Version{1, 2, 3},
+      Version{255, 255, 255},
+      Version{0, 0, 0},
+      //
+      Version{1, 2, 3, Version::PreReleaseType::kNone, 0},
+      Version{1, 2, 3, Version::PreReleaseType::kNone, 4},
+      Version{255, 255, 255, Version::PreReleaseType::kNone, 255},
+      Version{0, 0, 0, Version::PreReleaseType::kNone, 0},
+      //
+      Version{1, 2, 3, Version::PreReleaseType::kAlpha, 0},
+      Version{1, 2, 3, Version::PreReleaseType::kAlpha, 4},
+      Version{255, 255, 255, Version::PreReleaseType::kAlpha, 255},
+      Version{0, 0, 0, Version::PreReleaseType::kAlpha, 0},
+      //
+      Version{1, 2, 3, Version::PreReleaseType::kBetha, 0},
+      Version{1, 2, 3, Version::PreReleaseType::kBetha, 4},
+      Version{255, 255, 255, Version::PreReleaseType::kBetha, 255},
+      Version{0, 0, 0, Version::PreReleaseType::kBetha, 0},
+      //
+      Version{1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 0},
+      Version{1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4},
+      Version{255, 255, 255, Version::PreReleaseType::kReleaseCandidate, 255},
+      Version{0, 0, 0, Version::PreReleaseType::kReleaseCandidate, 0},
+  }};
+  std::array<std::string, versions_length> versions_strings = {{
+      "1.2.3",
+      "255.255.255",
+      "0.0.0",
+      //
+      "1.2.3",
+      "1.2.3",
+      "255.255.255",
+      "0.0.0",
+      //
+      "1.2.3-alpha",
+      "1.2.3-alpha.4",
+      "255.255.255-alpha.255",
+      "0.0.0-alpha",
+      //
+      "1.2.3-betha",
+      "1.2.3-betha.4",
+      "255.255.255-betha.255",
+      "0.0.0-betha",
+      //
+      "1.2.3-rc",
+      "1.2.3-rc.4",
+      "255.255.255-rc.255",
+      "0.0.0-rc",
+  }};
+
+  SECTION("from std::string") {
+    for (std::size_t i = 0; i < versions_length; ++i) {
+      Version v1(versions_strings[i]);
+      REQUIRE(versions[i] == v1);
+
+      Version v2;
+      REQUIRE(v2.FromString(versions_strings[i]));
+      REQUIRE(versions[i] == v2);
+
+      Version v3;
+      REQUIRE(FromString(&v3, versions_strings[i]));
+      REQUIRE(versions[i] == v3);
+    }
+  }
+
+  SECTION("from char*") {
+    for (std::size_t i = 0; i < versions_length; ++i) {
+      Version v1(versions_strings[i].c_str());
+      REQUIRE(versions[i] == v1);
+
+      Version v2;
+      REQUIRE(v2.FromString(versions_strings[i].c_str()));
+      REQUIRE(versions[i] == v2);
+
+      Version v3;
+      REQUIRE(FromString(&v3, versions_strings[i].c_str()));
+      REQUIRE(versions[i] == v3);
+    }
+  }
+
+  SECTION("to std::string") {
+    for (std::size_t i = 0; i < versions_length; ++i) {
+      const std::string s1 = versions[i].ToString();
+      REQUIRE(s1 == versions_strings[i]);
+
+      const std::string s2 = ToString(versions[i]);
+      REQUIRE(s2 == versions_strings[i]);
+    }
+  }
+
+  SECTION("to char*") {
+    for (std::size_t i = 0; i < versions_length; ++i) {
+      char s1[kVersionStringLength];
+      const auto size1 = versions[i].ToString(s1);
+      REQUIRE(s1 == versions_strings[i]);
+      REQUIRE(size1 == versions_strings[i].length());
+
+      char s2[kVersionStringLength];
+      const auto size2 = ToString(versions[i], s2);
+      REQUIRE(s2 == versions_strings[i]);
+      REQUIRE(size2 == versions_strings[i].length());
+    }
   }
 
   SECTION("operator <<") {
-    constexpr Version v(1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4);
-
-    std::stringstream os;
-    os << v;
-    REQUIRE(std::strcmp(os.str().c_str(), "1.2.3-rc.4") == 0);
+    for (std::size_t i = 0; i < versions_length; ++i) {
+      std::stringstream os;
+      os << versions[i];
+      REQUIRE(os.str() == versions_strings[i]);
+    }
   }
 
   SECTION("operator >>") {
-    constexpr Version v(1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4);
-    std::stringstream is("1.2.3-rc.4");
-
-    Version vi;
-    is >> vi;
-    REQUIRE(v == vi);
-  }
-}
-
-TEST_CASE("ToString")
-{
-  SECTION("std::string") {
-    Version v(1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4);
-
-    std::string s = v.ToString();
-    REQUIRE(std::strcmp(s.c_str(), "1.2.3-rc.4") == 0);
-  }
-
-  SECTION("char*") {
-    Version v(1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4);
-
-    char s1[kVersionStringLength];
-    v.ToString(s1);
-    REQUIRE(std::strcmp(s1, "1.2.3-rc.4") == 0);
-
-    char s2[11];
-    v.ToString(s2);
-    REQUIRE(std::strcmp(s2, "1.2.3-rc.4") == 0);
-  }
-}
-
-TEST_CASE("FromString") {
-  constexpr Version v(1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4);
-
-  SECTION("std::string") {
-    const std::string s("1.2.3-rc.4");
-
-    Version v1(s);
-    REQUIRE(v == v1);
-
-    Version v2;
-    v2.FromString(s);
-    REQUIRE(v == v2);
-
-    Version v3;
-    FromString(&v3, s);
-    REQUIRE(v == v3);
-  }
-
-  SECTION("char*") {
-    const char s[] = "1.2.3-rc.4";
-
-    Version v1(s);
-    REQUIRE(v == v1);
-
-    Version v2;
-    v2.FromString(s);
-    REQUIRE(v == v2);
-
-    Version v3;
-    FromString(&v3, s);
-    REQUIRE(v == v3);
+    for (std::size_t i = 0; i < versions_length; ++i) {
+      std::stringstream is(versions_strings[i]);
+      Version vi;
+      is >> vi;
+      REQUIRE(versions[i] == vi);
+    }
   }
 }
