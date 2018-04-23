@@ -238,7 +238,7 @@ inline std::istream& operator>>(std::istream& is, Version& v) {
 }
 
 inline std::size_t ToString(const Version& v, char* s, const std::size_t length) {
-  if (s == nullptr) {
+  if (s == nullptr || !v.IsValid()) {
     return 0;
   }
 
