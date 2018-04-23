@@ -92,7 +92,7 @@ struct Version final {
 
   Version& operator=(Version&&) = default;
 
-  bool IsValid() const;
+  constexpr bool IsValid() const;
 
   std::size_t ToString(char*, const std::size_t = kVersionStringLength) const;
 
@@ -159,7 +159,7 @@ inline Version::Version(const char* s) : Version(0, 0, 0) {
   (*this) = semver::FromString(s);
 }
 
-inline bool Version::IsValid() const {
+inline constexpr bool Version::IsValid() const {
   return ((pre_release_type >= PreReleaseType::kAlpha) && (pre_release_type <= PreReleaseType::kNone));
 }
 
