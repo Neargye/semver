@@ -355,8 +355,8 @@ TEST_CASE("from/to string") {
       REQUIRE(v2.FromString(versions_strings[i]));
       REQUIRE(versions[i] == v2);
 
-      Version v3;
-      REQUIRE(FromString(&v3, versions_strings[i]));
+      Version v3 = FromString(versions_strings[i]);
+      REQUIRE(v3.IsValid());
       REQUIRE(versions[i] == v3);
     }
   }
@@ -370,8 +370,8 @@ TEST_CASE("from/to string") {
       REQUIRE(v2.FromString(versions_strings[i].c_str()));
       REQUIRE(versions[i] == v2);
 
-      Version v3;
-      REQUIRE(FromString(&v3, versions_strings[i].c_str()));
+      Version v3 = FromString(versions_strings[i].c_str());
+      REQUIRE(v3.IsValid());
       REQUIRE(versions[i] == v3);
     }
   }

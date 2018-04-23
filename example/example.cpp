@@ -57,7 +57,12 @@ int main() {
 
   Version vi;
   std::cin >> vi;
-  std::cout << vi << std::endl;
+  if (vi.IsValid()) {
+    std::cout << vi << std::endl;
+  } else {
+    std::cout << "incorrect format version" << std::endl;
+  }
+
 
   return 0;
 }

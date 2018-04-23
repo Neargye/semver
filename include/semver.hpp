@@ -41,9 +41,7 @@
 #include <cinttypes>
 #include <cstdio>
 #include <cstring>
-#include <cctype>
 #include <array>
-#include <algorithm>
 #include <string>
 #include <ostream>
 #include <istream>
@@ -61,7 +59,7 @@ constexpr std::size_t kVersionStringLength = 22; // 3(<major>) + 1(.) + 3(<minor
 
 #pragma pack(push, 1)
 struct Version {
-  enum class PreReleaseType : std::uint8_t {
+  enum class PreReleaseType : std::int8_t {
     kAlpha = 0,
     kBetha = 1,
     kReleaseCandidate = 2,
@@ -94,6 +92,8 @@ struct Version {
 
   Version& operator=(Version&&) = default;
 
+  bool IsValid() const;
+
   std::size_t ToString(char*, const std::size_t = kVersionStringLength) const;
 
   std::string ToString() const;
@@ -120,20 +120,20 @@ struct Version {
 };
 #pragma pack(pop)
 
-inline std::size_t ToString(const Version&, char*,
-                            const std::size_t = kVersionStringLength);
+inline std::size_t ToString(const Version&, char*, const std::size_t = kVersionStringLength);
 
 inline std::string ToString(const Version&);
 
-inline bool FromString(Version*, const char*);
+inline Version FromString(const char*);
 
-inline bool FromString(Version*, const std::string&);
+inline Version FromString(const std::string&);
 
 inline Version operator"" _version(const char*, const std::size_t);
 
 } // namespace semver
 
 namespace semver {
+
 inline constexpr Version::Version(const std::uint8_t major,
                                   const std::uint8_t minor,
                                   const std::uint8_t patch,
@@ -143,7 +143,7 @@ inline constexpr Version::Version(const std::uint8_t major,
       minor{minor},
       patch{patch},
       pre_release_type{pre_release_type},
-      pre_release_version{pre_release_type == PreReleaseType::kNone
+      pre_release_version{(pre_release_type == PreReleaseType::kNone)
                               ? static_cast<std::uint8_t>(0)
                               : pre_release_version} {}
 
@@ -152,11 +152,15 @@ inline constexpr Version::Version() : Version(0, 1, 0) {
 }
 
 inline Version::Version(const std::string& s) : Version(0, 0, 0) {
-  (void)semver::FromString(this, s);
+  (*this) = semver::FromString(s);
 }
 
 inline Version::Version(const char* s) : Version(0, 0, 0) {
-  (void)semver::FromString(this, s);
+  (*this) = semver::FromString(s);
+}
+
+inline bool Version::IsValid() const {
+  return ((pre_release_type >= PreReleaseType::kAlpha) && (pre_release_type <= PreReleaseType::kNone));
 }
 
 inline std::size_t Version::ToString(char* s, const std::size_t length) const {
@@ -168,11 +172,11 @@ inline std::string Version::ToString() const {
 }
 
 inline bool Version::FromString(const char* s) {
-  return semver::FromString(this, s);
+  return ((*this) = semver::FromString(s)).IsValid();
 }
 
 inline bool Version::FromString(const std::string& s) {
-  return semver::FromString(this, s);
+  return ((*this) = semver::FromString(s)).IsValid();
 }
 
 inline constexpr bool operator==(const Version& v1, const Version& v2) {
@@ -306,57 +310,52 @@ inline std::string ToString(const Version& v) {
   return std::string{};
 }
 
-inline bool FromString(Version* v, const char* s) {
+inline Version FromString(const char* s) {
+  Version v{0, 0, 0, static_cast<Version::PreReleaseType>(-1), 0};
   if (s == nullptr) {
-    return false;
+    return v;
   }
 
-  Version temp{0, 0, 0};
   std::array<char, 7> prerelease = {{'\0'}}; // 5(<prerelease>) + 1(.) + 1('\0') = 7
   const int num = std::sscanf(s, "%" SCNu8 ".%" SCNu8 ".%" SCNu8 "-%[^0-9]%" SCNu8,
-                              &(temp.major), &(temp.minor), &(temp.patch),
-                              prerelease.data(), &(temp.pre_release_version));
+                              &(v.major), &(v.minor), &(v.patch),
+                              prerelease.data(), &(v.pre_release_version));
 
   if (num >= 3 && num <= 5) {
-    std::transform(prerelease.begin(), prerelease.end(), prerelease.begin(),
-                   [](char c) { return static_cast<char>(std::tolower(c)); });
-
     if (std::strncmp(prerelease.data(), "alpha.", 6) == 0) {
-      temp.pre_release_type = Version::PreReleaseType::kAlpha;
+      v.pre_release_type = Version::PreReleaseType::kAlpha;
     } else if (std::strncmp(prerelease.data(), "alpha", 5) == 0) {
-      temp.pre_release_type = Version::PreReleaseType::kAlpha;
-      temp.pre_release_version = 0;
+      v.pre_release_type = Version::PreReleaseType::kAlpha;
+      v.pre_release_version = 0;
     } else if (std::strncmp(prerelease.data(), "betha.", 6) == 0) {
-      temp.pre_release_type = Version::PreReleaseType::kBetha;
+      v.pre_release_type = Version::PreReleaseType::kBetha;
     } else if (std::strncmp(prerelease.data(), "betha", 5) == 0) {
-      temp.pre_release_type = Version::PreReleaseType::kBetha;
-      temp.pre_release_version = 0;
+      v.pre_release_type = Version::PreReleaseType::kBetha;
+      v.pre_release_version = 0;
     } else if (std::strncmp(prerelease.data(), "rc.", 3) == 0) {
-      temp.pre_release_type = Version::PreReleaseType::kReleaseCandidate;
+      v.pre_release_type = Version::PreReleaseType::kReleaseCandidate;
     } else if (std::strncmp(prerelease.data(), "rc", 2) == 0) {
-      temp.pre_release_type = Version::PreReleaseType::kReleaseCandidate;
-      temp.pre_release_version = 0;
+      v.pre_release_type = Version::PreReleaseType::kReleaseCandidate;
+      v.pre_release_version = 0;
     } else if (std::strncmp(prerelease.data(), "\0\0\0\0\0\0\0", 7) == 0) {
-      temp.pre_release_type = Version::PreReleaseType::kNone;
-      temp.pre_release_version = 0;
-    } else {
-      return false;
+      v.pre_release_type = Version::PreReleaseType::kNone;
+      v.pre_release_version = 0;
     }
 
-    (*v) = temp;
-    return true;
+    if(std::strcmp(v.ToString().c_str(), s) != 0) {
+      v.pre_release_type = static_cast<Version::PreReleaseType>(-1);
+    }
   }
 
-  return false;
+  return v;
 }
 
-inline bool FromString(Version* v, const std::string& s) {
-  return FromString(v, s.c_str());
+inline Version FromString(const std::string& s) {
+  return FromString(s.c_str());
 }
 
 inline Version operator"" _version(const char* s, const std::size_t) {
-  Version v;
-  return FromString(&v, s) ? v : Version{0, 0, 0};
+  return FromString(s);
 }
 
 } // namespace semver
