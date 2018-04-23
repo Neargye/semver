@@ -128,6 +128,8 @@ inline bool FromString(Version* v, const char* s);
 
 inline bool FromString(Version* v, const std::string& s);
 
+inline Version operator"" _version(const char* str, const std::size_t);
+
 inline constexpr Version::Version(const std::uint8_t major,
                                   const std::uint8_t minor,
                                   const std::uint8_t patch,
@@ -345,6 +347,11 @@ inline bool FromString(Version* v, const char* s) {
 
 inline bool FromString(Version* v, const std::string& s) {
   return FromString(v, s.c_str());
+}
+
+inline Version operator"" _version(const char * str, const std::size_t) {
+  Version v;
+  return FromString(&v, str) ? v : Version{0, 0, 0};
 }
 
 } // namespace semver
