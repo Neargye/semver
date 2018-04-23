@@ -32,6 +32,14 @@
 
 using namespace semver;
 
+#define STATIC_CKECK_OP_AND_REVERSE(v1, op, v2) \
+  static_assert(v1 op v2, ""); \
+  static_assert(v2 op v1, "");
+
+#define STATIC_CKECK_OP_AND_REVERSE_FALSE(v1, op, v2) \
+  static_assert(v1 op v2, ""); \
+  static_assert(!(v2 op v1), "");
+
 #define CKECK_OP_AND_REVERSE(v1, op, v2) \
   REQUIRE(v1 op v2); \
   REQUIRE(v2 op v1);
@@ -189,16 +197,16 @@ TEST_CASE("operators") {
     constexpr Version v1{1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4};
     constexpr Version v2{1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4};
     constexpr Version v3 = v1;
-    CKECK_OP_AND_REVERSE(v1, == , v2);
-    CKECK_OP_AND_REVERSE(v1, == , v3);
+    STATIC_CKECK_OP_AND_REVERSE(v1, == , v2);
+    STATIC_CKECK_OP_AND_REVERSE(v1, == , v3);
   }
 
   SECTION("operator !=") {
-    static_assert(v1_0_0 != v1_0_0_a, "");
-    static_assert(v1_0_0 != v1_1_0_a, "");
-    static_assert(v1_0_0 != v1_0_1_a, "");
-    static_assert(v1_0_0 != v1_0_0_a_1, "");
-    static_assert(v1_0_0 != v2_0_0, "");
+    STATIC_CKECK_OP_AND_REVERSE(v1_0_0, != , v1_0_0_a);
+    STATIC_CKECK_OP_AND_REVERSE(v1_0_0, != , v1_0_0_a_1);
+    STATIC_CKECK_OP_AND_REVERSE(v1_0_0, != , v1_0_1_a);
+    STATIC_CKECK_OP_AND_REVERSE(v1_0_0, != , v1_1_0_a);
+    STATIC_CKECK_OP_AND_REVERSE(v1_0_0, != , v2_0_0);
 
     for (std::size_t i = 1; i < versions.size(); ++i) {
       auto v_larger = versions[i];
@@ -208,14 +216,14 @@ TEST_CASE("operators") {
   }
 
   SECTION("operator >") {
-    static_assert(v2_0_0 > v1_0_0, "");
-    static_assert(v1_0_0 > v1_0_0_a, "");
-    static_assert(v1_0_0 > v1_0_0_a_1, "");
-    static_assert(v1_0_0_a_1 > v1_0_0_a, "");
-    static_assert(v1_0_1_a > v1_0_0_a, "");
-    static_assert(v1_0_1_a > v1_0_0_a_1, "");
-    static_assert(v1_1_0_a > v1_0_0_a, "");
-    static_assert(v1_1_0_a > v1_0_0_a_1, "");
+    STATIC_CKECK_OP_AND_REVERSE_FALSE(v2_0_0, > , v1_0_0);
+    STATIC_CKECK_OP_AND_REVERSE_FALSE(v1_0_0, > , v1_0_0_a);
+    STATIC_CKECK_OP_AND_REVERSE_FALSE(v1_0_0, > , v1_0_0_a_1);
+    STATIC_CKECK_OP_AND_REVERSE_FALSE(v1_0_0_a_1, > , v1_0_0_a);
+    STATIC_CKECK_OP_AND_REVERSE_FALSE(v1_0_1_a, > , v1_0_0_a);
+    STATIC_CKECK_OP_AND_REVERSE_FALSE(v1_0_1_a, > , v1_0_0_a_1);
+    STATIC_CKECK_OP_AND_REVERSE_FALSE(v1_1_0_a, > , v1_0_0_a);
+    STATIC_CKECK_OP_AND_REVERSE_FALSE(v1_1_0_a, > , v1_0_0_a_1);
 
     for (std::size_t i = 1; i < versions.size(); ++i) {
       auto v_larger = versions[i];
@@ -225,16 +233,16 @@ TEST_CASE("operators") {
   }
 
   SECTION("operator >=") {
-    static_assert(v2_0_0 >= v1_0_0, "");
-    static_assert(v1_0_0 >= v1_0_0_a, "");
-    static_assert(v1_0_0 >= v1_0_0_a_1, "");
-    static_assert(v1_0_0_a_1 >= v1_0_0_a, "");
-    static_assert(v1_0_1_a >= v1_0_0_a, "");
-    static_assert(v1_0_1_a >= v1_0_0_a_1, "");
-    static_assert(v1_1_0_a >= v1_0_0_a, "");
-    static_assert(v1_1_0_a >= v1_0_0_a_1, "");
+    STATIC_CKECK_OP_AND_REVERSE_FALSE(v2_0_0, >= , v1_0_0);
+    STATIC_CKECK_OP_AND_REVERSE_FALSE(v1_0_0, >= , v1_0_0_a);
+    STATIC_CKECK_OP_AND_REVERSE_FALSE(v1_0_0, >= , v1_0_0_a_1);
+    STATIC_CKECK_OP_AND_REVERSE_FALSE(v1_0_0_a_1, >= , v1_0_0_a);
+    STATIC_CKECK_OP_AND_REVERSE_FALSE(v1_0_1_a, >= , v1_0_0_a);
+    STATIC_CKECK_OP_AND_REVERSE_FALSE(v1_0_1_a, >= , v1_0_0_a_1);
+    STATIC_CKECK_OP_AND_REVERSE_FALSE(v1_1_0_a, >= , v1_0_0_a);
+    STATIC_CKECK_OP_AND_REVERSE_FALSE(v1_1_0_a, >= , v1_0_0_a_1);
     constexpr Version v = v1_0_0;
-    static_assert(v1_0_0 >= v, "");
+    STATIC_CKECK_OP_AND_REVERSE(v1_0_0, >= , v);
 
     for (std::size_t i = 1; i < versions.size(); ++i) {
       auto v_larger = versions[i];
@@ -246,14 +254,14 @@ TEST_CASE("operators") {
   }
 
   SECTION("operator <") {
-    static_assert(v1_0_0 < v2_0_0, "");
-    static_assert(v1_0_0_a < v1_0_0, "");
-    static_assert(v1_0_0_a_1 < v1_0_0, "");
-    static_assert(v1_0_0_a < v1_0_0_a_1, "");
-    static_assert(v1_0_0_a < v1_0_1_a, "");
-    static_assert(v1_0_0_a_1 < v1_0_1_a, "");
-    static_assert(v1_0_0_a < v1_1_0_a, "");
-    static_assert(v1_0_0_a_1 < v1_1_0_a, "");
+    STATIC_CKECK_OP_AND_REVERSE_FALSE(v1_0_0, < , v2_0_0);
+    STATIC_CKECK_OP_AND_REVERSE_FALSE(v1_0_0_a, < , v1_0_0);
+    STATIC_CKECK_OP_AND_REVERSE_FALSE(v1_0_0_a_1, < , v1_0_0);
+    STATIC_CKECK_OP_AND_REVERSE_FALSE(v1_0_0_a, < , v1_0_0_a_1);
+    STATIC_CKECK_OP_AND_REVERSE_FALSE(v1_0_0_a, < , v1_0_1_a);
+    STATIC_CKECK_OP_AND_REVERSE_FALSE(v1_0_0_a_1, < , v1_0_1_a);
+    STATIC_CKECK_OP_AND_REVERSE_FALSE(v1_0_0_a, < , v1_1_0_a);
+    STATIC_CKECK_OP_AND_REVERSE_FALSE(v1_0_0_a_1, < , v1_1_0_a);
 
     for (std::size_t i = 1; i < versions.size(); ++i) {
       auto v_larger = versions[i];
@@ -263,16 +271,16 @@ TEST_CASE("operators") {
   }
 
   SECTION("operator <=") {
-    static_assert(v1_0_0 <= v2_0_0, "");
-    static_assert(v1_0_0_a <= v1_0_0, "");
-    static_assert(v1_0_0_a_1 <= v1_0_0, "");
-    static_assert(v1_0_0_a <= v1_0_0_a_1, "");
-    static_assert(v1_0_0_a <= v1_0_1_a, "");
-    static_assert(v1_0_0_a_1 <= v1_0_1_a, "");
-    static_assert(v1_0_0_a <= v1_1_0_a, "");
-    static_assert(v1_0_0_a_1 <= v1_1_0_a, "");
+    STATIC_CKECK_OP_AND_REVERSE_FALSE(v1_0_0, <= , v2_0_0);
+    STATIC_CKECK_OP_AND_REVERSE_FALSE(v1_0_0_a, <= , v1_0_0);
+    STATIC_CKECK_OP_AND_REVERSE_FALSE(v1_0_0_a_1, <= , v1_0_0);
+    STATIC_CKECK_OP_AND_REVERSE_FALSE(v1_0_0_a, <= , v1_0_0_a_1);
+    STATIC_CKECK_OP_AND_REVERSE_FALSE(v1_0_0_a, <= , v1_0_1_a);
+    STATIC_CKECK_OP_AND_REVERSE_FALSE(v1_0_0_a_1, <= , v1_0_1_a);
+    STATIC_CKECK_OP_AND_REVERSE_FALSE(v1_0_0_a_1, <= , v1_1_0_a);
+    STATIC_CKECK_OP_AND_REVERSE_FALSE(v1_0_0_a_1, <= , v1_1_0_a);
     constexpr Version v = v1_0_0;
-    static_assert(v1_0_0 <= v, "");
+    STATIC_CKECK_OP_AND_REVERSE(v1_0_0, <= , v);
 
     for (std::size_t i = 1; i < versions.size(); ++i) {
       auto v_larger = versions[i];
