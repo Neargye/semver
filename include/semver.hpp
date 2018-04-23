@@ -55,7 +55,9 @@
 
 namespace semver {
 
-constexpr std::size_t kVersionStringLength = 22; // 3(<major>) + 1(.) + 3(<minor>) + 1(.) + 3(<patch>) + 1(-) + 5(<prerelease>) + 1(.) + 3(<prereleaseversion>) + 1('\0') = 27
+constexpr std::size_t kVersionStringLength = 22; // 3(<major>) + 1(.) + 3(<minor>) + 1(.) + 3(<patch>) +
+                                                 // 1(-) + 5(<prerelease>) +
+                                                 // 1(.) + 3(<prereleaseversion>) + 1('\0') = 22
 
 #pragma pack(push, 1)
 struct Version {
@@ -72,21 +74,19 @@ struct Version {
   PreReleaseType pre_release_type;
   std::uint8_t pre_release_version;
 
-  constexpr Version(const std::uint8_t major,
-                    const std::uint8_t minor,
-                    const std::uint8_t patch,
-                    const PreReleaseType pre_release_type = PreReleaseType::kNone,
-                    const std::uint8_t pre_release_version = static_cast<std::uint8_t>(0));
+  constexpr Version(const std::uint8_t, const std::uint8_t, const std::uint8_t,
+                    const PreReleaseType = PreReleaseType::kNone,
+                    const std::uint8_t = static_cast<std::uint8_t>(0));
 
   constexpr Version();
 
-  constexpr Version(const Version& v) = default;
+  constexpr Version(const Version&) = default;
 
-  constexpr Version(Version&& v) = default;
+  constexpr Version(Version&&) = default;
 
-  explicit Version(const std::string& s);
+  explicit Version(const std::string&);
 
-  explicit Version(const char* s);
+  explicit Version(const char*);
 
   ~Version() = default;
 
@@ -94,42 +94,46 @@ struct Version {
 
   Version& operator=(Version&&) = default;
 
-  std::size_t ToString(char* s, const std::size_t length = kVersionStringLength) const;
+  std::size_t ToString(char*, const std::size_t = kVersionStringLength) const;
 
   std::string ToString() const;
 
-  bool FromString(const char* s);
+  bool FromString(const char*);
 
-  bool FromString(const std::string& s);
+  bool FromString(const std::string&);
 
-  constexpr friend bool operator==(const Version& v1, const Version& v2);
+  constexpr friend bool operator==(const Version&, const Version&);
 
-  constexpr friend bool operator!=(const Version& v1, const Version& v2);
+  constexpr friend bool operator!=(const Version&, const Version&);
 
-  constexpr friend bool operator>(const Version& v1, const Version& v2);
+  constexpr friend bool operator>(const Version&, const Version&);
 
-  constexpr friend bool operator>=(const Version& v1, const Version& v2);
+  constexpr friend bool operator>=(const Version&, const Version&);
 
-  constexpr friend bool operator<(const Version& v1, const Version& v2);
+  constexpr friend bool operator<(const Version&, const Version&);
 
-  constexpr friend bool operator<=(const Version& v1, const Version& v2);
+  constexpr friend bool operator<=(const Version&, const Version&);
 
-  friend std::ostream& operator<<(std::ostream& os, const Version& v);
+  friend std::ostream& operator<<(std::ostream&, const Version&);
 
-  friend std::istream& operator>>(std::istream& is, Version& v);
+  friend std::istream& operator>>(std::istream&, Version&);
 };
 #pragma pack(pop)
 
-inline std::size_t ToString(const Version& v, char* s, const std::size_t length = kVersionStringLength);
+inline std::size_t ToString(const Version&, char*,
+                            const std::size_t = kVersionStringLength);
 
-inline std::string ToString(const Version& v);
+inline std::string ToString(const Version&);
 
-inline bool FromString(Version* v, const char* s);
+inline bool FromString(Version*, const char*);
 
-inline bool FromString(Version* v, const std::string& s);
+inline bool FromString(Version*, const std::string&);
 
-inline Version operator"" _version(const char* str, const std::size_t);
+inline Version operator"" _version(const char*, const std::size_t);
 
+} // namespace semver
+
+namespace semver {
 inline constexpr Version::Version(const std::uint8_t major,
                                   const std::uint8_t minor,
                                   const std::uint8_t patch,
@@ -139,7 +143,9 @@ inline constexpr Version::Version(const std::uint8_t major,
       minor{minor},
       patch{patch},
       pre_release_type{pre_release_type},
-      pre_release_version{pre_release_type == PreReleaseType::kNone ? static_cast<std::uint8_t>(0) : pre_release_version} {}
+      pre_release_version{pre_release_type == PreReleaseType::kNone
+                              ? static_cast<std::uint8_t>(0)
+                              : pre_release_version} {}
 
 inline constexpr Version::Version() : Version(0, 1, 0) {
   // https://semver.org/#how-should-i-deal-with-revisions-in-the-0yz-initial-development-phase
@@ -182,14 +188,14 @@ inline constexpr bool operator!=(const Version& v1, const Version& v2) {
 inline constexpr bool operator>(const Version& v1, const Version& v2) {
   // https://semver.org/#spec-item-11
   return (v1.major != v2.major)
-           ? v1.major > v2.major
-           : (v1.minor != v2.minor)
-                 ? (v1.minor > v2.minor)
-                 : (v1.patch != v2.patch)
-                       ? (v1.patch > v2.patch)
-                       : (v1.pre_release_type != v2.pre_release_type)
-                             ? (v1.pre_release_type > v2.pre_release_type)
-                             : (v1.pre_release_version > v2.pre_release_version);
+             ? (v1.major > v2.major)
+             : (v1.minor != v2.minor)
+                   ? (v1.minor > v2.minor)
+                   : (v1.patch != v2.patch)
+                         ? (v1.patch > v2.patch)
+                         : (v1.pre_release_type != v2.pre_release_type)
+                               ? (v1.pre_release_type > v2.pre_release_type)
+                               : (v1.pre_release_version > v2.pre_release_version);
 }
 
 inline constexpr bool operator>=(const Version& v1, const Version& v2) {
@@ -199,14 +205,14 @@ inline constexpr bool operator>=(const Version& v1, const Version& v2) {
 inline constexpr bool operator<(const Version& v1, const Version& v2) {
   // https://semver.org/#spec-item-11
   return (v1.major != v2.major)
-           ? v1.major < v2.major
-           : (v1.minor != v2.minor)
-                 ? (v1.minor < v2.minor)
-                 : (v1.patch != v2.patch)
-                       ? (v1.patch < v2.patch)
-                       : (v1.pre_release_type != v2.pre_release_type)
-                             ? (v1.pre_release_type < v2.pre_release_type)
-                             : (v1.pre_release_version < v2.pre_release_version);
+             ? (v1.major < v2.major)
+             : (v1.minor != v2.minor)
+                   ? (v1.minor < v2.minor)
+                   : (v1.patch != v2.patch)
+                         ? (v1.patch < v2.patch)
+                         : (v1.pre_release_type != v2.pre_release_type)
+                               ? (v1.pre_release_type < v2.pre_release_type)
+                               : (v1.pre_release_version < v2.pre_release_version);
 }
 
 inline constexpr bool operator<=(const Version& v1, const Version& v2) {
@@ -261,10 +267,9 @@ inline std::size_t ToString(const Version& v, char* s, const std::size_t length)
     }
     case Version::PreReleaseType::kReleaseCandidate: {
       if (v.pre_release_version == 0) {
-        size =
-            std::snprintf(s, length,
-                          "%" PRIu8 ".%" PRIu8 ".%" PRIu8 "-rc",
-                          v.major, v.minor, v.patch);
+        size = std::snprintf(s, length,
+                             "%" PRIu8 ".%" PRIu8 ".%" PRIu8 "-rc",
+                             v.major, v.minor, v.patch);
       } else {
         size = std::snprintf(s, length,
                              "%" PRIu8 ".%" PRIu8 ".%" PRIu8 "-rc.%" PRIu8,
@@ -328,7 +333,7 @@ inline bool FromString(Version* v, const char* s) {
       temp.pre_release_version = 0;
     } else if (std::strncmp(prerelease.data(), "rc.", 3) == 0) {
       temp.pre_release_type = Version::PreReleaseType::kReleaseCandidate;
-    } else if(std::strncmp(prerelease.data(), "rc", 2) == 0) {
+    } else if (std::strncmp(prerelease.data(), "rc", 2) == 0) {
       temp.pre_release_type = Version::PreReleaseType::kReleaseCandidate;
       temp.pre_release_version = 0;
     } else if (std::strncmp(prerelease.data(), "\0\0\0\0\0\0\0", 7) == 0) {
@@ -349,9 +354,9 @@ inline bool FromString(Version* v, const std::string& s) {
   return FromString(v, s.c_str());
 }
 
-inline Version operator"" _version(const char * str, const std::size_t) {
+inline Version operator"" _version(const char* s, const std::size_t) {
   Version v;
-  return FromString(&v, str) ? v : Version{0, 0, 0};
+  return FromString(&v, s) ? v : Version{0, 0, 0};
 }
 
 } // namespace semver
