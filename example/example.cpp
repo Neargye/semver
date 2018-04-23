@@ -25,15 +25,17 @@
 
 #include <iostream>
 
+using namespace semver;
+
 int main() {
-  constexpr semver::Version v_default;
-  static_assert(v_default == semver::Version(0, 1, 0, semver::Version::PreReleaseType::kNone, 0), "");
+  constexpr Version v_default;
+  static_assert(v_default == Version(0, 1, 0, Version::PreReleaseType::kNone, 0), "");
 
   std::cout << v_default << std::endl; // 0.1.0
 
-  constexpr semver::Version v1(1, 4, 3);
+  constexpr Version v1(1, 4, 3);
   std::cout << v1 << std::endl; // 1.4.3
-  constexpr semver::Version v2(1, 2, 4, semver::Version::PreReleaseType::kAlpha, 10);
+  constexpr Version v2(1, 2, 4, Version::PreReleaseType::kAlpha, 10);
   std::cout << v2 << std::endl; // 1.2.4-alpha.10
   static_assert(v1 != v2, "");
   static_assert(!(v1 == v2), "");
@@ -42,7 +44,7 @@ int main() {
   static_assert(!(v1 < v2), "");
   static_assert(!(v1 <= v2), "");
 
-  semver::Version v_s;
+  Version v_s;
   v_s.FromString("1.2.3-rc.1");
   const std::string s1 = v_s.ToString(); // 1.2.3-rc.1
   std::cout << s1 << std::endl;
@@ -50,7 +52,10 @@ int main() {
   const std::string s2 = v_s.ToString(); // 1.2.3-rc
   std::cout << s2 << std::endl;
 
-  semver::Version vi;
+  const Version vo = "1.2.3-rc.1"_version;
+  std::cout << vo << std::endl;
+
+  Version vi;
   std::cin >> vi;
   std::cout << vi << std::endl;
 
