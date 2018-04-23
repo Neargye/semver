@@ -416,6 +416,11 @@ TEST_CASE("from/to string") {
       REQUIRE(versions[i] == vi);
     }
   }
+
+  SECTION("operator _version") {
+    Version v = "1.2.3-rc.4"_version;
+    REQUIRE(v == Version{1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4});
+  }
 }
 
 #undef CKECK_OP_AND_REVERSE
