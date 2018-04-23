@@ -50,8 +50,8 @@ static_assert(v1 != v2, "");
 static_assert(!(v1 == v2), "");
 static_assert(v1 > v2, "");
 static_assert(v1 >= v2, "");
-static_assert(!(v1 < v2), "");
-static_assert(!(v1 <= v2), "");
+static_assert(v2 < v1, "");
+static_assert(v2 <= v1, "");
 ```
 
 * To string
@@ -68,6 +68,7 @@ const std::string s("1.2.3-rc.4");
 Version v1(s);
 Version v2;
 v2.FromString(s);
+Version v3 = "1.2.3-rc.4"_version;
 ```
 
 * To char array
