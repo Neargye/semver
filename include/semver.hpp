@@ -58,7 +58,7 @@ constexpr std::size_t kVersionStringLength = 22; // 3(<major>) + 1(.) + 3(<minor
                                                  // 1(.) + 3(<prereleaseversion>) + 1('\0') = 22
 
 #pragma pack(push, 1)
-struct Version {
+struct Version final {
   enum class PreReleaseType : std::int8_t {
     kAlpha = 0,
     kBetha = 1,
