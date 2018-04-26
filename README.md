@@ -1,4 +1,4 @@
-# semver c++
+# Semantic Versioning C++
 
 ```text
          _____                            _   _
