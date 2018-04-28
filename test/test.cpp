@@ -41,7 +41,7 @@ using namespace semver;
   static_assert(v1 op v2, "");                        \
   static_assert(!(v2 op v1), "");
 
-#define STATIC_CKECK_FALS_OP_AND_REVERSE(v1, op, v2) \
+#define STATIC_CKECK_FALSE_OP_AND_REVERSE(v1, op, v2) \
   static_assert(!(v1 op v2), "");                    \
   static_assert(!(v2 op v1), "");
 
@@ -53,7 +53,7 @@ using namespace semver;
   REQUIRE(v1 op v2);                           \
   REQUIRE_FALSE(v2 op v1);
 
-#define CKECK_FALS_OP_AND_REVERSE(v1, op, v2) \
+#define CKECK_FALSE_OP_AND_REVERSE(v1, op, v2) \
   REQUIRE_FALSE(v1 op v2);                    \
   REQUIRE_FALSE(v2 op v1);
 
@@ -307,7 +307,7 @@ TEST_CASE("operators") {
 
 TEST_CASE("from/to string") {
   constexpr std::size_t versions_length = 19;
-  const std::array<Version, 19> versions = {{
+  const std::array<Version, versions_length> versions = {{
       Version{1, 2, 3},
       Version{255, 255, 255},
       Version{0, 0, 0},
@@ -439,18 +439,18 @@ TEST_CASE("is valid") {
   SECTION("operators") {
     constexpr Version v1(1, 4, 3, static_cast<Version::PreReleaseType>(-100));
     constexpr Version v2(1, 4, 3, static_cast<Version::PreReleaseType>(-50));
-    STATIC_CKECK_FALS_OP_AND_REVERSE(v1, ==, v2);
-    STATIC_CKECK_FALS_OP_AND_REVERSE(v1, != , v2);
-    STATIC_CKECK_FALS_OP_AND_REVERSE(v1, > , v2);
-    STATIC_CKECK_FALS_OP_AND_REVERSE(v1, >= , v2);
-    STATIC_CKECK_FALS_OP_AND_REVERSE(v1, < , v2);
-    STATIC_CKECK_FALS_OP_AND_REVERSE(v1, <= , v2);
+    STATIC_CKECK_FALSE_OP_AND_REVERSE(v1, ==, v2);
+    STATIC_CKECK_FALSE_OP_AND_REVERSE(v1, != , v2);
+    STATIC_CKECK_FALSE_OP_AND_REVERSE(v1, > , v2);
+    STATIC_CKECK_FALSE_OP_AND_REVERSE(v1, >= , v2);
+    STATIC_CKECK_FALSE_OP_AND_REVERSE(v1, < , v2);
+    STATIC_CKECK_FALSE_OP_AND_REVERSE(v1, <= , v2);
   }
 }
 
 #undef STATIC_CKECK_OP_AND_REVERSE
 #undef STATIC_CKECK_OP_AND_REVERSE_FALSE
-#undef STATIC_CKECK_FALS_OP_AND_REVERSE
+#undef STATIC_CKECK_FALSE_OP_AND_REVERSE
 #undef CKECK_OP_AND_REVERSE
 #undef CKECK_OP_AND_REVERSE_FALSE
-#undef CKECK_FALS_OP_AND_REVERSE
+#undef CKECK_FALSE_OP_AND_REVERSE

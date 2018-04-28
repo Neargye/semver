@@ -72,7 +72,9 @@ struct Version final {
   PreReleaseType pre_release_type;
   std::uint8_t pre_release_version;
 
-  constexpr Version(const std::uint8_t, const std::uint8_t, const std::uint8_t,
+  constexpr Version(const std::uint8_t,
+                    const std::uint8_t,
+                    const std::uint8_t,
                     const PreReleaseType = PreReleaseType::kNone,
                     const std::uint8_t = static_cast<std::uint8_t>(0));
 
@@ -120,15 +122,15 @@ struct Version final {
 };
 #pragma pack(pop)
 
-inline std::size_t ToString(const Version&, char*, const std::size_t = kVersionStringLength);
+std::size_t ToString(const Version&, char*, const std::size_t = kVersionStringLength);
 
-inline std::string ToString(const Version&);
+std::string ToString(const Version&);
 
-inline Version FromString(const char*);
+Version FromString(const char*);
 
-inline Version FromString(const std::string&);
+Version FromString(const std::string&);
 
-inline Version operator"" _version(const char*, const std::size_t);
+Version operator"" _version(const char*, const std::size_t);
 
 namespace detail {
 
