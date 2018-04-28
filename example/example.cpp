@@ -30,12 +30,11 @@ using namespace semver;
 int main() {
   constexpr Version v_default;
   static_assert(v_default == Version(0, 1, 0, Version::PreReleaseType::kNone, 0), "");
-
   std::cout << v_default << std::endl; // 0.1.0
 
   constexpr Version v1(1, 4, 3);
-  std::cout << v1 << std::endl; // 1.4.3
   constexpr Version v2(1, 2, 4, Version::PreReleaseType::kAlpha, 10);
+  std::cout << v1 << std::endl; // 1.4.3
   std::cout << v2 << std::endl; // 1.2.4-alpha.10
   static_assert(v1 != v2, "");
   static_assert(!(v1 == v2), "");
@@ -46,14 +45,14 @@ int main() {
 
   Version v_s;
   v_s.FromString("1.2.3-rc.1");
-  const std::string s1 = v_s.ToString(); // 1.2.3-rc.1
-  std::cout << s1 << std::endl;
+  const std::string s1 = v_s.ToString();
+  std::cout << s1 << std::endl; // 1.2.3-rc.1
   v_s.pre_release_version = 0;
-  const std::string s2 = v_s.ToString(); // 1.2.3-rc
-  std::cout << s2 << std::endl;
+  const std::string s2 = v_s.ToString();
+  std::cout << s2 << std::endl; // 1.2.3-rc
 
   const Version vo = "1.2.3-rc.1"_version;
-  std::cout << vo << std::endl;
+  std::cout << vo << std::endl; // 1.2.3-rc.1
 
   Version vi;
   std::cin >> vi;
@@ -62,7 +61,6 @@ int main() {
   } else {
     std::cout << "incorrect format version" << std::endl;
   }
-
 
   return 0;
 }
