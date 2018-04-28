@@ -41,12 +41,20 @@ using namespace semver;
   static_assert(v1 op v2, "");                        \
   static_assert(!(v2 op v1), "");
 
+#define STATIC_CKECK_FALS_OP_AND_REVERSE(v1, op, v2) \
+  static_assert(!(v1 op v2), "");                    \
+  static_assert(!(v2 op v1), "");
+
 #define CKECK_OP_AND_REVERSE(v1, op, v2) \
   REQUIRE(v1 op v2);                     \
   REQUIRE(v2 op v1);
 
 #define CKECK_OP_AND_REVERSE_FALSE(v1, op, v2) \
   REQUIRE(v1 op v2);                           \
+  REQUIRE_FALSE(v2 op v1);
+
+#define CKECK_FALS_OP_AND_REVERSE(v1, op, v2) \
+  REQUIRE_FALSE(v1 op v2);                    \
   REQUIRE_FALSE(v2 op v1);
 
 TEST_CASE("constructors") {
@@ -424,6 +432,19 @@ TEST_CASE("from/to string") {
   SECTION("operator _version") {
     Version v = "1.2.3-rc.4"_version;
     REQUIRE(v == Version{1, 2, 3, Version::PreReleaseType::kReleaseCandidate, 4});
+  }
+}
+
+TEST_CASE("is valid") {
+  SECTION("operators") {
+    constexpr Version v1(1, 4, 3, static_cast<Version::PreReleaseType>(-100));
+    constexpr Version v2(1, 4, 3, static_cast<Version::PreReleaseType>(-50));
+    STATIC_CKECK_FALS_OP_AND_REVERSE(v1, ==, v2);
+    STATIC_CKECK_FALS_OP_AND_REVERSE(v1, != , v2);
+    STATIC_CKECK_FALS_OP_AND_REVERSE(v1, > , v2);
+    STATIC_CKECK_FALS_OP_AND_REVERSE(v1, >= , v2);
+    STATIC_CKECK_FALS_OP_AND_REVERSE(v1, < , v2);
+    STATIC_CKECK_FALS_OP_AND_REVERSE(v1, <= , v2);
   }
 }
 

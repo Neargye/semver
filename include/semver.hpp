@@ -130,9 +130,57 @@ inline Version FromString(const std::string&);
 
 inline Version operator"" _version(const char*, const std::size_t);
 
+namespace detail {
+
+constexpr bool IsEquals(const Version& v1, const Version& v2);
+
+constexpr bool IsLess(const Version& v1, const Version& v2);
+
+constexpr bool IsGreater(const Version& v1, const Version& v2);
+
+} // namespace detail
+
 } // namespace semver
 
 namespace semver {
+
+namespace detail {
+
+inline constexpr bool IsEquals(const Version& v1, const Version& v2) {
+  return (v1.major == v2.major) &&
+         (v1.minor == v2.minor) &&
+         (v1.patch == v2.patch) &&
+         (v1.pre_release_type == v2.pre_release_type) &&
+         (v1.pre_release_version == v2.pre_release_version);
+}
+
+inline constexpr bool IsLess(const Version& v1, const Version& v2) {
+  // https://semver.org/#spec-item-11
+  return (v1.major != v2.major)
+             ? (v1.major < v2.major)
+             : (v1.minor != v2.minor)
+                   ? (v1.minor < v2.minor)
+                   : (v1.patch != v2.patch)
+                         ? (v1.patch < v2.patch)
+                         : (v1.pre_release_type != v2.pre_release_type)
+                               ? (v1.pre_release_type < v2.pre_release_type)
+                               : (v1.pre_release_version < v2.pre_release_version);
+}
+
+inline constexpr bool IsGreater(const Version& v1, const Version& v2) {
+  // https://semver.org/#spec-item-11
+  return (v1.major != v2.major)
+             ? (v1.major > v2.major)
+             : (v1.minor != v2.minor)
+                   ? (v1.minor > v2.minor)
+                   : (v1.patch != v2.patch)
+                         ? (v1.patch > v2.patch)
+                         : (v1.pre_release_type != v2.pre_release_type)
+                               ? (v1.pre_release_type > v2.pre_release_type)
+                               : (v1.pre_release_version > v2.pre_release_version);
+}
+
+} // namespace detail
 
 inline constexpr Version::Version(const std::uint8_t major,
                                   const std::uint8_t minor,
@@ -180,56 +228,27 @@ inline bool Version::FromString(const std::string& s) {
 }
 
 inline constexpr bool operator==(const Version& v1, const Version& v2) {
-  return (v1.IsValid() && v2.IsValid()) && (v1.major == v2.major) &&
-         (v1.minor == v2.minor) && (v1.patch == v2.patch) &&
-         (v1.pre_release_type == v2.pre_release_type) &&
-         (v1.pre_release_version == v2.pre_release_version);
+  return (v1.IsValid() && v2.IsValid() && detail::IsEquals(v1, v2));
 }
 
 inline constexpr bool operator!=(const Version& v1, const Version& v2) {
-  return !(v1 == v2);
+  return ((v1.IsValid() && v2.IsValid()) && !detail::IsEquals(v1, v2));
 }
 
 inline constexpr bool operator>(const Version& v1, const Version& v2) {
-  // https://semver.org/#spec-item-11
-  return (v1.IsValid() && v2.IsValid())
-             ? (v1.major != v2.major)
-                   ? (v1.major > v2.major)
-                   : (v1.minor != v2.minor)
-                         ? (v1.minor > v2.minor)
-                         : (v1.patch != v2.patch)
-                               ? (v1.patch > v2.patch)
-                               : (v1.pre_release_type != v2.pre_release_type)
-                                     ? (v1.pre_release_type >
-                                        v2.pre_release_type)
-                                     : (v1.pre_release_version >
-                                        v2.pre_release_version)
-             : false;
+  return (v1.IsValid() && v2.IsValid() && detail::IsGreater(v1, v2));
 }
 
 inline constexpr bool operator>=(const Version& v1, const Version& v2) {
-  return !(v1 < v2);
+  return ((v1.IsValid() && v2.IsValid()) && (detail::IsEquals(v1, v2) || detail::IsGreater(v1, v2)));
 }
 
 inline constexpr bool operator<(const Version& v1, const Version& v2) {
-  // https://semver.org/#spec-item-11
-  return (v1.IsValid() && v2.IsValid())
-             ? (v1.major != v2.major)
-                   ? (v1.major < v2.major)
-                   : (v1.minor != v2.minor)
-                         ? (v1.minor < v2.minor)
-                         : (v1.patch != v2.patch)
-                               ? (v1.patch < v2.patch)
-                               : (v1.pre_release_type != v2.pre_release_type)
-                                     ? (v1.pre_release_type <
-                                        v2.pre_release_type)
-                                     : (v1.pre_release_version <
-                                        v2.pre_release_version)
-             : false;
+  return (v1.IsValid() && v2.IsValid() && detail::IsLess(v1, v2));
 }
 
 inline constexpr bool operator<=(const Version& v1, const Version& v2) {
-  return !(v1 > v2);
+  return ((v1.IsValid() && v2.IsValid()) && (detail::IsEquals(v1, v2) || detail::IsLess(v1, v2)));
 }
 
 inline std::ostream& operator<<(std::ostream& os, const Version& v) {
