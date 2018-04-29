@@ -103,22 +103,6 @@ struct Version final {
   bool FromString(const char*);
 
   bool FromString(const std::string&);
-
-  constexpr friend bool operator==(const Version&, const Version&);
-
-  constexpr friend bool operator!=(const Version&, const Version&);
-
-  constexpr friend bool operator>(const Version&, const Version&);
-
-  constexpr friend bool operator>=(const Version&, const Version&);
-
-  constexpr friend bool operator<(const Version&, const Version&);
-
-  constexpr friend bool operator<=(const Version&, const Version&);
-
-  friend std::ostream& operator<<(std::ostream&, const Version&);
-
-  friend std::istream& operator>>(std::istream&, Version&);
 };
 #pragma pack(pop)
 
@@ -129,6 +113,22 @@ std::string ToString(const Version&);
 Version FromString(const char*);
 
 Version FromString(const std::string&);
+
+constexpr bool operator==(const Version&, const Version&);
+
+constexpr bool operator!=(const Version&, const Version&);
+
+constexpr bool operator>(const Version&, const Version&);
+
+constexpr bool operator>=(const Version&, const Version&);
+
+constexpr bool operator<(const Version&, const Version&);
+
+constexpr bool operator<=(const Version&, const Version&);
+
+std::ostream& operator<<(std::ostream&, const Version&);
+
+std::istream& operator>>(std::istream&, Version&);
 
 Version operator"" _version(const char*, const std::size_t);
 
