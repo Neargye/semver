@@ -400,12 +400,12 @@ TEST_CASE("from/to string") {
 
   SECTION("to char*") {
     for (std::size_t i = 0; i < versions_length; ++i) {
-      char s1[kVersionStringLength];
+      char s1[Version::kVersionStringLength];
       const auto size1 = versions[i].ToString(s1);
       REQUIRE(s1 == versions_strings[i]);
       REQUIRE(size1 == versions_strings[i].length());
 
-      char s2[kVersionStringLength];
+      char s2[Version::kVersionStringLength];
       const auto size2 = ToString(versions[i], s2);
       REQUIRE(s2 == versions_strings[i]);
       REQUIRE(size2 == versions_strings[i].length());

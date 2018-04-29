@@ -53,12 +53,11 @@
 
 namespace semver {
 
-constexpr std::size_t kVersionStringLength = 22; // 3(<major>) + 1(.) + 3(<minor>) + 1(.) + 3(<patch>) +
-                                                 // 1(-) + 5(<prerelease>) +
-                                                 // 1(.) + 3(<prereleaseversion>) + 1('\0') = 22
-
 #pragma pack(push, 1)
 struct Version final {
+  static constexpr const std::size_t kVersionStringLength = 22;
+  // 3(<major>) + 1(.) + 3(<minor>) + 1(.) + 3(<patch>) +
+  // 1(-) + 5(<prerelease>) + 1(.) + 3(<prereleaseversion>) + 1('\0') = 22
   enum class PreReleaseType : std::int8_t {
     kAlpha = 0,
     kBetha = 1,
@@ -106,7 +105,7 @@ struct Version final {
 };
 #pragma pack(pop)
 
-std::size_t ToString(const Version&, char*, const std::size_t = kVersionStringLength) noexcept;
+std::size_t ToString(const Version&, char*, const std::size_t = Version::kVersionStringLength) noexcept;
 
 std::string ToString(const Version&) noexcept;
 
@@ -254,14 +253,14 @@ inline constexpr bool operator<=(const Version& v1, const Version& v2) noexcept 
 }
 
 inline std::ostream& operator<<(std::ostream& os, const Version& v) noexcept {
-  std::array<char, kVersionStringLength> version = {{'\0'}};
+  std::array<char, Version::kVersionStringLength> version = {{'\0'}};
   v.ToString(version.data());
   os << version.data();
   return os;
 }
 
 inline std::istream& operator>>(std::istream& is, Version& v) noexcept {
-  std::array<char, kVersionStringLength> version = {{'\0'}};
+  std::array<char, Version::kVersionStringLength> version = {{'\0'}};
   is >> version.data();
   v.FromString(version.data());
   return is;
@@ -329,7 +328,7 @@ inline std::size_t ToString(const Version& v, char* s, const std::size_t length)
 }
 
 inline std::string ToString(const Version& v) noexcept {
-  std::string s(kVersionStringLength, '\0');
+  std::string s(Version::kVersionStringLength, '\0');
   const std::size_t size = ToString(v, &s[0], s.length());
   if (size > 0) {
     s.resize(size);
