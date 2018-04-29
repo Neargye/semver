@@ -76,69 +76,69 @@ struct Version final {
                     const std::uint8_t,
                     const std::uint8_t,
                     const PreReleaseType = PreReleaseType::kNone,
-                    const std::uint8_t = static_cast<std::uint8_t>(0));
+                    const std::uint8_t = static_cast<std::uint8_t>(0)) noexcept;
 
-  constexpr Version();
+  constexpr Version() noexcept;
 
-  constexpr Version(const Version&) = default;
+  constexpr Version(const Version&) noexcept = default;
 
-  constexpr Version(Version&&) = default;
+  constexpr Version(Version&&) noexcept = default;
 
-  explicit Version(const std::string&);
+  explicit Version(const std::string&) noexcept;
 
-  explicit Version(const char*);
+  explicit Version(const char*) noexcept;
 
-  ~Version() = default;
+  ~Version() noexcept = default;
 
-  Version& operator=(const Version&) = default;
+  Version& operator=(const Version&) noexcept = default;
 
-  Version& operator=(Version&&) = default;
+  Version& operator=(Version&&) noexcept = default;
 
-  constexpr bool IsValid() const;
+  constexpr bool IsValid() const noexcept;
 
-  std::size_t ToString(char*, const std::size_t = kVersionStringLength) const;
+  std::size_t ToString(char*, const std::size_t = kVersionStringLength) const noexcept;
 
-  std::string ToString() const;
+  std::string ToString() const noexcept;
 
-  bool FromString(const char*);
+  bool FromString(const char*) noexcept;
 
-  bool FromString(const std::string&);
+  bool FromString(const std::string&) noexcept;
 };
 #pragma pack(pop)
 
-std::size_t ToString(const Version&, char*, const std::size_t = kVersionStringLength);
+std::size_t ToString(const Version&, char*, const std::size_t = kVersionStringLength) noexcept;
 
-std::string ToString(const Version&);
+std::string ToString(const Version&) noexcept;
 
-Version FromString(const char*);
+Version FromString(const char*) noexcept;
 
-Version FromString(const std::string&);
+Version FromString(const std::string&) noexcept;
 
-constexpr bool operator==(const Version&, const Version&);
+constexpr bool operator==(const Version&, const Version&) noexcept;
 
-constexpr bool operator!=(const Version&, const Version&);
+constexpr bool operator!=(const Version&, const Version&) noexcept;
 
-constexpr bool operator>(const Version&, const Version&);
+constexpr bool operator>(const Version&, const Version&) noexcept;
 
-constexpr bool operator>=(const Version&, const Version&);
+constexpr bool operator>=(const Version&, const Version&) noexcept;
 
-constexpr bool operator<(const Version&, const Version&);
+constexpr bool operator<(const Version&, const Version&) noexcept;
 
-constexpr bool operator<=(const Version&, const Version&);
+constexpr bool operator<=(const Version&, const Version&) noexcept;
 
-std::ostream& operator<<(std::ostream&, const Version&);
+std::ostream& operator<<(std::ostream&, const Version&) noexcept;
 
-std::istream& operator>>(std::istream&, Version&);
+std::istream& operator>>(std::istream&, Version&) noexcept;
 
-Version operator"" _version(const char*, const std::size_t);
+Version operator"" _version(const char*, const std::size_t) noexcept;
 
 namespace detail {
 
-constexpr bool IsEquals(const Version& v1, const Version& v2);
+constexpr bool IsEquals(const Version& v1, const Version& v2) noexcept;
 
-constexpr bool IsLess(const Version& v1, const Version& v2);
+constexpr bool IsLess(const Version& v1, const Version& v2) noexcept;
 
-constexpr bool IsGreater(const Version& v1, const Version& v2);
+constexpr bool IsGreater(const Version& v1, const Version& v2) noexcept;
 
 } // namespace detail
 
@@ -148,7 +148,7 @@ namespace semver {
 
 namespace detail {
 
-inline constexpr bool IsEquals(const Version& v1, const Version& v2) {
+inline constexpr bool IsEquals(const Version& v1, const Version& v2) noexcept {
   return (v1.major == v2.major) &&
          (v1.minor == v2.minor) &&
          (v1.patch == v2.patch) &&
@@ -156,7 +156,7 @@ inline constexpr bool IsEquals(const Version& v1, const Version& v2) {
          (v1.pre_release_version == v2.pre_release_version);
 }
 
-inline constexpr bool IsLess(const Version& v1, const Version& v2) {
+inline constexpr bool IsLess(const Version& v1, const Version& v2) noexcept {
   // https://semver.org/#spec-item-11
   return (v1.major != v2.major)
              ? (v1.major < v2.major)
@@ -169,7 +169,7 @@ inline constexpr bool IsLess(const Version& v1, const Version& v2) {
                                : (v1.pre_release_version < v2.pre_release_version);
 }
 
-inline constexpr bool IsGreater(const Version& v1, const Version& v2) {
+inline constexpr bool IsGreater(const Version& v1, const Version& v2) noexcept {
   // https://semver.org/#spec-item-11
   return (v1.major != v2.major)
              ? (v1.major > v2.major)
@@ -188,7 +188,7 @@ inline constexpr Version::Version(const std::uint8_t major,
                                   const std::uint8_t minor,
                                   const std::uint8_t patch,
                                   const PreReleaseType pre_release_type,
-                                  const std::uint8_t pre_release_version)
+                                  const std::uint8_t pre_release_version) noexcept
     : major{major},
       minor{minor},
       patch{patch},
@@ -197,77 +197,77 @@ inline constexpr Version::Version(const std::uint8_t major,
                               ? static_cast<std::uint8_t>(0)
                               : pre_release_version} {}
 
-inline constexpr Version::Version() : Version(0, 1, 0) {
+inline constexpr Version::Version() noexcept : Version(0, 1, 0)  {
   // https://semver.org/#how-should-i-deal-with-revisions-in-the-0yz-initial-development-phase
 }
 
-inline Version::Version(const std::string& s) : Version(0, 0, 0) {
+inline Version::Version(const std::string& s) noexcept : Version(0, 0, 0)  {
   (*this) = semver::FromString(s);
 }
 
-inline Version::Version(const char* s) : Version(0, 0, 0) {
+inline Version::Version(const char* s) noexcept : Version(0, 0, 0) {
   (*this) = semver::FromString(s);
 }
 
-inline constexpr bool Version::IsValid() const {
+inline constexpr bool Version::IsValid() const noexcept {
   return ((pre_release_type >= PreReleaseType::kAlpha) && (pre_release_type <= PreReleaseType::kNone));
 }
 
-inline std::size_t Version::ToString(char* s, const std::size_t length) const {
+inline std::size_t Version::ToString(char* s, const std::size_t length) const noexcept {
   return semver::ToString(*this, s, length);
 }
 
-inline std::string Version::ToString() const {
+inline std::string Version::ToString() const noexcept {
   return semver::ToString(*this);
 }
 
-inline bool Version::FromString(const char* s) {
+inline bool Version::FromString(const char* s) noexcept {
   return ((*this) = semver::FromString(s)).IsValid();
 }
 
-inline bool Version::FromString(const std::string& s) {
+inline bool Version::FromString(const std::string& s) noexcept {
   return ((*this) = semver::FromString(s)).IsValid();
 }
 
-inline constexpr bool operator==(const Version& v1, const Version& v2) {
+inline constexpr bool operator==(const Version& v1, const Version& v2) noexcept {
   return (v1.IsValid() && v2.IsValid() && detail::IsEquals(v1, v2));
 }
 
-inline constexpr bool operator!=(const Version& v1, const Version& v2) {
+inline constexpr bool operator!=(const Version& v1, const Version& v2) noexcept {
   return ((v1.IsValid() && v2.IsValid()) && !detail::IsEquals(v1, v2));
 }
 
-inline constexpr bool operator>(const Version& v1, const Version& v2) {
+inline constexpr bool operator>(const Version& v1, const Version& v2) noexcept {
   return (v1.IsValid() && v2.IsValid() && detail::IsGreater(v1, v2));
 }
 
-inline constexpr bool operator>=(const Version& v1, const Version& v2) {
+inline constexpr bool operator>=(const Version& v1, const Version& v2) noexcept {
   return ((v1.IsValid() && v2.IsValid()) && (detail::IsEquals(v1, v2) || detail::IsGreater(v1, v2)));
 }
 
-inline constexpr bool operator<(const Version& v1, const Version& v2) {
+inline constexpr bool operator<(const Version& v1, const Version& v2) noexcept {
   return (v1.IsValid() && v2.IsValid() && detail::IsLess(v1, v2));
 }
 
-inline constexpr bool operator<=(const Version& v1, const Version& v2) {
+inline constexpr bool operator<=(const Version& v1, const Version& v2) noexcept {
   return ((v1.IsValid() && v2.IsValid()) && (detail::IsEquals(v1, v2) || detail::IsLess(v1, v2)));
 }
 
-inline std::ostream& operator<<(std::ostream& os, const Version& v) {
+inline std::ostream& operator<<(std::ostream& os, const Version& v) noexcept {
   std::array<char, kVersionStringLength> version = {{'\0'}};
   v.ToString(version.data());
   os << version.data();
   return os;
 }
 
-inline std::istream& operator>>(std::istream& is, Version& v) {
+inline std::istream& operator>>(std::istream& is, Version& v) noexcept {
   std::array<char, kVersionStringLength> version = {{'\0'}};
   is >> version.data();
   v.FromString(version.data());
   return is;
 }
 
-inline std::size_t ToString(const Version& v, char* s, const std::size_t length) {
+inline std::size_t ToString(const Version& v, char* s, const std::size_t length) noexcept {
   if (s == nullptr || !v.IsValid()) {
     return 0;
   }
@@ -328,7 +328,7 @@ inline std::size_t ToString(const Version& v, char* s, const std::size_t length)
   return 0;
 }
 
-inline std::string ToString(const Version& v) {
+inline std::string ToString(const Version& v) noexcept {
   std::string s(kVersionStringLength, '\0');
   const std::size_t size = ToString(v, &s[0], s.length());
   if (size > 0) {
@@ -340,7 +340,7 @@ inline std::string ToString(const Version& v) {
   return std::string{};
 }
 
-inline Version FromString(const char* s) {
+inline Version FromString(const char* s) noexcept {
   Version v{0, 0, 0, static_cast<Version::PreReleaseType>(-1), 0};
   if (s == nullptr) {
     return v;
@@ -380,11 +380,11 @@ inline Version FromString(const char* s) {
   return v;
 }
 
-inline Version FromString(const std::string& s) {
+inline Version FromString(const std::string& s) noexcept {
   return FromString(s.c_str());
 }
 
-inline Version operator"" _version(const char* s, const std::size_t) {
+inline Version operator"" _version(const char* s, const std::size_t) noexcept {
   return FromString(s);
 }
 
