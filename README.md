@@ -31,7 +31,7 @@ C++ library compare and manipulate versions are available as extensions to the `
 * Constexpr comparison: <, <=, ==, !=, > >=
 * From/To string
 
-## [Example](example/example.cpp) & Key Use Cases
+## [Examples](example/example.cpp)
 
 * Create
 
@@ -90,7 +90,7 @@ v2.FromString(s);
 
 ## Integration
 
-You need to add the single required file [semver.hpp](include/semver.hpp), and the necessary switches to enable C++11.
+You should add required file [semver.hpp](include/semver.hpp) and switch to C++11.
 
 ## Compiler compatibility
 
