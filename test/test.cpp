@@ -439,12 +439,12 @@ TEST_CASE("is valid") {
   SECTION("operators") {
     constexpr Version v1(1, 4, 3, static_cast<Version::PreReleaseType>(-100));
     constexpr Version v2(1, 4, 3, static_cast<Version::PreReleaseType>(-50));
-    STATIC_CKECK_FALSE_OP_AND_REVERSE(v1, ==, v2);
-    STATIC_CKECK_FALSE_OP_AND_REVERSE(v1, != , v2);
-    STATIC_CKECK_FALSE_OP_AND_REVERSE(v1, > , v2);
-    STATIC_CKECK_FALSE_OP_AND_REVERSE(v1, >= , v2);
-    STATIC_CKECK_FALSE_OP_AND_REVERSE(v1, < , v2);
-    STATIC_CKECK_FALSE_OP_AND_REVERSE(v1, <= , v2);
+    STATIC_CKECK_FALSE_OP_AND_REVERSE(v1, ==, v2); // false
+    STATIC_CKECK_OP_AND_REVERSE(v1, != , v2); // true
+    STATIC_CKECK_FALSE_OP_AND_REVERSE(v1, > , v2); // false
+    STATIC_CKECK_FALSE_OP_AND_REVERSE(v1, >= , v2); // false
+    STATIC_CKECK_FALSE_OP_AND_REVERSE(v1, < , v2); // false
+    STATIC_CKECK_FALSE_OP_AND_REVERSE(v1, <= , v2); // false
   }
 }
 

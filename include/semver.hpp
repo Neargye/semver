@@ -233,7 +233,7 @@ inline constexpr bool operator==(const Version& lhs, const Version& rhs) noexcep
 }
 
 inline constexpr bool operator!=(const Version& lhs, const Version& rhs) noexcept {
-  return ((lhs.IsValid() && rhs.IsValid()) && !detail::IsEquals(lhs, rhs));
+  return !(lhs == rhs);
 }
 
 inline constexpr bool operator>(const Version& lhs, const Version& rhs) noexcept {
