@@ -53,8 +53,7 @@
 
 namespace semver {
 
-#pragma pack(push, 1)
-struct Version final {
+struct alignas(1) Version final {
   static constexpr const ::std::size_t kVersionStringLength = 22;
   // 3(<major>) + 1(.) + 3(<minor>) + 1(.) + 3(<patch>) +
   // 1(-) + 5(<prerelease>) + 1(.) + 3(<prereleaseversion>) + 1('\0') = 22
@@ -103,7 +102,6 @@ struct Version final {
 
   bool FromString(const ::std::string&) noexcept;
 };
-#pragma pack(pop)
 
 ::std::size_t ToString(const Version&, char*, const ::std::size_t = Version::kVersionStringLength) noexcept;
 
