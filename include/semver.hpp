@@ -253,15 +253,21 @@ inline constexpr bool operator<=(const Version& lhs, const Version& rhs) noexcep
 
 inline std::ostream& operator<<(std::ostream& os, const Version& v) noexcept {
   std::array<char, Version::kVersionStringLength> version = {{'\0'}};
-  v.ToString(version.data());
-  os << version.data();
+  const auto length = v.ToString(version.data());
+  if (length > 0) {
+    os << version.data();
+  }
+
   return os;
 }
 
 inline std::istream& operator>>(std::istream& is, Version& v) noexcept {
   std::array<char, Version::kVersionStringLength> version = {{'\0'}};
   is >> version.data();
-  v.FromString(version.data());
+  if (!v.FromString(version.data())) {
+    is.setstate(std::ios::failbit);
+  }
+
   return is;
 }
 
