@@ -60,7 +60,7 @@ struct alignas(1) Version final {
 
   enum class PreReleaseType : std::int8_t {
     kAlpha = 0,
-    kBetha = 1,
+    kBeta = 1,
     kReleaseCandidate = 2,
     kNone = 3,
   };
@@ -289,12 +289,12 @@ inline std::size_t ToString(const Version& v, char* str, std::size_t length) noe
       }
       break;
     }
-    case Version::PreReleaseType::kBetha: {
+    case Version::PreReleaseType::kBeta: {
       if (v.pre_release_version == 0) {
-        size = std::snprintf(str, length, "%" PRIu8 ".%" PRIu8 ".%" PRIu8 "-betha",
+        size = std::snprintf(str, length, "%" PRIu8 ".%" PRIu8 ".%" PRIu8 "-beta",
                              v.major, v.minor, v.patch);
       } else {
-        size = std::snprintf(str, length, "%" PRIu8 ".%" PRIu8 ".%" PRIu8 "-betha.%" PRIu8,
+        size = std::snprintf(str, length, "%" PRIu8 ".%" PRIu8 ".%" PRIu8 "-beta.%" PRIu8,
                              v.major, v.minor, v.patch, v.pre_release_version);
       }
       break;
@@ -353,10 +353,10 @@ inline Version FromString(const char* str) noexcept {
     } else if (std::strcmp(prerelease.data(), "-alpha") == 0) {
       v.pre_release_type = Version::PreReleaseType::kAlpha;
       v.pre_release_version = 0;
-    } else if (std::strcmp(prerelease.data(), "-betha.") == 0) {
-      v.pre_release_type = Version::PreReleaseType::kBetha;
-    } else if (std::strcmp(prerelease.data(), "-betha") == 0) {
-      v.pre_release_type = Version::PreReleaseType::kBetha;
+    } else if (std::strcmp(prerelease.data(), "-beta.") == 0) {
+      v.pre_release_type = Version::PreReleaseType::kBeta;
+    } else if (std::strcmp(prerelease.data(), "-beta") == 0) {
+      v.pre_release_type = Version::PreReleaseType::kBeta;
       v.pre_release_version = 0;
     } else if (std::strcmp(prerelease.data(), "-rc.") == 0) {
       v.pre_release_type = Version::PreReleaseType::kReleaseCandidate;
