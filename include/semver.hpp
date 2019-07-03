@@ -34,357 +34,256 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE  OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#pragma once
-
-#if defined(_MSC_VER)
-#  pragma warning(push)
-#  pragma warning(disable : 4996)
-#endif
+#ifndef NEARGYE_SEMANTIC_VERSIONING_HPP
+#define NEARGYE_SEMANTIC_VERSIONING_HPP
 
 #include <cstdint>
 #include <cstddef>
-#include <cinttypes>
-#include <cstdio>
-#include <cstring>
-#include <array>
+#include <iosfwd>
+#include <optional>
 #include <string>
-#include <ostream>
-#include <istream>
+#include <string_view>
+
+// Allow to disable exceptions.
+#if (defined(__cpp_exceptions) || defined(__EXCEPTIONS) || defined(_CPPUNWIND)) && !defined(SEMVER_NOEXCEPTION)
+#  include <stdexcept>
+#  define SEMVER_THROW(exception) throw exception
+#else
+#  include <cstdlib>
+#  define SEMVER_THROW(exception) std::abort()
+#endif
 
 namespace semver {
 
-struct alignas(1) Version final {
-  static constexpr const std::size_t kVersionStringLength = 22;
-  // 3(<major>) + 1(.) + 3(<minor>) + 1(.) + 3(<patch>) +
-  // 1(-) + 5(<prerelease>) + 1(.) + 3(<prereleaseversion>) + 1('\0') = 22
+enum class prerelease : std::uint8_t {
+  alpha = 0,
+  beta = 1,
+  rc = 2,
+  none = 3
+};
 
-  enum class PreReleaseType : std::int8_t {
-    kAlpha = 0,
-    kBeta = 1,
-    kReleaseCandidate = 2,
-    kNone = 3,
-  };
+namespace detail {
 
+constexpr char char_to_lower(char c) {
+  return (c >= 'A' && c <= 'Z') ? c + ('a' - 'A') : c;
+}
+
+constexpr bool is_digit(char c) {
+  return c >= '0' && c <= '9';
+}
+
+constexpr std::uint8_t char_to_digit(char c) {
+  return c - '0';
+}
+
+constexpr bool read_uint(std::string_view str, std::size_t& i, std::uint8_t& d) {
+  if (d = 0; is_digit(str[i])) {
+    for (std::size_t p = 0; (p < 3) && (i + p < str.length()); ++p) {
+      if (detail::is_digit(str[p + i])) {
+        d = d * 10 + detail::char_to_digit(str[p + i]);
+      } else {
+        i += p;
+        return true;
+      }
+    }
+    i += 3;
+    return true;
+  } else {
+    return false;
+  }
+}
+
+constexpr bool read_dot(std::string_view str, std::size_t& i) {
+  if (str[i] == '.') {
+    ++i;
+    return true;
+  } else {
+    return false;
+  }
+}
+
+constexpr bool read_prerelease(std::string_view str, std::size_t& i, prerelease& p) {
+  constexpr std::string_view alpha{"-alpha"};
+  constexpr std::string_view beta{"-beta"};
+  constexpr std::string_view rc{"-rc"};
+
+  if (str.compare(i, alpha.length(), alpha) == 0) {
+    i += alpha.length();
+    p = prerelease::alpha;
+    return true;
+  } else if (str.compare(i, beta.length(), beta) == 0) {
+    i += beta.length();
+    p = prerelease::beta;
+    return true;
+  } else if (str.compare(i, rc.length(), rc) == 0) {
+    i += rc.length();
+    p = prerelease::rc;
+    return true;
+  } else {
+    return false;
+  }
+}
+
+} // namespace semver::detail
+
+struct alignas(1) version final {
   std::uint8_t major;
   std::uint8_t minor;
   std::uint8_t patch;
-  PreReleaseType pre_release_type;
+  prerelease prerelease_type;
   std::uint8_t pre_release_version;
 
-  constexpr Version(std::uint8_t major,
+  constexpr version(std::uint8_t major,
                     std::uint8_t minor,
                     std::uint8_t patch,
-                    PreReleaseType pre_release_type = PreReleaseType::kNone,
-                    std::uint8_t pre_release_version = static_cast<std::uint8_t>(0)) noexcept;
-
-  constexpr Version() noexcept;
-
-  constexpr Version(const Version&) = default;
-
-  constexpr Version(Version&&) = default;
-
-  explicit Version(const std::string& str) noexcept;
-
-  explicit Version(const char* str) noexcept;
-
-  ~Version() = default;
-
-  Version& operator=(const Version&) = default;
-
-  Version& operator=(Version&&) = default;
-
-  constexpr bool IsValid() const noexcept;
-
-  std::size_t ToString(char* str, std::size_t length = kVersionStringLength) const noexcept;
-
-  std::string ToString() const noexcept;
-
-  bool FromString(const char* str) noexcept;
-
-  bool FromString(const std::string& str) noexcept;
-};
-
-std::size_t ToString(const Version& v, char* str, std::size_t length = Version::kVersionStringLength) noexcept;
-
-std::string ToString(const Version& v) noexcept;
-
-Version FromString(const char* str) noexcept;
-
-Version FromString(const std::string& str) noexcept;
-
-constexpr bool operator==(const Version& lhs, const Version& rhs) noexcept;
-
-constexpr bool operator!=(const Version& lhs, const Version& rhs) noexcept;
-
-constexpr bool operator>(const Version& lhs, const Version& rhs) noexcept;
-
-constexpr bool operator>=(const Version& lhs, const Version& rhs) noexcept;
-
-constexpr bool operator<(const Version& lhs, const Version& rhs) noexcept;
-
-constexpr bool operator<=(const Version& lhs, const Version& rhs) noexcept;
-
-std::ostream& operator<<(std::ostream& os, const Version& v) noexcept;
-
-std::istream& operator>>(std::istream& is, Version& v) noexcept;
-
-Version operator"" _version(const char* str, std::size_t length) noexcept;
-
-namespace detail {
-
-constexpr bool IsEquals(const Version&, const Version&) noexcept;
-
-constexpr bool IsLess(const Version&, const Version&) noexcept;
-
-constexpr bool IsGreater(const Version&, const Version&) noexcept;
-
-} // namespace detail
-
-} // namespace semver
-
-namespace semver {
-
-namespace detail {
-
-inline constexpr bool IsEquals(const Version& lhs, const Version& rhs) noexcept {
-  return (lhs.major == rhs.major) &&
-         (lhs.minor == rhs.minor) &&
-         (lhs.patch == rhs.patch) &&
-         (lhs.pre_release_type == rhs.pre_release_type) &&
-         (lhs.pre_release_version == rhs.pre_release_version);
-}
-
-inline constexpr bool IsLess(const Version& lhs, const Version& rhs) noexcept {
-  // https://semver.org/#spec-item-11
-  return (lhs.major != rhs.major)
-             ? (lhs.major < rhs.major)
-             : (lhs.minor != rhs.minor)
-                   ? (lhs.minor < rhs.minor)
-                   : (lhs.patch != rhs.patch)
-                         ? (lhs.patch < rhs.patch)
-                         : (lhs.pre_release_type != rhs.pre_release_type)
-                               ? (lhs.pre_release_type < rhs.pre_release_type)
-                               : (lhs.pre_release_version < rhs.pre_release_version);
-}
-
-inline constexpr bool IsGreater(const Version& lhs, const Version& rhs) noexcept {
-  // https://semver.org/#spec-item-11
-  return (lhs.major != rhs.major)
-             ? (lhs.major > rhs.major)
-             : (lhs.minor != rhs.minor)
-                   ? (lhs.minor > rhs.minor)
-                   : (lhs.patch != rhs.patch)
-                         ? (lhs.patch > rhs.patch)
-                         : (lhs.pre_release_type != rhs.pre_release_type)
-                               ? (lhs.pre_release_type > rhs.pre_release_type)
-                               : (lhs.pre_release_version > rhs.pre_release_version);
-}
-
-} // namespace detail
-
-inline constexpr Version::Version(std::uint8_t major,
-                                  std::uint8_t minor,
-                                  std::uint8_t patch,
-                                  PreReleaseType pre_release_type,
-                                  std::uint8_t pre_release_version) noexcept
-    : major{major},
-      minor{minor},
-      patch{patch},
-      pre_release_type{pre_release_type},
-      pre_release_version{(pre_release_type == PreReleaseType::kNone)
-                              ? static_cast<std::uint8_t>(0)
-                              : pre_release_version} {}
-
-inline constexpr Version::Version() noexcept : Version(0, 1, 0) {
-  // https://semver.org/#how-should-i-deal-with-revisions-in-the-0yz-initial-development-phase
-}
-
-inline Version::Version(const std::string& str) noexcept : Version(0, 0, 0) {
-  (*this) = semver::FromString(str);
-}
-
-inline Version::Version(const char* str) noexcept : Version(0, 0, 0) {
-  (*this) = semver::FromString(str);
-}
-
-inline constexpr bool Version::IsValid() const noexcept {
-  return ((pre_release_type >= PreReleaseType::kAlpha) && (pre_release_type <= PreReleaseType::kNone));
-}
-
-inline std::size_t Version::ToString(char* str, std::size_t length) const noexcept {
-  return semver::ToString(*this, str, length);
-}
-
-inline std::string Version::ToString() const noexcept {
-  return semver::ToString(*this);
-}
-
-inline bool Version::FromString(const char* str) noexcept {
-  return ((*this) = semver::FromString(str)).IsValid();
-}
-
-inline bool Version::FromString(const std::string& str) noexcept {
-  return ((*this) = semver::FromString(str)).IsValid();
-}
-
-inline constexpr bool operator==(const Version& lhs, const Version& rhs) noexcept {
-  return (lhs.IsValid() && rhs.IsValid() && detail::IsEquals(lhs, rhs));
-}
-
-inline constexpr bool operator!=(const Version& lhs, const Version& rhs) noexcept {
-  return !(lhs == rhs);
-}
-
-inline constexpr bool operator>(const Version& lhs, const Version& rhs) noexcept {
-  return (lhs.IsValid() && rhs.IsValid() && detail::IsGreater(lhs, rhs));
-}
-
-inline constexpr bool operator>=(const Version& lhs, const Version& rhs) noexcept {
-  return ((lhs.IsValid() && rhs.IsValid()) && (detail::IsEquals(lhs, rhs) || detail::IsGreater(lhs, rhs)));
-}
-
-inline constexpr bool operator<(const Version& lhs, const Version& rhs) noexcept {
-  return (lhs.IsValid() && rhs.IsValid() && detail::IsLess(lhs, rhs));
-}
-
-inline constexpr bool operator<=(const Version& lhs, const Version& rhs) noexcept {
-  return ((lhs.IsValid() && rhs.IsValid()) && (detail::IsEquals(lhs, rhs) || detail::IsLess(lhs, rhs)));
-}
-
-inline std::ostream& operator<<(std::ostream& os, const Version& v) noexcept {
-  std::array<char, Version::kVersionStringLength> version = {{'\0'}};
-  const auto length = v.ToString(version.data());
-  if (length > 0) {
-    os << version.data();
+                    prerelease prerelease_type = prerelease::none,
+                    std::uint8_t pre_release_version = 0) noexcept
+      : major{major},
+        minor{minor},
+        patch{patch},
+        prerelease_type{prerelease_type},
+        pre_release_version{prerelease_type == prerelease::none ? static_cast<std::uint8_t>(0) : pre_release_version} {
   }
 
-  return os;
-}
-
-inline std::istream& operator>>(std::istream& is, Version& v) noexcept {
-  std::array<char, Version::kVersionStringLength> version = {{'\0'}};
-  is >> version.data();
-  if (!v.FromString(version.data())) {
-    is.setstate(std::ios::failbit);
+  constexpr version(std::string_view str): version() {
+    from_string(str);
   }
 
-  return is;
-}
-
-inline std::size_t ToString(const Version& v, char* str, std::size_t length) noexcept {
-  if (str == nullptr || !v.IsValid()) {
-    return 0;
+  constexpr version() noexcept : version(0, 1, 0) {
+    // https://semver.org/#how-should-i-deal-with-revisions-in-the-0yz-initial-development-phase
   }
 
-  int size = 0;
+  constexpr version(const version&) = default;
 
-  switch (v.pre_release_type) {
-    case Version::PreReleaseType::kAlpha: {
-      if (v.pre_release_version == 0) {
-        size = std::snprintf(str, length, "%" PRIu8 ".%" PRIu8 ".%" PRIu8 "-alpha",
-                             v.major, v.minor, v.patch);
-      } else {
-        size = std::snprintf(str, length, "%" PRIu8 ".%" PRIu8 ".%" PRIu8 "-alpha.%" PRIu8,
-                             v.major, v.minor, v.patch, v.pre_release_version);
-      }
-      break;
+  constexpr version(version&&) = default;
+
+  ~version() = default;
+
+  version& operator=(const version&) = default;
+
+  version& operator=(version&&) = default;
+
+  std::string to_string() const {
+    auto str = std::to_string(major)
+                  .append(".")
+                  .append(std::to_string(minor))
+                  .append(".")
+                  .append(std::to_string(patch));
+
+    switch (prerelease_type) {
+      case prerelease::alpha:
+        str.append("-alpha");
+        break;
+
+      case prerelease::beta:
+        str.append("-beta");
+        break;
+
+      case prerelease::rc:
+        str.append("-rc");
+        break;
+
+      case prerelease::none:
+        return str;
+
+      default:
+        SEMVER_THROW(std::invalid_argument{"invalid version"});
     }
-    case Version::PreReleaseType::kBeta: {
-      if (v.pre_release_version == 0) {
-        size = std::snprintf(str, length, "%" PRIu8 ".%" PRIu8 ".%" PRIu8 "-beta",
-                             v.major, v.minor, v.patch);
-      } else {
-        size = std::snprintf(str, length, "%" PRIu8 ".%" PRIu8 ".%" PRIu8 "-beta.%" PRIu8,
-                             v.major, v.minor, v.patch, v.pre_release_version);
-      }
-      break;
-    }
-    case Version::PreReleaseType::kReleaseCandidate: {
-      if (v.pre_release_version == 0) {
-        size = std::snprintf(str, length, "%" PRIu8 ".%" PRIu8 ".%" PRIu8 "-rc",
-                             v.major, v.minor, v.patch);
-      } else {
-        size = std::snprintf(str, length, "%" PRIu8 ".%" PRIu8 ".%" PRIu8 "-rc.%" PRIu8,
-                             v.major, v.minor, v.patch, v.pre_release_version);
-      }
-      break;
-    }
-    case Version::PreReleaseType::kNone: {
-      size = std::snprintf(str, length, "%" PRIu8 ".%" PRIu8 ".%" PRIu8,
-                           v.major, v.minor, v.patch);
-      break;
-    }
-    default:
-      break;
-  }
 
-  if (size > 0) {
-    return static_cast<std::size_t>(size);
-  }
+    if (pre_release_version > 0) {
+      str.append(".").append(std::to_string(pre_release_version));
+    }
 
-  return 0;
-}
-
-inline std::string ToString(const Version& v) noexcept {
-  std::string str(Version::kVersionStringLength, '\0');
-  const auto size = ToString(v, &str[0], str.length());
-  if (size > 0) {
-    str.resize(size);
-    str.shrink_to_fit();
     return str;
   }
 
-  return std::string{};
-}
-
-inline Version FromString(const char* str) noexcept {
-  Version v{0, 0, 0, static_cast<Version::PreReleaseType>(-1), 0};
-  if (str == nullptr) {
-    return v;
-  }
-  std::array<char, 8> prerelease = {{'\0'}};
-  const auto num = std::sscanf(str, "%" SCNu8 ".%" SCNu8 ".%" SCNu8 "%7[^0-9]%" SCNu8,
-                               &(v.major), &(v.minor), &(v.patch),
-                               prerelease.data(), &(v.pre_release_version));
-
-  if (num > 3 && num <= 5) {
-    if (std::strcmp(prerelease.data(), "-alpha.") == 0) {
-      v.pre_release_type = Version::PreReleaseType::kAlpha;
-    } else if (std::strcmp(prerelease.data(), "-alpha") == 0) {
-      v.pre_release_type = Version::PreReleaseType::kAlpha;
-      v.pre_release_version = 0;
-    } else if (std::strcmp(prerelease.data(), "-beta.") == 0) {
-      v.pre_release_type = Version::PreReleaseType::kBeta;
-    } else if (std::strcmp(prerelease.data(), "-beta") == 0) {
-      v.pre_release_type = Version::PreReleaseType::kBeta;
-      v.pre_release_version = 0;
-    } else if (std::strcmp(prerelease.data(), "-rc.") == 0) {
-      v.pre_release_type = Version::PreReleaseType::kReleaseCandidate;
-    } else if (std::strcmp(prerelease.data(), "-rc") == 0) {
-      v.pre_release_type = Version::PreReleaseType::kReleaseCandidate;
-      v.pre_release_version = 0;
+  constexpr void from_string(std::string_view str) {
+    if (std::size_t i = 0;
+        detail::read_uint(str, i, major) && detail::read_dot(str, i) &&
+        detail::read_uint(str, i, minor) && detail::read_dot(str, i) &&
+        detail::read_uint(str, i, patch)) {
+      if (str.length() != i) {
+        if (detail::read_prerelease(str, i, prerelease_type)) {
+          if (str.length() != i) {
+            if (detail::read_dot(str, i) && detail::read_uint(str, i, pre_release_version)) {
+              if (str.length() != i) {
+                SEMVER_THROW(std::invalid_argument{"invalid version"});
+              }
+            } else {
+              SEMVER_THROW(std::invalid_argument{"invalid version"});
+            }
+          }
+        } else {
+          SEMVER_THROW(std::invalid_argument{"invalid version"});
+        }
+      }
     } else {
-      v.pre_release_type = static_cast<Version::PreReleaseType>(-1);
+      SEMVER_THROW(std::invalid_argument{"invalid version"});
     }
-  } else if (num == 3) {
-      v.pre_release_type = Version::PreReleaseType::kNone;
-      v.pre_release_version = 0;
   }
 
-  return v;
+  constexpr int compare(const version& other) const noexcept {
+    if (major == other.major) {
+      if (minor == other.minor) {
+        if (patch == other.patch) {
+          if (prerelease_type == other.prerelease_type) {
+            return pre_release_version - other.pre_release_version;
+          } else {
+            return static_cast<std::uint8_t>(prerelease_type) - static_cast<std::uint8_t>(other.prerelease_type);
+          }
+        } else {
+          return patch - other.patch;
+        }
+      } else {
+        return minor - other.minor;
+      }
+    } else {
+      return major - other.major;
+    }
+  }
+};
+
+constexpr bool operator==(const version& lhs, const version& rhs) noexcept {
+  return lhs.compare(rhs) == 0;
 }
 
-inline Version FromString(const std::string& str) noexcept {
-  return FromString(str.c_str());
+constexpr bool operator!=(const version& lhs, const version& rhs) noexcept {
+  return lhs.compare(rhs) != 0;
 }
 
-inline Version operator"" _version(const char* str, std::size_t length) noexcept {
-  (void)length;
-  return FromString(str);
+constexpr bool operator>(const version& lhs, const version& rhs) noexcept {
+  return lhs.compare(rhs) > 0;
+}
+
+constexpr bool operator>=(const version& lhs, const version& rhs) noexcept {
+  return lhs.compare(rhs) >= 0;
+}
+
+constexpr bool operator<(const version& lhs, const version& rhs) noexcept {
+  return lhs.compare(rhs) < 0;
+}
+
+constexpr bool operator<=(const version& lhs, const version& rhs) noexcept {
+  return lhs.compare(rhs) <= 0;
+}
+
+inline std::ostream& operator<<(std::ostream& os, const version& v) {
+  os << v.to_string();
+  return os;
+}
+
+inline version operator"" _version(const char* str, std::size_t) {
+  return version{str};
+}
+
+std::string to_string(const version& v) {
+  return v.to_string();
+}
+
+version from_string(std::string_view str) {
+  return version{str};
 }
 
 } // namespace semver
 
-#if defined(_MSC_VER)
-#  pragma warning(pop)
-#endif
+#endif // NEARGYE_SEMANTIC_VERSIONING_HPP

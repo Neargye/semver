@@ -21,46 +21,33 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE  OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <semver.hpp>
-
 #include <iostream>
+
+#include <semver.hpp>
 
 using namespace semver;
 
 int main() {
-  constexpr Version v_default;
-  static_assert(v_default == Version(0, 1, 0, Version::PreReleaseType::kNone, 0), "");
+  constexpr version v_default;
+  static_assert(v_default == version(0, 1, 0, prerelease::none, 0), "");
   std::cout << v_default << std::endl; // 0.1.0
 
-  constexpr Version v1(1, 4, 3);
-  constexpr Version v2(1, 2, 4, Version::PreReleaseType::kAlpha, 10);
+  constexpr version v1(1, 4, 3);
+  constexpr version v2(255, 255, 255, prerelease::alpha, 255);
   std::cout << v1 << std::endl; // 1.4.3
   std::cout << v2 << std::endl; // 1.2.4-alpha.10
-  static_assert(v1 != v2, "");
-  static_assert(!(v1 == v2), "");
-  static_assert(v1 > v2, "");
-  static_assert(v1 >= v2, "");
-  static_assert(!(v1 < v2), "");
-  static_assert(!(v1 <= v2), "");
 
-  Version v_s;
-  v_s.FromString("1.2.3-rc.1");
-  const std::string s1 = v_s.ToString();
-  std::cout << s1 << std::endl; // 1.2.3-rc.1
-  v_s.pre_release_version = 0;
-  const std::string s2 = v_s.ToString();
-  std::cout << s2 << std::endl; // 1.2.3-rc
+  auto s = v2.to_string();
+  std::cout << s.size() << std::endl;
+  std::cout << s.capacity() << std::endl;
+  s.shrink_to_fit();
+  std::cout << s.size() << std::endl;
+  std::cout << s.capacity() << std::endl;
 
-  const Version vo = "1.2.3-rc.1"_version;
-  std::cout << vo << std::endl; // 1.2.3-rc.1
-
-  Version vi;
-  std::cin >> vi;
-  if (vi.IsValid()) {
-    std::cout << vi << std::endl;
-  } else {
-    std::cout << "incorrect format version" << std::endl;
-  }
+  version vs("1.2.3-alpha");
+  version v(0,0,0);
+  v.from_string("1.2.3-alpha.100");
+  std::cout << v.to_string() << std::endl;
 
   return 0;
 }
