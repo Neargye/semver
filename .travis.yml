@@ -1,6 +1,5 @@
-os: linux
-dist: trusty
-
+os: linux # Use linux unless specified otherwise.
+dist: xenial
 sudo: required
 
 language: cpp
@@ -10,50 +9,6 @@ git:
 
 matrix:
   include:
-    - os: linux
-      compiler: g++
-      addons:
-        apt:
-          sources:
-            - ubuntu-toolchain-r-test
-          packages:
-            - g++-4.8
-      env:
-        - CXX_COMPILER=g++-4.8 CC_COMPILER=gcc-4.8
-
-    - os: linux
-      compiler: g++
-      addons:
-        apt:
-          sources:
-            - ubuntu-toolchain-r-test
-          packages:
-            - g++-4.9
-      env:
-        - CXX_COMPILER=g++-4.9 CC_COMPILER=gcc-4.9
-
-    - os: linux
-      compiler: g++
-      addons:
-        apt:
-          sources:
-            - ubuntu-toolchain-r-test
-          packages:
-            - g++-5
-      env:
-        - CXX_COMPILER=g++-5 CC_COMPILER=gcc-5
-
-    - os: linux
-      compiler: g++
-      addons:
-        apt:
-          sources:
-            - ubuntu-toolchain-r-test
-          packages:
-            - g++-6
-      env:
-        - CXX_COMPILER=g++-6 CC_COMPILER=gcc-6
-
     - os: linux
       compiler: g++
       addons:
@@ -77,16 +32,15 @@ matrix:
         - CXX_COMPILER=g++-8 CC_COMPILER=gcc-8
 
     - os: linux
-      compiler: clang++
+      compiler: g++
       addons:
         apt:
           sources:
             - ubuntu-toolchain-r-test
-            - llvm-toolchain-precise-3.6
           packages:
-            - clang-3.6
+            - g++-9
       env:
-        - CXX_COMPILER=clang++-3.6 CC_COMPILER=clang-3.6
+        - CXX_COMPILER=g++-9 CC_COMPILER=gcc-9
 
     - os: linux
       compiler: clang++
@@ -94,55 +48,7 @@ matrix:
         apt:
           sources:
             - ubuntu-toolchain-r-test
-            - llvm-toolchain-precise-3.7
-          packages:
-            - clang-3.7
-      env:
-        - CXX_COMPILER=clang++-3.7 CC_COMPILER=clang-3.7
-
-    - os: linux
-      compiler: clang++
-      addons:
-        apt:
-          sources:
-            - ubuntu-toolchain-r-test
-            - llvm-toolchain-precise-3.8
-          packages:
-            - clang-3.8
-      env:
-        - CXX_COMPILER=clang++-3.8 CC_COMPILER=clang-3.8
-
-    - os: linux
-      compiler: clang++
-      addons:
-        apt:
-          sources:
-            - ubuntu-toolchain-r-test
-            - llvm-toolchain-trusty-3.9
-          packages:
-            - clang-3.9
-      env:
-        - CXX_COMPILER=clang++-3.9 CC_COMPILER=clang-3.9
-
-    - os: linux
-      compiler: clang++
-      addons:
-        apt:
-          sources:
-            - ubuntu-toolchain-r-test
-            - llvm-toolchain-trusty-4.0
-          packages:
-            - clang-4.0
-      env:
-        - CXX_COMPILER=clang++-4.0 CC_COMPILER=clang-4.0
-
-    - os: linux
-      compiler: clang++
-      addons:
-        apt:
-          sources:
-            - ubuntu-toolchain-r-test
-            - llvm-toolchain-trusty-5.0
+            - llvm-toolchain-xenial-5.0
           packages:
             - clang-5.0
       env:
@@ -154,7 +60,7 @@ matrix:
         apt:
           sources:
             - ubuntu-toolchain-r-test
-            - llvm-toolchain-trusty-6.0
+            - llvm-toolchain-xenial-6.0
           packages:
             - clang-6.0
       env:
@@ -166,23 +72,23 @@ matrix:
         apt:
           sources:
             - ubuntu-toolchain-r-test
-            - llvm-toolchain-trusty-7
+            - llvm-toolchain-xenial-7
           packages:
             - clang-7
       env:
         - CXX_COMPILER=clang++-7 CC_COMPILER=clang-7
 
-    - os: osx
+    - os: linux
       compiler: clang++
-      osx_image: xcode7.3
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+            - llvm-toolchain-xenial-8
+          packages:
+            - clang-8
       env:
-        - CXX_COMPILER=clang++ CC_COMPILER=clang
-
-    - os: osx
-      compiler: clang++
-      osx_image: xcode8.3
-      env:
-        - CXX_COMPILER=clang++ CC_COMPILER=clang
+        - CXX_COMPILER=clang++-8 CC_COMPILER=clang-8
 
     - os: osx
       compiler: clang++
@@ -192,7 +98,7 @@ matrix:
 
     - os: osx
       compiler: clang++
-      osx_image: xcode10.1
+      osx_image: xcode10.2
       env:
         - CXX_COMPILER=clang++ CC_COMPILER=clang
 
@@ -212,7 +118,8 @@ install:
       elif [[ "${CXX}" == "clang++-4.0" ]]; then LLVM_VERSION="4.0.1";
       elif [[ "${CXX}" == "clang++-5.0" ]]; then LLVM_VERSION="5.0.2";
       elif [[ "${CXX}" == "clang++-6.0" ]]; then LLVM_VERSION="6.0.1";
-      elif [[ "${CXX}" == "clang++-7" ]]; then LLVM_VERSION="7.0.0";
+      elif [[ "${CXX}" == "clang++-7" ]]; then LLVM_VERSION="7.0.1";
+      elif [[ "${CXX}" == "clang++-8" ]]; then LLVM_VERSION="8.0.0";
       fi
       LLVM_URL="http://llvm.org/releases/${LLVM_VERSION}/llvm-${LLVM_VERSION}.src.tar.xz"
       LIBCXX_URL="http://llvm.org/releases/${LLVM_VERSION}/libcxx-${LLVM_VERSION}.src.tar.xz"
