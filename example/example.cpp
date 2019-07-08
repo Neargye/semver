@@ -1,7 +1,6 @@
-// semver example
-//
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
-// Copyright (c) 2018 Daniil Goncharov <neargye@gmail.com>.
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2018 - 2019 Daniil Goncharov <neargye@gmail.com>.
 //
 // Permission is hereby  granted, free of charge, to any  person obtaining a copy
 // of this software and associated  documentation files (the "Software"), to deal
@@ -29,25 +28,30 @@ using namespace semver;
 
 int main() {
   constexpr version v_default;
-  static_assert(v_default == version(0, 1, 0, prerelease::none, 0), "");
+  static_assert(v_default == version(0, 1, 0, prerelease::none, 0));
   std::cout << v_default << std::endl; // 0.1.0
 
-  constexpr version v1(1, 4, 3);
-  constexpr version v2(255, 255, 255, prerelease::alpha, 255);
+  constexpr version v1{1, 4, 3};
+  constexpr version v2{"1.2.4-alpha.10"};
   std::cout << v1 << std::endl; // 1.4.3
   std::cout << v2 << std::endl; // 1.2.4-alpha.10
+  static_assert(v1 != v2);
+  static_assert(!(v1 == v2));
+  static_assert(v1 > v2);
+  static_assert(v1 >= v2);
+  static_assert(!(v1 < v2));
+  static_assert(!(v1 <= v2));
 
-  auto s = v2.to_string();
-  std::cout << s.size() << std::endl;
-  std::cout << s.capacity() << std::endl;
-  s.shrink_to_fit();
-  std::cout << s.size() << std::endl;
-  std::cout << s.capacity() << std::endl;
+  version v_s;
+  v_s.from_string("1.2.3-rc.1");
+  std::string s1 = v_s.to_string();
+  std::cout << s1 << std::endl; // 1.2.3-rc.1
+  v_s.prerelease_number = 0;
+  std::string s2 = v_s.to_string();
+  std::cout << s2 << std::endl; // 1.2.3-rc
 
-  version vs("1.2.3-alpha");
-  version v(0,0,0);
-  v.from_string("1.2.3-alpha.100");
-  std::cout << v.to_string() << std::endl;
+  constexpr version vo = "2.0.0-rc.3"_version;
+  std::cout << vo << std::endl; // .0.0-rc.3
 
   return 0;
 }
