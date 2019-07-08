@@ -1,22 +1,48 @@
-﻿cmake_minimum_required(VERSION 3.2)
-include(CheckCXXCompilerFlag)
-project(semver)
+﻿cmake_minimum_required(VERSION 3.8)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+project(semver VERSION "0.2.0" LANGUAGES CXX)
 
-if((CMAKE_CXX_COMPILER_ID MATCHES "GNU") OR (CMAKE_CXX_COMPILER_ID MATCHES "Clang"))
-    add_compile_options(-Wall -Wextra -pedantic-errors)
-elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-    add_compile_options(/W4)
-    check_cxx_compiler_flag(/permissive HAS_PERMISSIVE_FLAG)
-    if(HAS_PERMISSIVE_FLAG)
-        add_compile_options(/permissive-)
-    endif()
+if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+    set(IS_TOPLEVEL_PROJECT TRUE)
+else()
+    set(IS_TOPLEVEL_PROJECT FALSE)
 endif()
 
-add_subdirectory(example)
+option(SEMVER_OPT_BUILD_EXAMPLES "Build semver examples" ${IS_TOPLEVEL_PROJECT})
+option(SEMVER_OPT_BUILD_TESTS "Build and perform semver tests" ${IS_TOPLEVEL_PROJECT})
 
-#enable_testing()
-#add_subdirectory(test)
+if(SEMVER_OPT_BUILD_EXAMPLES)
+    add_subdirectory(example)
+endif()
+
+if(SEMVER_OPT_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(test)
+endif()
+
+include(CMakePackageConfigHelpers)
+
+add_library(${PROJECT_NAME} INTERFACE)
+add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
+target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_17)
+target_include_directories(${PROJECT_NAME}
+        INTERFACE
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+            $<INSTALL_INTERFACE:include>)
+
+write_basic_package_version_file(${PROJECT_NAME}ConfigVersion.cmake
+        VERSION ${PROJECT_VERSION}
+        COMPATIBILITY AnyNewerVersion)
+
+install(TARGETS ${PROJECT_NAME}
+        EXPORT ${PROJECT_NAME}Config)
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake
+        DESTINATION lib/cmake/${PROJECT_NAME})
+
+install(EXPORT ${PROJECT_NAME}Config
+        NAMESPACE ${PROJECT_NAME}::
+        DESTINATION lib/cmake/${PROJECT_NAME})
+
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include
+        DESTINATION .)
