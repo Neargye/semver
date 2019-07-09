@@ -70,6 +70,15 @@ constexpr char char_to_lower(char c) {
   return (c >= 'A' && c <= 'Z') ? c + ('a' - 'A') : c;
 }
 
+constexpr bool str_equals(std::string_view lhs, std::size_t pos, std::string_view rhs) {
+  for (std::size_t i1 = pos, i2 = 0; i1 < lhs.length() && i2 < rhs.length(); ++i1, ++i2) {
+    if (char_to_lower(lhs[i1]) != char_to_lower(rhs[i2])) {
+      return false;
+    }
+  }
+  return true;
+}
+
 constexpr bool is_digit(char c) {
   return c >= '0' && c <= '9';
 }
@@ -111,15 +120,15 @@ constexpr bool read_prerelease(std::string_view str, std::size_t& i, prerelease&
 
   if (i >= str.length()) {
     return false;
-  } else if (str.compare(i, alpha.length(), alpha) == 0) {
+  } else if (str_equals(str, i, alpha)) {
     i += alpha.length();
     p = prerelease::alpha;
     return true;
-  } else if (str.compare(i, beta.length(), beta) == 0) {
+  } else if (str_equals(str, i, beta)) {
     i += beta.length();
     p = prerelease::beta;
     return true;
-  } else if (str.compare(i, rc.length(), rc) == 0) {
+  } else if (str_equals(str, i, rc)) {
     i += rc.length();
     p = prerelease::rc;
     return true;
