@@ -28,6 +28,7 @@
 #include <cstddef>
 #include <array>
 #include <string>
+#include <string_view>
 #include <sstream>
 
 using namespace semver;
@@ -129,7 +130,7 @@ TEST_CASE("constructors") {
 }
 
 TEST_CASE("operators") {
-  constexpr std::array versions = {
+  constexpr std::array<version, 56> versions = {
       version{0, 0, 0, prerelease::alpha, 0},
       version{0, 0, 0, prerelease::alpha, 1},
       version{0, 0, 0, prerelease::beta, 0},
@@ -287,7 +288,7 @@ TEST_CASE("operators") {
 }
 
 TEST_CASE("from/to string") {
-  constexpr std::array versions = {
+  constexpr std::array<version, 19> versions = {
       version{1, 2, 3},
       version{255, 255, 255},
       version{0, 0, 0},
@@ -313,7 +314,7 @@ TEST_CASE("from/to string") {
       version{0, 0, 0, prerelease::rc, 0},
   };
 
-  constexpr std::array versions_strings = {
+  constexpr std::array<std::string_view, 19> versions_strings = {
       "1.2.3",
       "255.255.255",
       "0.0.0",
