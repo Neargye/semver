@@ -88,7 +88,7 @@ constexpr std::uint8_t char_to_digit(char c) {
 }
 
 constexpr bool read_uint(std::string_view str, std::size_t& i, std::uint8_t& d) {
-  if (std::int32_t t = 0; i < str.length() && is_digit(str[i])) {
+  if (std::uint32_t t = 0; i < str.length() && is_digit(str[i])) {
     for (std::size_t p = i, s = 0; p < str.length() && s < 3; ++p, ++s) {
       if (is_digit(str[p])) {
         t = t * 10 + char_to_digit(str[p]);
@@ -223,6 +223,7 @@ struct alignas(1) version final {
     } else if (detail::read_dot(str, i) && detail::read_uint(str, i, prerelease_number) && str.length() == i) {
       return true;
     }
+    *this = version{0, 0, 0};
     return false;
   }
 
