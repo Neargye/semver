@@ -76,6 +76,7 @@ constexpr bool str_equals(std::string_view lhs, std::size_t pos, std::string_vie
       return false;
     }
   }
+
   return true;
 }
 
@@ -102,6 +103,7 @@ constexpr bool read_uint(std::string_view str, std::size_t& i, std::uint8_t& d) 
       return true;
     }
   }
+
   return false;
 }
 
@@ -110,6 +112,7 @@ constexpr bool read_dot(std::string_view str, std::size_t& i) {
     ++i;
     return true;
   }
+
   return false;
 }
 
@@ -133,6 +136,7 @@ constexpr bool read_prerelease(std::string_view str, std::size_t& i, prerelease&
     p = prerelease::rc;
     return true;
   }
+
   return false;
 }
 
@@ -223,6 +227,7 @@ struct alignas(1) version final {
     } else if (detail::read_dot(str, i) && detail::read_uint(str, i, prerelease_number) && str.length() == i) {
       return true;
     }
+
     *this = version{0, 0, 0};
     return false;
   }
@@ -284,6 +289,7 @@ constexpr bool operator<=(const version& lhs, const version& rhs) noexcept {
 
 inline std::ostream& operator<<(std::ostream& os, const version& v) {
   os << v.to_string();
+
   return os;
 }
 
@@ -298,9 +304,9 @@ inline std::string to_string(const version& v) {
 constexpr std::optional<version> from_string_noexcept(std::string_view str) noexcept {
   if (version v{0, 0, 0}; v.from_string_noexcept(str)) {
     return v;
-  } else {
-    return std::nullopt;
   }
+
+  return std::nullopt;
 }
 
 constexpr version from_string(std::string_view str) {
