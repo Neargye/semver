@@ -66,11 +66,11 @@ enum class prerelease : std::uint8_t {
 
 namespace detail {
 
-constexpr char char_to_lower(char c) {
+constexpr char char_to_lower(char c) noexcept {
   return (c >= 'A' && c <= 'Z') ? c + ('a' - 'A') : c;
 }
 
-constexpr bool str_equals(std::string_view lhs, std::size_t pos, std::string_view rhs) {
+constexpr bool str_equals(std::string_view lhs, std::size_t pos, std::string_view rhs) noexcept {
   for (std::size_t i1 = pos, i2 = 0; i1 < lhs.length() && i2 < rhs.length(); ++i1, ++i2) {
     if (char_to_lower(lhs[i1]) != char_to_lower(rhs[i2])) {
       return false;
@@ -80,15 +80,15 @@ constexpr bool str_equals(std::string_view lhs, std::size_t pos, std::string_vie
   return true;
 }
 
-constexpr bool is_digit(char c) {
+constexpr bool is_digit(char c) noexcept {
   return c >= '0' && c <= '9';
 }
 
-constexpr std::uint8_t char_to_digit(char c) {
+constexpr std::uint8_t char_to_digit(char c) noexcept {
   return c - '0';
 }
 
-constexpr bool read_uint(std::string_view str, std::size_t& i, std::uint8_t& d) {
+constexpr bool read_uint(std::string_view str, std::size_t& i, std::uint8_t& d) noexcept {
   if (std::uint32_t t = 0; i < str.length() && is_digit(str[i])) {
     for (std::size_t p = i, s = 0; p < str.length() && s < 3; ++p, ++s) {
       if (is_digit(str[p])) {
@@ -107,7 +107,7 @@ constexpr bool read_uint(std::string_view str, std::size_t& i, std::uint8_t& d) 
   return false;
 }
 
-constexpr bool read_dot(std::string_view str, std::size_t& i) {
+constexpr bool read_dot(std::string_view str, std::size_t& i) noexcept {
   if (i < str.length() && str[i] == '.') {
     ++i;
     return true;
@@ -116,7 +116,7 @@ constexpr bool read_dot(std::string_view str, std::size_t& i) {
   return false;
 }
 
-constexpr bool read_prerelease(std::string_view str, std::size_t& i, prerelease& p) {
+constexpr bool read_prerelease(std::string_view str, std::size_t& i, prerelease& p) noexcept {
   constexpr std::string_view alpha{"-alpha"};
   constexpr std::string_view beta{"-beta"};
   constexpr std::string_view rc{"-rc"};
