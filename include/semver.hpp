@@ -293,8 +293,8 @@ inline std::ostream& operator<<(std::ostream& os, const version& v) {
   return os;
 }
 
-constexpr version operator"" _version(const char* str, std::size_t) {
-  return version{str};
+constexpr version operator"" _version(const char* str, std::size_t size) {
+  return version{std::string_view{str, size}};
 }
 
 inline std::string to_string(const version& v) {
