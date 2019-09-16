@@ -57,7 +57,7 @@
 
 namespace semver {
 
-enum class prerelease : std::uint8_t {
+enum struct prerelease : std::uint8_t {
   alpha = 0,
   beta = 1,
   rc = 2,
@@ -122,6 +122,7 @@ constexpr bool read_prerelease(std::string_view str, std::size_t& i, prerelease&
   constexpr std::string_view rc{"-rc"};
 
   if (i >= str.length()) {
+    p = prerelease::none;
     return false;
   } else if (str_equals(str, i, alpha)) {
     i += alpha.length();
@@ -293,7 +294,7 @@ inline std::ostream& operator<<(std::ostream& os, const version& v) {
   return os;
 }
 
-constexpr version operator"" _version(const char* str, std::size_t size) {
+constexpr version operator""_version(const char* str, std::size_t size) {
   return version{std::string_view{str, size}};
 }
 
