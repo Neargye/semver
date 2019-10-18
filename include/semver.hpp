@@ -143,12 +143,12 @@ constexpr bool read_prerelease(std::string_view str, std::size_t& i, prerelease&
 
 } // namespace semver::detail
 
-struct alignas(1) version final {
-  std::uint8_t major;
-  std::uint8_t minor;
-  std::uint8_t patch;
-  prerelease prerelease_type;
-  std::uint8_t prerelease_number;
+struct alignas(1) version {
+  std::uint8_t major = 0;
+  std::uint8_t minor = 1;
+  std::uint8_t patch = 0;
+  prerelease prerelease_type = prerelease::none;
+  std::uint8_t prerelease_number = 0;
 
   constexpr version(std::uint8_t major,
                     std::uint8_t minor,
@@ -162,13 +162,11 @@ struct alignas(1) version final {
         prerelease_number{prerelease_type == prerelease::none ? static_cast<std::uint8_t>(0) : prerelease_number} {
   }
 
-  constexpr version(std::string_view str) : version(0, 0, 0) {
+  constexpr version(std::string_view str) : version(0, 0, 0, prerelease::none, 0) {
     from_string(str);
   }
 
-  constexpr version() noexcept : version(0, 1, 0) {
-    // https://semver.org/#how-should-i-deal-with-revisions-in-the-0yz-initial-development-phase
-  }
+  constexpr version() = default; // https://semver.org/#how-should-i-deal-with-revisions-in-the-0yz-initial-development-phase
 
   constexpr version(const version&) = default;
 
@@ -289,9 +287,7 @@ constexpr bool operator<=(const version& lhs, const version& rhs) noexcept {
 }
 
 inline std::ostream& operator<<(std::ostream& os, const version& v) {
-  os << v.to_string();
-
-  return os;
+  return os << v.to_string();
 }
 
 constexpr version operator""_version(const char* str, std::size_t size) {
