@@ -75,8 +75,8 @@ You should add required file [semver.hpp](include/semver.hpp).
 ## Compiler compatibility
 
 * Clang/LLVM >= 5
-* Visual C++ >= 15.3 / Visual Studio >= 2017
-* Xcode >= 10.2
+* MSVC++ >= 14.11 / Visual Studio >= 2017
+* Xcode >= 10
 * GCC >= 7
 
 ## Licensed under the [MIT License](LICENSE)
