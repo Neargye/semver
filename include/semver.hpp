@@ -49,10 +49,10 @@
 // Allow to disable exceptions.
 #if (defined(__cpp_exceptions) || defined(__EXCEPTIONS) || defined(_CPPUNWIND)) && !defined(SEMVER_NOEXCEPTION)
 #  include <stdexcept>
-#  define SEMVER_THROW(exception) throw exception
+#  define __SEMVER_THROW(exception) throw exception
 #else
 #  include <cstdlib>
-#  define SEMVER_THROW(exception) std::abort()
+#  define __SEMVER_THROW(exception) std::abort()
 #endif
 
 namespace semver {
@@ -202,7 +202,7 @@ struct alignas(1) version {
         return str;
 
       default:
-        SEMVER_THROW(std::invalid_argument{"invalid version"});
+        __SEMVER_THROW(std::invalid_argument{"invalid version"});
     }
 
     if (prerelease_number > 0) {
@@ -233,7 +233,7 @@ struct alignas(1) version {
 
   constexpr void from_string(std::string_view str) {
     if (!from_string_noexcept(str)) {
-      SEMVER_THROW(std::invalid_argument{"invalid version"});
+      __SEMVER_THROW(std::invalid_argument{"invalid version"});
     }
   }
 
