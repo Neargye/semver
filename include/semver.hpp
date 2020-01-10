@@ -45,6 +45,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <iostream>
 
 // Allow to disable exceptions.
 #if (defined(__cpp_exceptions) || defined(__EXCEPTIONS) || defined(_CPPUNWIND)) && !defined(SEMVER_NOEXCEPTION)
