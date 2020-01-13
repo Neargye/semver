@@ -118,9 +118,9 @@ constexpr bool read_dot(std::string_view str, std::size_t& i) noexcept {
 }
 
 constexpr bool read_prerelease(std::string_view str, std::size_t& i, prerelease& p) noexcept {
-  constexpr std::string_view alpha{"-alpha"};
-  constexpr std::string_view beta{"-beta"};
-  constexpr std::string_view rc{"-rc"};
+  constexpr std::string_view alpha{"-alpha", 6};
+  constexpr std::string_view beta{"-beta", 5};
+  constexpr std::string_view rc{"-rc", 3};
 
   if (i >= str.length()) {
     p = prerelease::none;
