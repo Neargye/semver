@@ -31,7 +31,7 @@ C++ library compare and manipulate versions are available as extensions to the `
 * Dependency-free
 * Constexpr comparison: <, <=, ==, !=, > >=
 * Constexpr from string
-* To String
+* Constexpr to String
 
 ## [Examples](example/example.cpp)
 
@@ -58,14 +58,31 @@ static_assert(v2 <= v1);
 
 ```cpp
 constexpr semver::version v{1, 2, 3, prerelease::rc, 4};
+
+// To string.
 auto s = v.to_string(); // "1.2.3-rc.4"
+
+// Constexpr to chars.
+std::array<char, 32> str;
+v.to_chars(str.data(), str.data() + str.size());
 ```
 
 * From string
 
 ```cpp
-constexpr version v1("1.2.3-rc.4");
-constexpr version v2 = "1.2.3-rc.4"_version;
+// Constexpr from chars.
+constexpr semver::version v1("1.2.3-rc.4");
+constexpr semver::version v2 = "1.2.3-rc.4"_version;
+
+// From string.
+std::string s = "1.2.3-rc.4";
+version v3 = semver::from_string(s);
+```
+
+## Synopsis
+
+```
+TODO
 ```
 
 ## Integration

@@ -45,7 +45,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
-#include <iostream>
+#include <charconv>
 
 // Allow to disable exceptions.
 #if (defined(__cpp_exceptions) || defined(__EXCEPTIONS) || defined(_CPPUNWIND)) && !defined(SEMVER_NOEXCEPTION)
@@ -65,15 +65,46 @@ enum struct prerelease : std::uint8_t {
   none = 3
 };
 
+// Max version string length = 3(<major>) + 1(.) + 3(<minor>) + 1(.) + 3(<patch>) + 1(-) + 5(<prerelease>) + 1(.) + 3(<prereleaseversion>) = 21.
+inline constexpr std::size_t version_string_length = 21;
+
 namespace detail {
 
-constexpr char char_to_lower(char c) noexcept {
+inline constexpr std::string_view alpha = {"-alpha", 6};
+inline constexpr std::string_view beta  = {"-beta", 5};
+inline constexpr std::string_view rc    = {"-rc", 3};
+
+constexpr char to_lower(char c) noexcept {
   return (c >= 'A' && c <= 'Z') ? c + ('a' - 'A') : c;
 }
 
-constexpr bool str_equals(std::string_view lhs, std::size_t pos, std::string_view rhs) noexcept {
-  for (std::size_t i1 = pos, i2 = 0; i1 < lhs.length() && i2 < rhs.length(); ++i1, ++i2) {
-    if (char_to_lower(lhs[i1]) != char_to_lower(rhs[i2])) {
+constexpr bool is_digit(char c) noexcept {
+  return c >= '0' && c <= '9';
+}
+
+constexpr std::uint8_t to_digit(char c) noexcept {
+  return c - '0';
+}
+
+constexpr std::uint8_t length(std::uint8_t x) {
+  return x < 10 ? 1 : (x < 100 ? 2 : 3);
+}
+
+constexpr std::uint8_t length(prerelease t) {
+  if (t == prerelease::alpha) {
+    return 5;
+  } else if (t == prerelease::beta){
+    return 4;
+  } else if(t == prerelease::rc) {
+    return 2;
+  }
+
+  return 0;
+}
+
+constexpr bool equals(const char* first, const char* last, std::string_view str) noexcept {
+  for (std::size_t i = 0; first != last && i < str.length(); ++i, ++first) {
+    if (to_lower(*first) != to_lower(str[i])) {
       return false;
     }
   }
@@ -81,65 +112,67 @@ constexpr bool str_equals(std::string_view lhs, std::size_t pos, std::string_vie
   return true;
 }
 
-constexpr bool is_digit(char c) noexcept {
-  return c >= '0' && c <= '9';
+constexpr char* to_chars(char* str, std::uint8_t x, bool dot = true) noexcept {
+  do {
+    *(--str) = static_cast<char>('0' + (x % 10));
+    x /= 10;
+  } while (x != 0);
+
+  if (dot) {
+    *(--str) = '.';
+  }
+
+  return str;
 }
 
-constexpr std::uint8_t char_to_digit(char c) noexcept {
-  return c - '0';
+constexpr char* to_chars(char* str, prerelease t) noexcept {
+  const auto p = t == prerelease::alpha
+                     ? alpha
+                     : t == prerelease::beta
+                           ? beta
+                           : t == prerelease::rc
+                                 ? rc
+                                 : std::string_view{};
+
+  for (auto it = p.rbegin(); it != p.rend(); ++it) {
+    *(--str) = *it;
+  }
+
+  return str;
 }
 
-constexpr bool read_uint(std::string_view str, std::size_t& i, std::uint8_t& d) noexcept {
-  if (std::uint32_t t = 0; i < str.length() && is_digit(str[i])) {
-    for (std::size_t p = i, s = 0; p < str.length() && s < 3; ++p, ++s) {
-      if (is_digit(str[p])) {
-        t = t * 10 + char_to_digit(str[p]);
-        ++i;
-      } else {
-        break;
-      }
+constexpr const char* from_chars(const char* first, const char* last, std::uint8_t& d) {
+  if (first != last && is_digit(*first)) {
+    std::int32_t t = 0;
+    for (; first != last && is_digit(*first); ++first) {
+      t = t * 10 + to_digit(*first);
     }
     if (t <= std::numeric_limits<std::uint8_t>::max()) {
       d = static_cast<std::uint8_t>(t);
-      return true;
+      return first;
     }
   }
 
-  return false;
+  return nullptr;
 }
 
-constexpr bool read_dot(std::string_view str, std::size_t& i) noexcept {
-  if (i < str.length() && str[i] == '.') {
-    ++i;
-    return true;
-  }
-
-  return false;
-}
-
-constexpr bool read_prerelease(std::string_view str, std::size_t& i, prerelease& p) noexcept {
-  constexpr std::string_view alpha{"-alpha", 6};
-  constexpr std::string_view beta{"-beta", 5};
-  constexpr std::string_view rc{"-rc", 3};
-
-  if (i >= str.length()) {
-    p = prerelease::none;
-    return false;
-  } else if (str_equals(str, i, alpha)) {
-    i += alpha.length();
+constexpr const char* from_chars(const char* first, const char* last, prerelease& p) {
+  if (equals(first,last, alpha)) {
     p = prerelease::alpha;
-    return true;
-  } else if (str_equals(str, i, beta)) {
-    i += beta.length();
+    return first + alpha.length();
+  } else if (equals(first, last, beta)) {
     p = prerelease::beta;
-    return true;
-  } else if (str_equals(str, i, rc)) {
-    i += rc.length();
+    return first + beta.length();
+  } else if (equals(first, last, rc)) {
     p = prerelease::rc;
-    return true;
+    return first + rc.length();
   }
 
-  return false;
+  return nullptr;
+}
+
+constexpr bool check_delimiter(const char* first, const char* last, char d) noexcept {
+  return first != last && *first == d;
 }
 
 } // namespace semver::detail
@@ -179,62 +212,70 @@ struct alignas(1) version {
 
   constexpr version& operator=(version&&) = default;
 
-  std::string to_string() const {
-    auto str = std::to_string(major)
-                  .append(".")
-                  .append(std::to_string(minor))
-                  .append(".")
-                  .append(std::to_string(patch));
-
-    switch (prerelease_type) {
-      case prerelease::alpha:
-        str.append("-alpha");
-        break;
-
-      case prerelease::beta:
-        str.append("-beta");
-        break;
-
-      case prerelease::rc:
-        str.append("-rc");
-        break;
-
-      case prerelease::none:
-        return str;
-
-      default:
-        __SEMVER_THROW(std::invalid_argument{"invalid version"});
+  constexpr std::from_chars_result from_chars(const char* first, const char* last) noexcept {
+    if (first == nullptr || last == nullptr) {
+      return {first, std::errc::invalid_argument};
     }
 
-    if (prerelease_number > 0) {
-      str.append(".").append(std::to_string(prerelease_number));
+    auto next = first;
+    if (next = detail::from_chars(next, last, major); next != nullptr && detail::check_delimiter(next, last, '.')) {
+      if (next = detail::from_chars(++next, last, minor); next != nullptr && detail::check_delimiter(next, last, '.')) {
+        if (next = detail::from_chars(++next, last, patch); next != nullptr && !detail::check_delimiter(next, last, '-')) {
+          prerelease_type = prerelease::none;
+          prerelease_number = 0;
+          return {next, std::errc{}};
+        } else {
+          if (next = detail::from_chars(next, last, prerelease_type); next != nullptr && !detail::check_delimiter(next, last, '.')) {
+            prerelease_number = 0;
+            return {next, std::errc{}};
+          } else {
+            if (next = detail::from_chars(++next, last, prerelease_number); next != nullptr) {
+              return {next, std::errc{}};
+            }
+          }
+        }
+      }
+    }
+
+    return {first, std::errc::invalid_argument};
+  }
+
+  constexpr std::to_chars_result to_chars(char* first, char* last) const noexcept {
+    const auto length = chars_length();
+    if (first == nullptr || last == nullptr || (last - first) < length) {
+      return {last, std::errc::value_too_large};
+    }
+
+    auto next = first + length;
+    if (prerelease_type != prerelease::none) {
+      if (prerelease_number != 0) {
+        next = detail::to_chars(next, prerelease_number);
+      }
+      next = detail::to_chars(next, prerelease_type);
+    }
+    next = detail::to_chars(next, patch);
+    next = detail::to_chars(next, minor);
+    next = detail::to_chars(next, major, false);
+
+    return {first + length, std::errc{}};
+  }
+
+  std::string to_string() const {
+    auto str = std::string(chars_length(), '\0');
+    if (to_chars(str.data(), str.data() + str.length()).ec != std::errc{}) {
+      __SEMVER_THROW(std::invalid_argument{"semver::version::to_string() invalid version."});
     }
 
     return str;
   }
 
   constexpr bool from_string_noexcept(std::string_view str) noexcept {
-    if (std::size_t i = 0;
-        detail::read_uint(str, i, major) && detail::read_dot(str, i) &&
-        detail::read_uint(str, i, minor) && detail::read_dot(str, i) &&
-        detail::read_uint(str, i, patch) && str.length() == i) {
-      prerelease_type = prerelease::none;
-      prerelease_number = 0;
-      return true;
-    } else if (detail::read_prerelease(str, i, prerelease_type) && str.length() == i) {
-      prerelease_number = 0;
-      return true;
-    } else if (detail::read_dot(str, i) && detail::read_uint(str, i, prerelease_number) && str.length() == i) {
-      return true;
-    }
-
-    *this = version{0, 0, 0};
-    return false;
+    return from_chars(str.data(), str.data() + str.length()).ec == std::errc{};
   }
 
   constexpr void from_string(std::string_view str) {
     if (!from_string_noexcept(str)) {
-      __SEMVER_THROW(std::invalid_argument{"invalid version"});
+      __SEMVER_THROW(std::invalid_argument{"semver::version::from_string() invalid version."});
     }
   }
 
@@ -260,6 +301,21 @@ struct alignas(1) version {
     }
 
     return 0;
+  }
+
+ private:
+  constexpr std::uint8_t chars_length() const {
+    // (<major>) + 1(.) + (<minor>) + 1(.) + (<patch>)
+    std::uint8_t length = detail::length(major) + detail::length(minor) + detail::length(patch) + 2;
+    if (prerelease_type != prerelease::none) {
+      // + 1(-) + (<prerelease>)
+      length += detail::length(prerelease_type) + 1;
+      if (prerelease_number != 0) {
+        // + 1(.) + (<prereleaseversion>)
+        length += detail::length(prerelease_number) + 1;
+      }
+    }
+    return length;
   }
 };
 
@@ -287,12 +343,16 @@ constexpr bool operator<=(const version& lhs, const version& rhs) noexcept {
   return lhs.compare(rhs) <= 0;
 }
 
-inline std::ostream& operator<<(std::ostream& os, const version& v) {
-  return os << v.to_string();
+constexpr version operator""_version(const char* str, std::size_t length) {
+  return version{std::string_view{str, length}};
 }
 
-constexpr version operator""_version(const char* str, std::size_t size) {
-  return version{std::string_view{str, size}};
+constexpr std::to_chars_result to_chars(char* first, char* last, const version& v) noexcept {
+  return v.to_chars(first, last);
+}
+
+constexpr std::from_chars_result from_chars(const char* first, const char* last, version& v) noexcept {
+  return v.from_chars(first, last);
 }
 
 inline std::string to_string(const version& v) {
@@ -300,7 +360,7 @@ inline std::string to_string(const version& v) {
 }
 
 constexpr std::optional<version> from_string_noexcept(std::string_view str) noexcept {
-  if (version v{0, 0, 0}; v.from_string_noexcept(str)) {
+  if (auto v = version{0, 0, 0}; v.from_string_noexcept(str)) {
     return v;
   }
 
@@ -309,6 +369,16 @@ constexpr std::optional<version> from_string_noexcept(std::string_view str) noex
 
 constexpr version from_string(std::string_view str) {
   return version{str};
+}
+
+template <typename Char, typename Traits>
+std::basic_ostream<Char, Traits>& operator<<(std::basic_ostream<Char, Traits>& os, const version& v) {
+  const auto str = v.to_string();
+  for (auto c : str) {
+      os.put(c);
+  }
+
+  return os;
 }
 
 } // namespace semver

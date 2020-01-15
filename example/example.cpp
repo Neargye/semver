@@ -20,9 +20,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE  OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <iostream>
-
 #include <semver.hpp>
+
+#include <iostream>
 
 using namespace semver;
 
@@ -51,7 +51,7 @@ int main() {
   std::cout << s2 << std::endl; // 1.2.3-rc
 
   constexpr version vo = "2.0.0-rc.3"_version;
-  std::cout << vo << std::endl; // .0.0-rc.3
+  std::cout << vo << std::endl; // 2.0.0-rc.3
 
   return 0;
 }
