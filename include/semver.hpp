@@ -45,7 +45,9 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#if __has_include(<charconv>)
 #include <charconv>
+#endif
 
 // Allow to disable exceptions.
 #if (defined(__cpp_exceptions) || defined(__EXCEPTIONS) || defined(_CPPUNWIND)) && !defined(SEMVER_NOEXCEPTION)
@@ -69,6 +71,22 @@ enum struct prerelease : std::uint8_t {
 inline constexpr std::size_t version_string_length = 21;
 
 namespace detail {
+
+#if __has_include(<charconv>)
+struct from_chars_result : std::from_chars_result {};
+
+struct to_chars_result : std::to_chars_result {};
+#else
+struct from_chars_result {
+  const char* ptr;
+  errc ec;
+};
+
+struct to_chars_result {
+  char* ptr;
+  errc ec;
+};
+#endif
 
 inline constexpr std::string_view alpha = {"-alpha", 6};
 inline constexpr std::string_view beta  = {"-beta", 5};
@@ -212,7 +230,7 @@ struct alignas(1) version {
 
   constexpr version& operator=(version&&) = default;
 
-  constexpr std::from_chars_result from_chars(const char* first, const char* last) noexcept {
+  constexpr detail::from_chars_result from_chars(const char* first, const char* last) noexcept {
     if (first == nullptr || last == nullptr) {
       return {first, std::errc::invalid_argument};
     }
@@ -240,7 +258,7 @@ struct alignas(1) version {
     return {first, std::errc::invalid_argument};
   }
 
-  constexpr std::to_chars_result to_chars(char* first, char* last) const noexcept {
+  constexpr detail::to_chars_result to_chars(char* first, char* last) const noexcept {
     const auto length = chars_length();
     if (first == nullptr || last == nullptr || (last - first) < length) {
       return {last, std::errc::value_too_large};
@@ -347,12 +365,12 @@ constexpr version operator""_version(const char* str, std::size_t length) {
   return version{std::string_view{str, length}};
 }
 
-constexpr std::to_chars_result to_chars(char* first, char* last, const version& v) noexcept {
-  return v.to_chars(first, last);
+constexpr detail::from_chars_result from_chars(const char* first, const char* last, version& v) noexcept {
+  return v.from_chars(first, last);
 }
 
-constexpr std::from_chars_result from_chars(const char* first, const char* last, version& v) noexcept {
-  return v.from_chars(first, last);
+constexpr detail::to_chars_result to_chars(char* first, char* last, const version& v) noexcept {
+  return v.to_chars(first, last);
 }
 
 inline std::string to_string(const version& v) {
