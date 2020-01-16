@@ -76,23 +76,23 @@ namespace detail {
 
 #if __has_include(<charconv>)
 struct from_chars_result : std::from_chars_result {
-  constexpr operator bool() const { return ec == std::errc{}; }
+  [[nodiscard]] constexpr operator bool() const { return ec == std::errc{}; }
 };
 
 struct to_chars_result : std::to_chars_result {
-  constexpr operator bool() const { return ec == std::errc{}; }
+  [[nodiscard]] constexpr operator bool() const { return ec == std::errc{}; }
 };
 #else
 struct from_chars_result {
   const char* ptr;
   std::errc ec;
-  constexpr operator bool() const { return ec == std::errc{}; }
+  [[nodiscard]] constexpr operator bool() const { return ec == std::errc{}; }
 };
 
 struct to_chars_result {
   char* ptr;
   std::errc ec;
-  constexpr operator bool() const { return ec == std::errc{}; }
+  [[nodiscard]] constexpr operator bool() const { return ec == std::errc{}; }
 };
 #endif
 
@@ -238,9 +238,9 @@ struct alignas(1) version {
 
   constexpr version& operator=(version&&) = default;
 
-  constexpr detail::from_chars_result from_chars(const char* first, const char* last) noexcept {
+  [[nodiscard]] constexpr detail::from_chars_result from_chars(const char* first, const char* last) noexcept {
     if (first == nullptr || last == nullptr) {
-      return {{first, std::errc::invalid_argument}};
+      return {first, std::errc::invalid_argument};
     }
 
     auto next = first;
@@ -249,27 +249,27 @@ struct alignas(1) version {
         if (next = detail::from_chars(++next, last, patch); next != nullptr && !detail::check_delimiter(next, last, '-')) {
           prerelease_type = prerelease::none;
           prerelease_number = 0;
-          return {{next, std::errc{}}};
+          return {next, std::errc{}};
         } else {
           if (next = detail::from_chars(next, last, prerelease_type); next != nullptr && !detail::check_delimiter(next, last, '.')) {
             prerelease_number = 0;
-            return {{next, std::errc{}}};
+            return {next, std::errc{}};
           } else {
             if (next = detail::from_chars(++next, last, prerelease_number); next != nullptr) {
-              return {{next, std::errc{}}};
+              return {next, std::errc{}};
             }
           }
         }
       }
     }
 
-    return {{first, std::errc::invalid_argument}};
+    return {first, std::errc::invalid_argument};
   }
 
-  constexpr detail::to_chars_result to_chars(char* first, char* last) const noexcept {
+  [[nodiscard]] constexpr detail::to_chars_result to_chars(char* first, char* last) const noexcept {
     const auto length = chars_length();
     if (first == nullptr || last == nullptr || (last - first) < length) {
-      return {{last, std::errc::value_too_large}};
+      return {last, std::errc::value_too_large};
     }
 
     auto next = first + length;
@@ -283,19 +283,10 @@ struct alignas(1) version {
     next = detail::to_chars(next, minor);
     next = detail::to_chars(next, major, false);
 
-    return {{first + length, std::errc{}}};
+    return {first + length, std::errc{}};
   }
 
-  std::string to_string() const {
-    auto str = std::string(chars_length(), '\0');
-    if (!to_chars(str.data(), str.data() + str.length())) {
-      __SEMVER_THROW(std::invalid_argument{"semver::version::to_string() invalid version."});
-    }
-
-    return str;
-  }
-
-  constexpr bool from_string_noexcept(std::string_view str) noexcept {
+  [[nodiscard]] constexpr bool from_string_noexcept(std::string_view str) noexcept {
     return from_chars(str.data(), str.data() + str.length());
   }
 
@@ -305,7 +296,16 @@ struct alignas(1) version {
     }
   }
 
-  constexpr int compare(const version& other) const noexcept {
+  [[nodiscard]] std::string to_string() const {
+    auto str = std::string(chars_length(), '\0');
+    if (!to_chars(str.data(), str.data() + str.length())) {
+      __SEMVER_THROW(std::invalid_argument{"semver::version::to_string() invalid version."});
+    }
+
+    return str;
+  }
+
+  [[nodiscard]] constexpr int compare(const version& other) const noexcept {
     if (major != other.major) {
       return major - other.major;
     }
@@ -345,47 +345,43 @@ struct alignas(1) version {
   }
 };
 
-constexpr bool operator==(const version& lhs, const version& rhs) noexcept {
+[[nodiscard]] constexpr bool operator==(const version& lhs, const version& rhs) noexcept {
   return lhs.compare(rhs) == 0;
 }
 
-constexpr bool operator!=(const version& lhs, const version& rhs) noexcept {
+[[nodiscard]] constexpr bool operator!=(const version& lhs, const version& rhs) noexcept {
   return lhs.compare(rhs) != 0;
 }
 
-constexpr bool operator>(const version& lhs, const version& rhs) noexcept {
+[[nodiscard]] constexpr bool operator>(const version& lhs, const version& rhs) noexcept {
   return lhs.compare(rhs) > 0;
 }
 
-constexpr bool operator>=(const version& lhs, const version& rhs) noexcept {
+[[nodiscard]] constexpr bool operator>=(const version& lhs, const version& rhs) noexcept {
   return lhs.compare(rhs) >= 0;
 }
 
-constexpr bool operator<(const version& lhs, const version& rhs) noexcept {
+[[nodiscard]] constexpr bool operator<(const version& lhs, const version& rhs) noexcept {
   return lhs.compare(rhs) < 0;
 }
 
-constexpr bool operator<=(const version& lhs, const version& rhs) noexcept {
+[[nodiscard]] constexpr bool operator<=(const version& lhs, const version& rhs) noexcept {
   return lhs.compare(rhs) <= 0;
 }
 
-constexpr version operator""_version(const char* str, std::size_t length) {
+[[nodiscard]] constexpr version operator""_version(const char* str, std::size_t length) {
   return version{std::string_view{str, length}};
 }
 
-constexpr detail::from_chars_result from_chars(const char* first, const char* last, version& v) noexcept {
+[[nodiscard]] constexpr detail::from_chars_result from_chars(const char* first, const char* last, version& v) noexcept {
   return v.from_chars(first, last);
 }
 
-constexpr detail::to_chars_result to_chars(char* first, char* last, const version& v) noexcept {
+[[nodiscard]] constexpr detail::to_chars_result to_chars(char* first, char* last, const version& v) noexcept {
   return v.to_chars(first, last);
 }
 
-inline std::string to_string(const version& v) {
-  return v.to_string();
-}
-
-constexpr std::optional<version> from_string_noexcept(std::string_view str) noexcept {
+[[nodiscard]] constexpr std::optional<version> from_string_noexcept(std::string_view str) noexcept {
   if (auto v = version{0, 0, 0}; v.from_string_noexcept(str)) {
     return v;
   }
@@ -393,15 +389,18 @@ constexpr std::optional<version> from_string_noexcept(std::string_view str) noex
   return std::nullopt;
 }
 
-constexpr version from_string(std::string_view str) {
+[[nodiscard]] constexpr version from_string(std::string_view str) {
   return version{str};
 }
 
+[[nodiscard]] inline std::string to_string(const version& v) {
+  return v.to_string();
+}
+
 template <typename Char, typename Traits>
-std::basic_ostream<Char, Traits>& operator<<(std::basic_ostream<Char, Traits>& os, const version& v) {
-  const auto str = v.to_string();
-  for (auto c : str) {
-      os.put(c);
+inline std::basic_ostream<Char, Traits>& operator<<(std::basic_ostream<Char, Traits>& os, const version& v) {
+  for (const auto c : v.to_string()) {
+    os.put(c);
   }
 
   return os;

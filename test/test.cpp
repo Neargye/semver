@@ -343,7 +343,7 @@ TEST_CASE("from/to string") {
   SECTION("from chars") {
     version v;
     for (std::size_t i = 0; i < versions.size(); ++i) {
-      v.from_chars(versions_strings[i].data(), versions_strings[i].data() + versions_strings[i].size());
+      REQUIRE(v.from_chars(versions_strings[i].data(), versions_strings[i].data() + versions_strings[i].size()));
       REQUIRE(versions[i] == v);
     }
   }
@@ -351,7 +351,7 @@ TEST_CASE("from/to string") {
   SECTION("to chars") {
     for (std::size_t i = 0; i < versions.size(); ++i) {
       std::array<char, semver::version_string_length + 1> m = {};
-      versions[i].to_chars(m.data(), m.data() + m.size());
+      REQUIRE(versions[i].to_chars(m.data(), m.data() + m.size()));
       auto s = std::string_view{m.data()};
       REQUIRE(s == versions_strings[i]);
     }
