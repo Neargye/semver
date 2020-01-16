@@ -240,7 +240,7 @@ struct alignas(1) version {
 
   constexpr detail::from_chars_result from_chars(const char* first, const char* last) noexcept {
     if (first == nullptr || last == nullptr) {
-      return {first, std::errc::invalid_argument};
+      return {{first, std::errc::invalid_argument}};
     }
 
     auto next = first;
@@ -249,27 +249,27 @@ struct alignas(1) version {
         if (next = detail::from_chars(++next, last, patch); next != nullptr && !detail::check_delimiter(next, last, '-')) {
           prerelease_type = prerelease::none;
           prerelease_number = 0;
-          return {next, std::errc{}};
+          return {{next, std::errc{}}};
         } else {
           if (next = detail::from_chars(next, last, prerelease_type); next != nullptr && !detail::check_delimiter(next, last, '.')) {
             prerelease_number = 0;
-            return {next, std::errc{}};
+            return {{next, std::errc{}}};
           } else {
             if (next = detail::from_chars(++next, last, prerelease_number); next != nullptr) {
-              return {next, std::errc{}};
+              return {{next, std::errc{}}};
             }
           }
         }
       }
     }
 
-    return {first, std::errc::invalid_argument};
+    return {{first, std::errc::invalid_argument}};
   }
 
   constexpr detail::to_chars_result to_chars(char* first, char* last) const noexcept {
     const auto length = chars_length();
     if (first == nullptr || last == nullptr || (last - first) < length) {
-      return {last, std::errc::value_too_large};
+      return {{last, std::errc::value_too_large}};
     }
 
     auto next = first + length;
@@ -283,7 +283,7 @@ struct alignas(1) version {
     next = detail::to_chars(next, minor);
     next = detail::to_chars(next, major, false);
 
-    return {first + length, std::errc{}};
+    return {{first + length, std::errc{}}};
   }
 
   std::string to_string() const {
