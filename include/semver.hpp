@@ -47,6 +47,8 @@
 #include <string_view>
 #if __has_include(<charconv>)
 #include <charconv>
+#else
+#include <system_error>
 #endif
 
 // Allow to disable exceptions.
@@ -73,18 +75,24 @@ inline constexpr std::size_t version_string_length = 21;
 namespace detail {
 
 #if __has_include(<charconv>)
-struct from_chars_result : std::from_chars_result {};
+struct from_chars_result : std::from_chars_result {
+  constexpr operator bool() const { return ec == std::errc{}; }
+};
 
-struct to_chars_result : std::to_chars_result {};
+struct to_chars_result : std::to_chars_result {
+  constexpr operator bool() const { return ec == std::errc{}; }
+};
 #else
 struct from_chars_result {
   const char* ptr;
-  errc ec;
+  std::errc ec;
+  constexpr operator bool() const { return ec == std::errc{}; }
 };
 
 struct to_chars_result {
   char* ptr;
-  errc ec;
+  std::errc ec;
+  constexpr operator bool() const { return ec == std::errc{}; }
 };
 #endif
 
@@ -280,7 +288,7 @@ struct alignas(1) version {
 
   std::string to_string() const {
     auto str = std::string(chars_length(), '\0');
-    if (to_chars(str.data(), str.data() + str.length()).ec != std::errc{}) {
+    if (!to_chars(str.data(), str.data() + str.length())) {
       __SEMVER_THROW(std::invalid_argument{"semver::version::to_string() invalid version."});
     }
 
@@ -288,7 +296,7 @@ struct alignas(1) version {
   }
 
   constexpr bool from_string_noexcept(std::string_view str) noexcept {
-    return from_chars(str.data(), str.data() + str.length()).ec == std::errc{};
+    return from_chars(str.data(), str.data() + str.length());
   }
 
   constexpr void from_string(std::string_view str) {
