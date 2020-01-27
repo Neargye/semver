@@ -60,6 +60,11 @@
 #  define __SEMVER_THROW(exception) std::abort()
 #endif
 
+#if defined(__clang__)
+#  pragma clang diagnostic push
+#  pragma clang diagnostic ignored "-Wmissing-braces" // Ignore warning: suggest braces around initialization of subobject [-Wmissing-braces] 'return {first, std::errc::invalid_argument};'.
+#endif
+
 namespace semver {
 
 enum struct prerelease : std::uint8_t {
@@ -86,12 +91,14 @@ struct to_chars_result : std::to_chars_result {
 struct from_chars_result {
   const char* ptr;
   std::errc ec;
+
   [[nodiscard]] constexpr operator bool() const { return ec == std::errc{}; }
 };
 
 struct to_chars_result {
   char* ptr;
   std::errc ec;
+
   [[nodiscard]] constexpr operator bool() const { return ec == std::errc{}; }
 };
 #endif
@@ -407,5 +414,9 @@ inline std::basic_ostream<Char, Traits>& operator<<(std::basic_ostream<Char, Tra
 }
 
 } // namespace semver
+
+#if defined(__clang__)
+#  pragma clang diagnostic pop
+#endif
 
 #endif // NEARGYE_SEMANTIC_VERSIONING_HPP
