@@ -1,5 +1,3 @@
-# Semantic Versioning C++
-
 ```text
          _____                            _   _
         / ____|                          | | (_)
@@ -57,32 +55,50 @@ static_assert(v2 <= v1);
 * To string
 
 ```cpp
-constexpr semver::version v{1, 2, 3, prerelease::rc, 4};
+semver::version v{1, 2, 3, prerelease::rc, 4};
 
 // To string.
-auto s = v.to_string(); // "1.2.3-rc.4"
+std::string s1 = v.to_string(); // may throw.
 
-// Constexpr to chars.
-std::array<char, 32> str;
-v.to_chars(str.data(), str.data() + str.size());
+// Non-member to string.
+std::string s2 = semver::to_string(v); // may throw.
+
+std::array<char, 32> str = {};
+
+// To chars, like <https://en.cppreference.com/w/cpp/utility/to_chars>.
+auto [p, ec] = v.to_chars(str.data(), str.data() + str.size()); // constexpr and no throw.
+
+// Non-member to chars, like <https://en.cppreference.com/w/cpp/utility/to_chars>.
+auto [p, ec] = semver::to_chars(str.data(), str.data() + str.size(), v); // constexpr and no throw.
 ```
 
 * From string
 
 ```cpp
-// Constexpr from chars.
-constexpr semver::version v1("1.2.3-rc.4");
-constexpr semver::version v2 = "1.2.3-rc.4"_version;
+std::string_view s = "1.2.3-rc.4";
+
+// From chars.
+semver::version v1{s}; // constexpr and may throw.
+
+// User-defined literals '_version'.
+semver::version v2 = "1.2.3-rc.4"_version; // constexpr and may throw.
+
+// From chars, like <https://en.cppreference.com/w/cpp/utility/from_chars>.
+semver::version v3;
+auto [p, ec] = v3.to_chars(str.data(), str.data() + str.size()); // constexpr and no throw.
+
+// Non-member from chars, like <https://en.cppreference.com/w/cpp/utility/from_chars>.
+semver::version v4;
+auto [p, ec] = semver::to_chars(str.data(), str.data() + str.size(), v4); // constexpr and no throw.
+
+// Non-member from string.
+semver::version v5 = semver::from_string(s); // constexpr and may throw.
+std::optional<version> v6 = semver::from_string_noexcept(s); // constexpr and no throw.
 
 // From string.
-std::string s = "1.2.3-rc.4";
-version v3 = semver::from_string(s);
-```
-
-## Synopsis
-
-```
-TODO
+semver::version v6;
+v7.from_string(s); // constexpr and may throw.
+bool success = v8.from_string_noexcept(s); // constexpr and no throw.
 ```
 
 ## Integration
