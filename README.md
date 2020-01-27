@@ -35,71 +35,71 @@ C++ library compare and manipulate versions are available as extensions to the `
 
 * Create
 
-```cpp
-constexpr version v1 = version{1, 2, 3, prerelease::rc, 4};
-constexpr version v2 = v1;
-```
+  ```cpp
+  constexpr version v1 = version{1, 2, 3, prerelease::rc, 4};
+  constexpr version v2 = v1;
+  ```
 
 * Сomparison
 
-```cpp
-constexpr semver::version v1{1, 4, 3};
-constexpr semver::version v2{1, 2, 4, semver::prerelease::alpha, 10};
-static_assert(v1 != v2);
-static_assert(v1 > v2);
-static_assert(v1 >= v2);
-static_assert(v2 < v1);
-static_assert(v2 <= v1);
-```
+  ```cpp
+  constexpr semver::version v1{1, 4, 3};
+  constexpr semver::version v2{1, 2, 4, semver::prerelease::alpha, 10};
+  static_assert(v1 != v2);
+  static_assert(v1 > v2);
+  static_assert(v1 >= v2);
+  static_assert(v2 < v1);
+  static_assert(v2 <= v1);
+  ```
 
 * To string
 
-```cpp
-semver::version v{1, 2, 3, prerelease::rc, 4};
+  ```cpp
+  semver::version v{1, 2, 3, prerelease::rc, 4};
 
-// To string.
-std::string s1 = v.to_string(); // may throw.
+  // To string.
+  std::string s1 = v.to_string(); // may throw.
 
-// Non-member to string.
-std::string s2 = semver::to_string(v); // may throw.
+  // Non-member to string.
+  std::string s2 = semver::to_string(v); // may throw.
 
-std::array<char, 32> str = {};
+  std::array<char, 32> str = {};
 
-// To chars, like <https://en.cppreference.com/w/cpp/utility/to_chars>.
-auto [p, ec] = v.to_chars(str.data(), str.data() + str.size()); // constexpr and no throw.
+  // To chars, like <https://en.cppreference.com/w/cpp/utility/to_chars>.
+  auto [p, ec] = v.to_chars(str.data(), str.data() + str.size()); // constexpr and no throw.
 
-// Non-member to chars, like <https://en.cppreference.com/w/cpp/utility/to_chars>.
-auto [p, ec] = semver::to_chars(str.data(), str.data() + str.size(), v); // constexpr and no throw.
-```
+  // Non-member to chars, like <https://en.cppreference.com/w/cpp/utility/to_chars>.
+  auto [p, ec] = semver::to_chars(str.data(), str.data() + str.size(), v); // constexpr and no throw.
+  ```
 
 * From string
 
-```cpp
-std::string_view s = "1.2.3-rc.4";
+  ```cpp
+  std::string_view s = "1.2.3-rc.4";
 
-// From chars.
-semver::version v1{s}; // constexpr and may throw.
+  // From chars.
+  semver::version v1{s}; // constexpr and may throw.
 
-// User-defined literals '_version'.
-semver::version v2 = "1.2.3-rc.4"_version; // constexpr and may throw.
+  // User-defined literals '_version'.
+  semver::version v2 = "1.2.3-rc.4"_version; // constexpr and may throw.
 
-// From chars, like <https://en.cppreference.com/w/cpp/utility/from_chars>.
-semver::version v3;
-auto [p, ec] = v3.to_chars(str.data(), str.data() + str.size()); // constexpr and no throw.
+  // From chars, like <https://en.cppreference.com/w/cpp/utility/from_chars>.
+  semver::version v3;
+  auto [p, ec] = v3.to_chars(str.data(), str.data() + str.size()); // constexpr and no throw.
 
-// Non-member from chars, like <https://en.cppreference.com/w/cpp/utility/from_chars>.
-semver::version v4;
-auto [p, ec] = semver::to_chars(str.data(), str.data() + str.size(), v4); // constexpr and no throw.
+  // Non-member from chars, like <https://en.cppreference.com/w/cpp/utility/from_chars>.
+  semver::version v4;
+  auto [p, ec] = semver::to_chars(str.data(), str.data() + str.size(), v4); // constexpr and no throw.
 
-// Non-member from string.
-semver::version v5 = semver::from_string(s); // constexpr and may throw.
-std::optional<version> v6 = semver::from_string_noexcept(s); // constexpr and no throw.
+  // Non-member from string.
+  semver::version v5 = semver::from_string(s); // constexpr and may throw.
+  std::optional<version> v6 = semver::from_string_noexcept(s); // constexpr and no throw.
 
-// From string.
-semver::version v6;
-v7.from_string(s); // constexpr and may throw.
-bool success = v8.from_string_noexcept(s); // constexpr and no throw.
-```
+  // From string.
+  semver::version v6;
+  v7.from_string(s); // constexpr and may throw.
+  bool success = v8.from_string_noexcept(s); // constexpr and no throw.
+  ```
 
 ## Integration
 
