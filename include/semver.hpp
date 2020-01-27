@@ -297,10 +297,12 @@ struct alignas(1) version {
     return from_chars(str.data(), str.data() + str.length());
   }
 
-  constexpr void from_string(std::string_view str) {
+  constexpr version& from_string(std::string_view str) {
     if (!from_string_noexcept(str)) {
       __SEMVER_THROW(std::invalid_argument{"semver::version::from_string() invalid version."});
     }
+
+    return *this;
   }
 
   [[nodiscard]] std::string to_string() const {
