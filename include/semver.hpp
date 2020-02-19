@@ -180,7 +180,7 @@ constexpr const char* from_chars(const char* first, const char* last, std::uint8
     for (; first != last && is_digit(*first); ++first) {
       t = t * 10 + to_digit(*first);
     }
-    if (t <= std::numeric_limits<std::uint8_t>::max()) {
+    if (t <= (std::numeric_limits<std::uint8_t>::max)()) {
       d = static_cast<std::uint8_t>(t);
       return first;
     }
