@@ -35,6 +35,8 @@ using namespace semver;
 
 static_assert(alignof(version) == 1);
 static_assert(alignof(prerelease) == 1);
+static_assert(sizeof(version) == 5);
+static_assert(sizeof(prerelease) == 1);
 
 #define STATIC_CKECK_OP_AND_REVERSE(v1, op, v2) \
   static_assert(v1 op v2);                      \

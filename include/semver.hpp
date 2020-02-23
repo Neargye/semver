@@ -210,7 +210,7 @@ constexpr bool check_delimiter(const char* first, const char* last, char d) noex
 
 } // namespace semver::detail
 
-struct alignas(1) version {
+struct version {
   std::uint8_t major = 0;
   std::uint8_t minor = 1;
   std::uint8_t patch = 0;
