@@ -107,6 +107,9 @@ inline constexpr std::string_view alpha = {"-alpha", 6};
 inline constexpr std::string_view beta  = {"-beta", 5};
 inline constexpr std::string_view rc    = {"-rc", 3};
 
+// Min version string length = 1(<major>) + 1(.) + 1(<minor>) + 1(.) + 1(<patch>) = 5.
+inline constexpr auto min_version_string_length = 5;
+
 constexpr char to_lower(char c) noexcept {
   return (c >= 'A' && c <= 'Z') ? c + ('a' - 'A') : c;
 }
@@ -205,7 +208,7 @@ constexpr const char* from_chars(const char* first, const char* last, prerelease
 }
 
 constexpr bool check_delimiter(const char* first, const char* last, char d) noexcept {
-  return first != last && *first == d;
+  return first != last && first != nullptr && *first == d;
 }
 
 } // namespace semver::detail
@@ -246,23 +249,23 @@ struct version {
   constexpr version& operator=(version&&) = default;
 
   [[nodiscard]] constexpr detail::from_chars_result from_chars(const char* first, const char* last) noexcept {
-    if (first == nullptr || last == nullptr) {
+    if (first == nullptr || last == nullptr || (last - first) < detail::min_version_string_length) {
       return {first, std::errc::invalid_argument};
     }
 
     auto next = first;
-    if (next = detail::from_chars(next, last, major); next != nullptr && detail::check_delimiter(next, last, '.')) {
-      if (next = detail::from_chars(++next, last, minor); next != nullptr && detail::check_delimiter(next, last, '.')) {
-        if (next = detail::from_chars(++next, last, patch); next != nullptr && !detail::check_delimiter(next, last, '-')) {
+    if (next = detail::from_chars(next, last, major); detail::check_delimiter(next, last, '.')) {
+      if (next = detail::from_chars(++next, last, minor); detail::check_delimiter(next, last, '.')) {
+        if (next = detail::from_chars(++next, last, patch); next == last) {
           prerelease_type = prerelease::none;
           prerelease_number = 0;
           return {next, std::errc{}};
-        } else {
-          if (next = detail::from_chars(next, last, prerelease_type); next != nullptr && !detail::check_delimiter(next, last, '.')) {
+        } else if (detail::check_delimiter(next, last, '-')) {
+          if (next = detail::from_chars(next, last, prerelease_type); next == last) {
             prerelease_number = 0;
             return {next, std::errc{}};
-          } else {
-            if (next = detail::from_chars(++next, last, prerelease_number); next != nullptr) {
+          } else if (detail::check_delimiter(next, last, '.')) {
+            if (next = detail::from_chars(++next, last, prerelease_number); next == last) {
               return {next, std::errc{}};
             }
           }
