@@ -81,25 +81,25 @@ namespace detail {
 
 #if __has_include(<charconv>)
 struct from_chars_result : std::from_chars_result {
-  [[nodiscard]] constexpr operator bool() const { return ec == std::errc{}; }
+  [[nodiscard]] constexpr operator bool() const noexcept { return ec == std::errc{}; }
 };
 
 struct to_chars_result : std::to_chars_result {
-  [[nodiscard]] constexpr operator bool() const { return ec == std::errc{}; }
+  [[nodiscard]] constexpr operator bool() const noexcept { return ec == std::errc{}; }
 };
 #else
 struct from_chars_result {
   const char* ptr;
   std::errc ec;
 
-  [[nodiscard]] constexpr operator bool() const { return ec == std::errc{}; }
+  [[nodiscard]] constexpr operator bool() const noexcept { return ec == std::errc{}; }
 };
 
 struct to_chars_result {
   char* ptr;
   std::errc ec;
 
-  [[nodiscard]] constexpr operator bool() const { return ec == std::errc{}; }
+  [[nodiscard]] constexpr operator bool() const noexcept { return ec == std::errc{}; }
 };
 #endif
 
@@ -122,11 +122,11 @@ constexpr std::uint8_t to_digit(char c) noexcept {
   return c - '0';
 }
 
-constexpr std::uint8_t length(std::uint8_t x) {
+constexpr std::uint8_t length(std::uint8_t x) noexcept {
   return x < 10 ? 1 : (x < 100 ? 2 : 3);
 }
 
-constexpr std::uint8_t length(prerelease t) {
+constexpr std::uint8_t length(prerelease t) noexcept {
   if (t == prerelease::alpha) {
     return 5;
   } else if (t == prerelease::beta) {
@@ -177,7 +177,7 @@ constexpr char* to_chars(char* str, prerelease t) noexcept {
   return str;
 }
 
-constexpr const char* from_chars(const char* first, const char* last, std::uint8_t& d) {
+constexpr const char* from_chars(const char* first, const char* last, std::uint8_t& d) noexcept {
   if (first != last && is_digit(*first)) {
     std::int32_t t = 0;
     for (; first != last && is_digit(*first); ++first) {
@@ -192,7 +192,7 @@ constexpr const char* from_chars(const char* first, const char* last, std::uint8
   return nullptr;
 }
 
-constexpr const char* from_chars(const char* first, const char* last, prerelease& p) {
+constexpr const char* from_chars(const char* first, const char* last, prerelease& p) noexcept {
   if (equals(first, last, alpha)) {
     p = prerelease::alpha;
     return first + alpha.length();
@@ -342,7 +342,7 @@ struct version {
   }
 
  private:
-  constexpr std::uint8_t chars_length() const {
+  constexpr std::uint8_t chars_length() const noexcept {
     // (<major>) + 1(.) + (<minor>) + 1(.) + (<patch>)
     std::uint8_t length = detail::length(major) + detail::length(minor) + detail::length(patch) + 2;
     if (prerelease_type != prerelease::none) {
