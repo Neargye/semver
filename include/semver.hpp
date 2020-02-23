@@ -75,7 +75,7 @@ enum struct prerelease : std::uint8_t {
 };
 
 // Max version string length = 3(<major>) + 1(.) + 3(<minor>) + 1(.) + 3(<patch>) + 1(-) + 5(<prerelease>) + 1(.) + 3(<prereleaseversion>) = 21.
-inline constexpr std::size_t version_string_length = 21;
+inline constexpr std::size_t max_version_string_length = 21;
 
 namespace detail {
 
