@@ -129,7 +129,7 @@ constexpr std::uint8_t length(std::uint8_t x) {
 constexpr std::uint8_t length(prerelease t) {
   if (t == prerelease::alpha) {
     return 5;
-  } else if (t == prerelease::beta){
+  } else if (t == prerelease::beta) {
     return 4;
   } else if(t == prerelease::rc) {
     return 2;
@@ -193,7 +193,7 @@ constexpr const char* from_chars(const char* first, const char* last, std::uint8
 }
 
 constexpr const char* from_chars(const char* first, const char* last, prerelease& p) {
-  if (equals(first,last, alpha)) {
+  if (equals(first, last, alpha)) {
     p = prerelease::alpha;
     return first + alpha.length();
   } else if (equals(first, last, beta)) {
@@ -214,10 +214,10 @@ constexpr bool check_delimiter(const char* first, const char* last, char d) noex
 } // namespace semver::detail
 
 struct version {
-  std::uint8_t major = 0;
-  std::uint8_t minor = 1;
-  std::uint8_t patch = 0;
-  prerelease prerelease_type = prerelease::none;
+  std::uint8_t major             = 0;
+  std::uint8_t minor             = 1;
+  std::uint8_t patch             = 0;
+  prerelease prerelease_type     = prerelease::none;
   std::uint8_t prerelease_number = 0;
 
   constexpr version(std::uint8_t major,
