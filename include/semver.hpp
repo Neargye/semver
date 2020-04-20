@@ -60,7 +60,7 @@
 #  define __SEMVER_THROW(exception) std::abort()
 #endif
 
-#if defined(__clang__)
+#if defined(__clang__) && __clang_major__ < 5
 #  pragma clang diagnostic push
 #  pragma clang diagnostic ignored "-Wmissing-braces" // Ignore warning: suggest braces around initialization of subobject [-Wmissing-braces] 'return {first, std::errc::invalid_argument};'.
 #endif
@@ -302,7 +302,7 @@ struct version {
 
   constexpr version& from_string(std::string_view str) {
     if (!from_string_noexcept(str)) {
-      __SEMVER_THROW(std::invalid_argument{"semver::version::from_string() invalid version."});
+      __SEMVER_THROW(std::invalid_argument{"semver::version::from_string invalid version."});
     }
 
     return *this;
@@ -311,7 +311,7 @@ struct version {
   [[nodiscard]] std::string to_string() const {
     auto str = std::string(chars_length(), '\0');
     if (!to_chars(str.data(), str.data() + str.length())) {
-      __SEMVER_THROW(std::invalid_argument{"semver::version::to_string() invalid version."});
+      __SEMVER_THROW(std::invalid_argument{"semver::version::to_string invalid version."});
     }
 
     return str;
@@ -398,7 +398,7 @@ struct version {
 }
 
 [[nodiscard]] constexpr std::optional<version> from_string_noexcept(std::string_view str) noexcept {
-  if (auto v = version{0, 0, 0}; v.from_string_noexcept(str)) {
+  if (auto v = version{}; v.from_string_noexcept(str)) {
     return v;
   }
 
@@ -424,7 +424,7 @@ inline std::basic_ostream<Char, Traits>& operator<<(std::basic_ostream<Char, Tra
 
 } // namespace semver
 
-#if defined(__clang__)
+#if defined(__clang__) && __clang_major__ < 5
 #  pragma clang diagnostic pop
 #endif
 
