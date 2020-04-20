@@ -122,7 +122,7 @@ TEST_CASE("constructors") {
                       v7.prerelease_type == prerelease::none &&
                       v7.prerelease_number == 0);
 
-    constexpr version v8{ version{1, 2, 3, prerelease::none, 4} };
+    constexpr version v8{v6};
     static_assert(v8.major == 1 &&
                       v8.minor == 2 &&
                       v8.patch == 3 &&
@@ -287,6 +287,11 @@ TEST_CASE("operators") {
       }
     }
   }
+
+  SECTION("operator _version") {
+    constexpr version v = "1.2.3-rc.4"_version;
+    static_assert(v == version{1, 2, 3, prerelease::rc, 4});
+  }
 }
 
 TEST_CASE("from/to string") {
@@ -374,8 +379,14 @@ TEST_CASE("from/to string") {
     }
   }
 
-  SECTION("operator _version") {
-    constexpr version v = "1.2.3-rc.4"_version;
-    static_assert(v == version{1, 2, 3, prerelease::rc, 4});
+  SECTION("valid") {
+    for (std::size_t i = 0; i < versions.size(); ++i) {
+      REQUIRE(semver::valid(versions_strings[i]));
+    }
+
+    REQUIRE(!semver::valid("a"));
+    REQUIRE(!semver::valid("1.2.3.4"));
+    REQUIRE(!semver::valid("v1.2.4"));
+    REQUIRE(!semver::valid("1.2"));
   }
 }
