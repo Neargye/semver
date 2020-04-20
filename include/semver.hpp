@@ -385,6 +385,10 @@ struct version {
   return version{std::string_view{str, length}};
 }
 
+[[nodiscard]] constexpr bool valid(std::string_view str) noexcept {
+  return version{}.from_string_noexcept(str);
+}
+
 [[nodiscard]] constexpr detail::from_chars_result from_chars(const char* first, const char* last, version& v) noexcept {
   return v.from_chars(first, last);
 }
