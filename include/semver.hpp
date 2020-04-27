@@ -60,9 +60,9 @@
 #  define __SEMVER_THROW(exception) std::abort()
 #endif
 
-#if defined(__clang__) && __clang_major__ < 5
+#if defined(__APPLE_CC__)
 #  pragma clang diagnostic push
-#  pragma clang diagnostic ignored "-Wmissing-braces" // Ignore warning: suggest braces around initialization of subobject [-Wmissing-braces] 'return {first, std::errc::invalid_argument};'.
+#  pragma clang diagnostic ignored "-Wmissing-braces" // Ignore warning: suggest braces around initialization of subobject 'return {first, std::errc::invalid_argument};'.
 #endif
 
 namespace semver {
@@ -422,9 +422,13 @@ inline std::basic_ostream<Char, Traits>& operator<<(std::basic_ostream<Char, Tra
   return os;
 }
 
+namespace ranges {
+
+} // namespace semver::ranges
+
 } // namespace semver
 
-#if defined(__clang__) && __clang_major__ < 5
+#if defined(__APPLE_CC__)
 #  pragma clang diagnostic pop
 #endif
 
