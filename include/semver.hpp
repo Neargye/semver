@@ -232,7 +232,7 @@ struct version {
         prerelease_number{prerelease_type == prerelease::none ? static_cast<std::uint8_t>(0) : prerelease_number} {
   }
 
-  constexpr version(std::string_view str) : version(0, 0, 0, prerelease::none, 0) {
+  explicit constexpr version(std::string_view str) : version(0, 0, 0, prerelease::none, 0) {
     from_string(str);
   }
 
@@ -244,9 +244,9 @@ struct version {
 
   ~version() = default;
 
-  constexpr version& operator=(const version&) = default;
+  version& operator=(const version&) = default;
 
-  constexpr version& operator=(version&&) = default;
+  version& operator=(version&&) = default;
 
   [[nodiscard]] constexpr detail::from_chars_result from_chars(const char* first, const char* last) noexcept {
     if (first == nullptr || last == nullptr || (last - first) < detail::min_version_string_length) {

@@ -128,6 +128,21 @@ TEST_CASE("constructors") {
                       v8.patch == 3 &&
                       v8.prerelease_type == prerelease::none &&
                       v8.prerelease_number == 0);
+
+    constexpr version v9{"1.2.3-alpha.4"};
+    static_assert(v9.major == 1 &&
+                      v9.minor == 2 &&
+                      v9.patch == 3 &&
+                      v9.prerelease_type == prerelease::alpha &&
+                      v9.prerelease_number == 4);
+
+    std::string s = "1.1.1";
+    version v10{s};
+    REQUIRE(v10.major == 1);
+    REQUIRE(v10.minor == 1);
+    REQUIRE(v10.patch == 1);
+    REQUIRE(v10.prerelease_type == prerelease::none);
+    REQUIRE(v10.prerelease_number == 0);
   }
 }
 
