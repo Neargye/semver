@@ -29,7 +29,7 @@ C++ library compare and manipulate versions are available as extensions to the `
 * Dependency-free
 * Constexpr comparison: <, <=, ==, !=, > >=
 * Constexpr from string
-* Constexpr to String
+* Constexpr to string
 
 ## [Examples](example/example.cpp)
 
@@ -65,10 +65,10 @@ C++ library compare and manipulate versions are available as extensions to the `
 
   std::array<char, 32> str = {};
 
-  // To chars, like <https://en.cppreference.com/w/cpp/utility/to_chars>.
+  // constexpr to chars, like <https://en.cppreference.com/w/cpp/utility/to_chars>.
   auto [p, ec] = v.to_chars(str.data(), str.data() + str.size()); // constexpr and no throw.
 
-  // Non-member to chars, like <https://en.cppreference.com/w/cpp/utility/to_chars>.
+  // Non-member constexpr to chars, like <https://en.cppreference.com/w/cpp/utility/to_chars>.
   auto [p, ec] = semver::to_chars(str.data(), str.data() + str.size(), v); // constexpr and no throw.
   ```
 
@@ -83,11 +83,11 @@ C++ library compare and manipulate versions are available as extensions to the `
   // User-defined literals '_version'.
   semver::version v2 = "1.2.3-rc.4"_version; // constexpr and may throw.
 
-  // From chars, like <https://en.cppreference.com/w/cpp/utility/from_chars>.
+  // constexpr from_chars, like <https://en.cppreference.com/w/cpp/utility/from_chars>.
   semver::version v3;
   auto [p, ec] = v3.to_chars(str.data(), str.data() + str.size()); // constexpr and no throw.
 
-  // Non-member from chars, like <https://en.cppreference.com/w/cpp/utility/from_chars>.
+  // Non-member constexpr from chars, like <https://en.cppreference.com/w/cpp/utility/from_chars>.
   semver::version v4;
   auto [p, ec] = semver::to_chars(str.data(), str.data() + str.size(), v4); // constexpr and no throw.
 
