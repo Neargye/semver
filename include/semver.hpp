@@ -60,7 +60,7 @@
 #  define __SEMVER_THROW(exception) std::abort()
 #endif
 
-#if defined(__APPLE_CC__)
+#if defined(__clang__)
 #  pragma clang diagnostic push
 #  pragma clang diagnostic ignored "-Wmissing-braces" // Ignore warning: suggest braces around initialization of subobject 'return {first, std::errc::invalid_argument};'.
 #endif
@@ -428,7 +428,7 @@ namespace ranges {
 
 } // namespace semver
 
-#if defined(__APPLE_CC__)
+#if defined(__clang__)
 #  pragma clang diagnostic pop
 #endif
 
