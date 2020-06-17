@@ -111,7 +111,7 @@ inline constexpr std::string_view rc    = {"-rc", 3};
 inline constexpr auto min_version_string_length = 5;
 
 constexpr char to_lower(char c) noexcept {
-  return (c >= 'A' && c <= 'Z') ? c + ('a' - 'A') : c;
+  return (c >= 'A' && c <= 'Z') ? static_cast<char>(c + ('a' - 'A')) : c;
 }
 
 constexpr bool is_digit(char c) noexcept {
@@ -119,7 +119,7 @@ constexpr bool is_digit(char c) noexcept {
 }
 
 constexpr std::uint8_t to_digit(char c) noexcept {
-  return c - '0';
+  return static_cast<std::uint8_t>(c - '0');
 }
 
 constexpr std::uint8_t length(std::uint8_t x) noexcept {
@@ -220,16 +220,16 @@ struct version {
   prerelease prerelease_type     = prerelease::none;
   std::uint8_t prerelease_number = 0;
 
-  constexpr version(std::uint8_t major,
-                    std::uint8_t minor,
-                    std::uint8_t patch,
-                    prerelease prerelease_type = prerelease::none,
-                    std::uint8_t prerelease_number = 0) noexcept
-      : major{major},
-        minor{minor},
-        patch{patch},
-        prerelease_type{prerelease_type},
-        prerelease_number{prerelease_type == prerelease::none ? static_cast<std::uint8_t>(0) : prerelease_number} {
+  constexpr version(std::uint8_t major_,
+                    std::uint8_t minor_,
+                    std::uint8_t patch_,
+                    prerelease prerelease_type_ = prerelease::none,
+                    std::uint8_t prerelease_number_ = 0) noexcept
+      : major{major_},
+        minor{minor_},
+        patch{patch_},
+        prerelease_type{prerelease_type_},
+        prerelease_number{prerelease_type_ == prerelease::none ? static_cast<std::uint8_t>(0) : prerelease_number_} {
   }
 
   explicit constexpr version(std::string_view str) : version(0, 0, 0, prerelease::none, 0) {
@@ -344,7 +344,7 @@ struct version {
  private:
   constexpr std::uint8_t chars_length() const noexcept {
     // (<major>) + 1(.) + (<minor>) + 1(.) + (<patch>)
-    std::uint8_t length = detail::length(major) + detail::length(minor) + detail::length(patch) + 2;
+    auto length = detail::length(major) + detail::length(minor) + detail::length(patch) + 2;
     if (prerelease_type != prerelease::none) {
       // + 1(-) + (<prerelease>)
       length += detail::length(prerelease_type) + 1;
@@ -353,7 +353,7 @@ struct version {
         length += detail::length(prerelease_number) + 1;
       }
     }
-    return length;
+    return static_cast<std::uint8_t>(length);
   }
 };
 
