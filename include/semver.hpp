@@ -277,7 +277,7 @@ struct version {
   }
 
   [[nodiscard]] constexpr detail::to_chars_result to_chars(char* first, char* last) const noexcept {
-    const auto length = chars_length();
+    const auto length = string_length();
     if (first == nullptr || last == nullptr || (last - first) < length) {
       return {last, std::errc::value_too_large};
     }
@@ -309,12 +309,27 @@ struct version {
   }
 
   [[nodiscard]] std::string to_string() const {
-    auto str = std::string(chars_length(), '\0');
+    auto str = std::string(string_length(), '\0');
     if (!to_chars(str.data(), str.data() + str.length())) {
       __SEMVER_THROW(std::invalid_argument{"semver::version::to_string invalid version."});
     }
 
     return str;
+  }
+
+  [[nodiscard]] constexpr std::uint8_t string_length() const noexcept {
+    // (<major>) + 1(.) + (<minor>) + 1(.) + (<patch>)
+    auto length = detail::length(major) + detail::length(minor) + detail::length(patch) + 2;
+    if (prerelease_type != prerelease::none) {
+      // + 1(-) + (<prerelease>)
+      length += detail::length(prerelease_type) + 1;
+      if (prerelease_number != 0) {
+        // + 1(.) + (<prereleaseversion>)
+        length += detail::length(prerelease_number) + 1;
+      }
+    }
+
+    return static_cast<std::uint8_t>(length);
   }
 
   [[nodiscard]] constexpr int compare(const version& other) const noexcept {
@@ -339,21 +354,6 @@ struct version {
     }
 
     return 0;
-  }
-
- private:
-  constexpr std::uint8_t chars_length() const noexcept {
-    // (<major>) + 1(.) + (<minor>) + 1(.) + (<patch>)
-    auto length = detail::length(major) + detail::length(minor) + detail::length(patch) + 2;
-    if (prerelease_type != prerelease::none) {
-      // + 1(-) + (<prerelease>)
-      length += detail::length(prerelease_type) + 1;
-      if (prerelease_number != 0) {
-        // + 1(.) + (<prereleaseversion>)
-        length += detail::length(prerelease_number) + 1;
-      }
-    }
-    return static_cast<std::uint8_t>(length);
   }
 };
 
