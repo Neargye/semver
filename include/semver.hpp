@@ -38,6 +38,10 @@
 #ifndef NEARGYE_SEMANTIC_VERSIONING_HPP
 #define NEARGYE_SEMANTIC_VERSIONING_HPP
 
+#define SEMVER_VERSION_MAJOR 0
+#define SEMVER_VERSION_MINOR 2
+#define SEMVER_VERSION_PATCH 2
+
 #include <cstdint>
 #include <cstddef>
 #include <limits>
@@ -75,7 +79,7 @@ enum struct prerelease : std::uint8_t {
 };
 
 // Max version string length = 3(<major>) + 1(.) + 3(<minor>) + 1(.) + 3(<patch>) + 1(-) + 5(<prerelease>) + 1(.) + 3(<prereleaseversion>) = 21.
-inline constexpr std::size_t max_version_string_length = 21;
+inline constexpr auto max_version_string_length = std::size_t{21};
 
 namespace detail {
 
@@ -425,6 +429,9 @@ inline std::basic_ostream<Char, Traits>& operator<<(std::basic_ostream<Char, Tra
 namespace ranges {
 
 } // namespace semver::ranges
+
+// Version lib semver.
+inline constexpr auto semver_verion = version{SEMVER_VERSION_MAJOR, SEMVER_VERSION_MINOR, SEMVER_VERSION_PATCH};
 
 } // namespace semver
 
