@@ -54,10 +54,10 @@
 // Allow to disable exceptions.
 #if (defined(__cpp_exceptions) || defined(__EXCEPTIONS) || defined(_CPPUNWIND)) && !defined(SEMVER_NOEXCEPTION)
 #  include <stdexcept>
-#  define __SEMVER_THROW(exception) throw exception
+#  define NEARGYE_SEMVER_THROW(exception) throw exception
 #else
 #  include <cstdlib>
-#  define __SEMVER_THROW(exception) std::abort()
+#  define NEARGYE_SEMVER_THROW(exception) std::abort()
 #endif
 
 #if defined(__clang__)
@@ -302,7 +302,7 @@ struct version {
 
   constexpr version& from_string(std::string_view str) {
     if (!from_string_noexcept(str)) {
-      __SEMVER_THROW(std::invalid_argument{"semver::version::from_string invalid version."});
+      NEARGYE_SEMVER_THROW(std::invalid_argument{"semver::version::from_string invalid version."});
     }
 
     return *this;
@@ -311,7 +311,7 @@ struct version {
   [[nodiscard]] std::string to_string() const {
     auto str = std::string(string_length(), '\0');
     if (!to_chars(str.data(), str.data() + str.length())) {
-      __SEMVER_THROW(std::invalid_argument{"semver::version::to_string invalid version."});
+      NEARGYE_SEMVER_THROW(std::invalid_argument{"semver::version::to_string invalid version."});
     }
 
     return str;
