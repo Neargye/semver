@@ -15,6 +15,8 @@ __      __           _             _                _____
                                            |___/
 ```
 
+[![Github releases](https://img.shields.io/github/release/Neargye/semver.svg)](https://github.com/Neargye/semver/releases)
+[![Vcpkg package](https://img.shields.io/badge/Vcpkg-package-blueviolet)](https://github.com/microsoft/vcpkg/tree/master/ports/neargye-semver)
 [![License](https://img.shields.io/github/license/Neargye/semver.svg)](LICENSE)
 [![Build Status](https://travis-ci.org/Neargye/semver.svg?branch=master)](https://travis-ci.org/Neargye/semver)
 [![Build status](https://ci.appveyor.com/api/projects/status/5k62fhf7u1v5h1st/branch/master?svg=true)](https://ci.appveyor.com/project/Neargye/semver/branch/master)
@@ -104,6 +106,18 @@ C++ library compare and manipulate versions are available as extensions to the `
 ## Integration
 
 You should add required file [semver.hpp](include/semver.hpp).
+
+If you are using [vcpkg](https://github.com/Microsoft/vcpkg/) on your project for external dependencies, then you can use the [neargye-semver package](https://github.com/microsoft/vcpkg/tree/master/ports/neargye-semver).
+
+Alternatively, you can use something like [CPM](https://github.com/TheLartians/CPM) which is based on CMake's `Fetch_Content` module.
+
+```cmake
+CPMAddPackage(
+    NAME semver
+    GITHUB_REPOSITORY Neargye/semver
+    GIT_TAG x.y.z # Where `x.y.z` is the release version you want to use.
+)
+```
 
 ## Compiler compatibility
 
