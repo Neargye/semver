@@ -58,10 +58,10 @@
 // Allow to disable exceptions.
 #if (defined(__cpp_exceptions) || defined(__EXCEPTIONS) || defined(_CPPUNWIND)) && !defined(SEMVER_NOEXCEPTION)
 #  include <stdexcept>
-#  define NEARGYE_SEMVER_THROW(exception) throw exception
+#  define NEARGYE_THROW(exception) throw exception
 #else
 #  include <cstdlib>
-#  define NEARGYE_SEMVER_THROW(exception) std::abort()
+#  define NEARGYE_THROW(exception) std::abort()
 #endif
 
 #if defined(__clang__)
@@ -306,7 +306,7 @@ struct version {
 
   constexpr version& from_string(std::string_view str) {
     if (!from_string_noexcept(str)) {
-      NEARGYE_SEMVER_THROW(std::invalid_argument{"semver::version::from_string invalid version."});
+      NEARGYE_THROW(std::invalid_argument{"semver::version::from_string invalid version."});
     }
 
     return *this;
@@ -315,7 +315,7 @@ struct version {
   [[nodiscard]] std::string to_string() const {
     auto str = std::string(string_length(), '\0');
     if (!to_chars(str.data(), str.data() + str.length())) {
-      NEARGYE_SEMVER_THROW(std::invalid_argument{"semver::version::to_string invalid version."});
+      NEARGYE_THROW(std::invalid_argument{"semver::version::to_string invalid version."});
     }
 
     return str;
@@ -434,6 +434,8 @@ namespace ranges {
 inline constexpr auto semver_verion = version{SEMVER_VERSION_MAJOR, SEMVER_VERSION_MINOR, SEMVER_VERSION_PATCH};
 
 } // namespace semver
+
+#undef NEARGYE_THROW
 
 #if defined(__clang__)
 #  pragma clang diagnostic pop
