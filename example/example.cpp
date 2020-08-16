@@ -1,7 +1,6 @@
-// semver example
-//
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
-// Copyright (c) 2018 Daniil Goncharov <neargye@gmail.com>.
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2018 - 2020 Daniil Goncharov <neargye@gmail.com>.
 //
 // Permission is hereby  granted, free of charge, to any  person obtaining a copy
 // of this software and associated  documentation files (the "Software"), to deal
@@ -28,39 +27,31 @@
 using namespace semver;
 
 int main() {
-  constexpr Version v_default;
-  static_assert(v_default == Version(0, 1, 0, Version::PreReleaseType::kNone, 0), "");
+  constexpr version v_default;
+  static_assert(v_default == version(0, 1, 0, prerelease::none, 0));
   std::cout << v_default << std::endl; // 0.1.0
 
-  constexpr Version v1(1, 4, 3);
-  constexpr Version v2(1, 2, 4, Version::PreReleaseType::kAlpha, 10);
+  constexpr version v1{1, 4, 3};
+  constexpr version v2{"1.2.4-alpha.10"};
   std::cout << v1 << std::endl; // 1.4.3
   std::cout << v2 << std::endl; // 1.2.4-alpha.10
-  static_assert(v1 != v2, "");
-  static_assert(!(v1 == v2), "");
-  static_assert(v1 > v2, "");
-  static_assert(v1 >= v2, "");
-  static_assert(!(v1 < v2), "");
-  static_assert(!(v1 <= v2), "");
+  static_assert(v1 != v2);
+  static_assert(!(v1 == v2));
+  static_assert(v1 > v2);
+  static_assert(v1 >= v2);
+  static_assert(!(v1 < v2));
+  static_assert(!(v1 <= v2));
 
-  Version v_s;
-  v_s.FromString("1.2.3-rc.1");
-  const std::string s1 = v_s.ToString();
+  version v_s;
+  v_s.from_string("1.2.3-rc.1");
+  std::string s1 = v_s.to_string();
   std::cout << s1 << std::endl; // 1.2.3-rc.1
-  v_s.pre_release_version = 0;
-  const std::string s2 = v_s.ToString();
+  v_s.prerelease_number = 0;
+  std::string s2 = v_s.to_string();
   std::cout << s2 << std::endl; // 1.2.3-rc
 
-  const Version vo = "1.2.3-rc.1"_version;
-  std::cout << vo << std::endl; // 1.2.3-rc.1
-
-  Version vi;
-  std::cin >> vi;
-  if (vi.IsValid()) {
-    std::cout << vi << std::endl;
-  } else {
-    std::cout << "incorrect format version" << std::endl;
-  }
+  constexpr version vo = "2.0.0-rc.3"_version;
+  std::cout << vo << std::endl; // 2.0.0-rc.3
 
   return 0;
 }

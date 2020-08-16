@@ -1,34 +1,26 @@
 version: "{branch} #{build}"
 
-shallow_clone: true
-
 image:
   - Visual Studio 2017
+  - Visual Studio 2019
 
 platform:
   - Win32
   - x64
 
-configuration:
-  - Debug
-  - Release
-
 build:
   parallel: true
-
-environment:
-  matrix:
-    - GENERATOR: "Visual Studio 15 2017"
-    - GENERATOR: "Visual Studio 14 2015"
 
 before_build:
   - if exist build RMDIR /S /Q build
   - if not exist build mkdir build
   - cd build
-  - cmake -G "%GENERATOR%" -A %PLATFORM% ..
 
 build_script:
-  - cmake --build . --config %CONFIGURATION%
+  - cmake -A %PLATFORM% ..
+  - cmake --build . --config Debug
+  - cmake --build . --config Release
 
 test_script:
-  - ctest --output-on-failure -C %CONFIGURATION%
+  - ctest --output-on-failure -C Debug
+  - ctest --output-on-failure -C Release
