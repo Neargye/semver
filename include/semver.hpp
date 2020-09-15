@@ -49,6 +49,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 #if __has_include(<charconv>)
 #include <charconv>
 #else
@@ -425,6 +426,249 @@ inline std::basic_ostream<Char, Traits>& operator<<(std::basic_ostream<Char, Tra
 
   return os;
 }
+
+struct range {
+
+  explicit range(std::string_view str) {
+    from_string(str);
+  }
+
+  bool contains(const version& ver) const {
+    return ranges.contains(ver);
+  }
+
+private:
+
+  void from_string(std::string_view str) {
+    range_parser parser(str);
+    ranges = parser.parse();
+  }
+
+  enum struct range_operator {
+    less,
+    less_or_equal,
+    greater,
+    greater_or_equal,
+    equal
+  };
+
+  struct range_unit {
+    range_operator range_operator;
+    version ver;
+
+    bool contains(const version& version) const {
+      switch (range_operator) {
+        case range_operator::equal:
+          return version == ver;
+        case range_operator::greater:
+          return version > ver;
+        case range_operator::greater_or_equal:
+          return version >= ver;
+        case range_operator::less:
+          return version < ver;
+        case range_operator::less_or_equal:
+          return version <= ver;
+      }
+    }
+  };
+
+  struct range_set {
+    std::vector<range_unit> ranges;
+
+    void add(const range_unit& range) {
+      ranges.push_back(range);
+    }
+
+    bool contains(const version& version) const {
+      return std::all_of(ranges.begin(), ranges.end(), [&](const auto& range){ return range.contains(version); });
+    }
+  };
+
+  range_set ranges;
+
+  enum struct range_token_type {
+    none,
+    number,
+    range_operator,
+    dot,
+    end_of_line
+  };
+
+  struct range_token {
+    range_token_type type;
+    std::uint8_t number;
+    range_operator op;
+
+    range_token(range_token_type type) : type(type), number(0), op(range_operator::equal) {
+
+    }
+
+    range_token(range_token_type type, std::uint8_t number) : type(type), number(number), op(range_operator::equal) {
+
+    }
+
+    range_token(range_token_type type, range_operator op) : type(type), number(0), op(op) {
+
+    }
+
+  };
+
+  struct range_lexer {
+    std::string_view text;
+    std::size_t pos;
+
+    range_lexer(std::string_view text) : text(text), pos(0) {
+
+    }
+
+    range_token get_next_token() {
+      while (!end_of_line()) {
+
+        if (isspace(text[pos])) {
+          advance();
+          continue;
+        }
+
+        if (is_operator()) {
+          const auto op = get_operator();
+          return range_token(range_token_type::range_operator, op);
+        }
+
+        if (isdigit(text[pos])) {
+          const auto number = get_number();
+          return range_token(range_token_type::number, number);
+        }
+
+        if (is_dot()) {
+          advance();
+          return range_token(range_token_type::dot);
+        }
+
+        // todo handle unexpected symbol
+      }
+
+      return range_token(range_token_type::end_of_line);
+    }
+
+    bool end_of_line() const {
+      return pos >= text.length();
+    }
+
+    void advance() {
+      pos++;
+    }
+
+    bool is_operator() const {
+      auto c = text[pos];
+      return c == '<' || c == '>' || c == '=';
+    }
+
+    bool is_dot() const {
+      return text[pos] == '.';
+    }
+
+    range_operator get_operator() {
+      if (text[pos] == '<') {
+        advance();
+        if (text[pos] == '=') {
+          advance();
+          return range_operator::less_or_equal;
+        }
+        return range_operator::less;
+      } else if (text[pos] == '>') {
+        advance();
+        if (text[pos] == '=') {
+          advance();
+          return range_operator::greater_or_equal;
+        }
+        return range_operator::greater;
+      } else if (text[pos] == '=') {
+        advance();
+        return range_operator::equal;
+      }
+
+      // this should never happen
+      // todo handle error
+
+      return range_operator::equal;
+    }
+  
+    std::uint8_t get_number() {
+      std::string str;
+      while (isdigit(text[pos])) {
+        str += text[pos];
+        advance();
+      }
+      return static_cast<std::uint8_t>(std::stoi(str));
+    } 
+  };
+
+  struct range_parser {
+
+    range_lexer lexer;
+    range_token current_token;
+
+    range_parser(std::string_view str) : lexer(str), current_token(range_token_type::none) {
+      advance_token();
+    }
+
+    range_set parse() {
+      range_set ranges;
+
+      while (current_token.type == range_token_type::range_operator || current_token.type == range_token_type::number) {
+        const auto range = parse_range();
+        ranges.add(range);
+      }
+      
+      return ranges;
+    }
+
+    void advance_token() {
+      current_token = lexer.get_next_token();
+    }
+
+    range_unit parse_range() {
+      if (current_token.type == range_token_type::number) {
+        const auto version = parse_version();
+        return { range_operator::equal, version };
+      } else if (current_token.type == range_token_type::range_operator) {
+        const auto range_operator = current_token.op;
+        advance_token();
+        const auto version = parse_version();
+        return { range_operator, version };
+      }
+
+      // this should never happen
+      // todo handle error
+      
+      return { range_operator::equal, version() };
+    }
+
+    version parse_version() {
+      std::uint8_t major = parse_number();
+      std::uint8_t minor = 0;
+      std::uint8_t patch = 0;
+
+      if (current_token.type == range_token_type::dot) {
+        advance_token();
+        minor = parse_number();
+
+        if (current_token.type == range_token_type::dot) {
+          advance_token();
+          patch = parse_number();
+        }
+      }
+
+      return { major, minor, patch };
+    }
+
+    std::uint8_t parse_number() {
+      const auto token = current_token;
+      advance_token();
+      return token.number;
+    }
+  };
+};
 
 namespace ranges {
 

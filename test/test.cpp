@@ -409,3 +409,28 @@ TEST_CASE("from/to string") {
     REQUIRE(!semver::valid("1.2"));
   }
 }
+
+TEST_CASE("ranges") {
+  SECTION("basic") {
+    
+    struct TestCase {
+      std::string range;
+      version ver;
+      bool contains;
+    };
+ 
+    std::vector<TestCase> tests = {
+      {"> 1.2.3", {1, 2, 5}, true},
+      {"> 1.2.3", {1, 1, 0}, false},
+      {">=1.2.0 <2.0.0", {1, 2, 5}, true},
+      {">=1.2.0 <2.0.0", {2, 3, 0}, false},
+      {"1.0.0", {1, 0, 0}, true},
+      {"1.0.0 < 2.0.0", {1, 5, 0}, false}
+    };
+ 
+    for (const auto& test : tests) {
+      range range(test.range);
+      REQUIRE(range.contains(test.ver) == test.contains);
+    }
+  }
+}
