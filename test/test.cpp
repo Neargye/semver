@@ -412,7 +412,6 @@ TEST_CASE("from/to string") {
 
 TEST_CASE("ranges") {
   SECTION("basic") {
-    
     struct TestCase {
       std::string_view range;
       version ver;
@@ -427,9 +426,9 @@ TEST_CASE("ranges") {
       {"1.0.0", {1, 0, 0}, true},
       {"1.0.0 < 2.0.0", {1, 5, 0}, false}
     }};
- 
+
     for (const auto& test : tests) {
-      range range(test.range);
+      range range(test.str_range);
       REQUIRE(range.contains(test.ver) == test.contains);
     }
   }

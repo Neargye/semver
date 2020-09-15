@@ -426,16 +426,11 @@ inline std::basic_ostream<Char, Traits>& operator<<(std::basic_ostream<Char, Tra
   return os;
 }
 
-struct range {
-
-  std::string_view str;
-
-  constexpr explicit range(std::string_view str) {
-    this->str = str;
-  }
+class range {
+  constexpr explicit range(std::string_view str) : str_{str} {}
 
   constexpr bool contains(const version& ver) const {
-    range_parser parser(str);
+    range_parser parser{str_};
 
     while (parser.current_token.type == range_token_type::range_operator || parser.current_token.type == range_token_type::number) {
       const auto range = parser.parse_range();
@@ -448,8 +443,7 @@ struct range {
   }
 
 private:
-
-  enum struct range_operator {
+  enum struct range_operator : std::uint8_t {
     less,
     less_or_equal,
     greater,
@@ -477,7 +471,7 @@ private:
     }
   };
 
-  enum struct range_token_type {
+  enum struct range_token_type : std::uint8_t {
     none,
     number,
     range_operator,
@@ -486,31 +480,16 @@ private:
   };
 
   struct range_token {
-    range_token_type type;
-    std::uint8_t number;
-    range_operator op;
-
-    constexpr range_token(range_token_type type) : type(type), number(0), op(range_operator::equal) {
-
-    }
-
-    constexpr range_token(range_token_type type, std::uint8_t number) : type(type), number(number), op(range_operator::equal) {
-
-    }
-
-    constexpr range_token(range_token_type type, range_operator op) : type(type), number(0), op(op) {
-
-    }
-
+    range_token_type type = range_token_type::none;
+    std::uint8_t number = 0;
+    range_operator op = range_operator::equal;
   };
 
   struct range_lexer {
     std::string_view text;
     std::size_t pos;
 
-    constexpr range_lexer(std::string_view text) : text(text), pos(0) {
-
-    }
+    constexpr range_lexer(std::string_view text) : text{text}, pos{0} {}
 
     constexpr range_token get_next_token() {
       while (!end_of_line()) {
@@ -522,23 +501,23 @@ private:
 
         if (is_operator()) {
           const auto op = get_operator();
-          return range_token(range_token_type::range_operator, op);
+          return {range_token_type::range_operator, 0, op};
         }
 
         if (isdigit(text[pos])) {
           const auto number = get_number();
-          return range_token(range_token_type::number, number);
+          return {range_token_type::number, number};
         }
 
         if (is_dot()) {
           advance();
-          return range_token(range_token_type::dot);
+          return {range_token_type::dot};
         }
 
-        // todo handle unexpected symbol
+        // TODO: handle unexpected symbol
       }
 
-      return range_token(range_token_type::end_of_line);
+      return {range_token_type::end_of_line};
     }
 
     constexpr bool end_of_line() const {
@@ -550,7 +529,7 @@ private:
     }
 
     constexpr bool is_operator() const {
-      auto c = text[pos];
+      const auto c = text[pos];
       return c == '<' || c == '>' || c == '=';
     }
 
@@ -579,7 +558,7 @@ private:
       }
 
       // this should never happen
-      // todo handle error
+      // TODO: handle error
 
       return range_operator::equal;
     }
@@ -587,19 +566,19 @@ private:
     constexpr std::uint8_t get_number() {
       std::uint8_t number = 0;
       while (detail::is_digit(text[pos])) {
-        number = number * 10 + detail::to_digit(text[pos]);
+        number = (number * 10) + detail::to_digit(text[pos]);
         advance();
       }
+
       return number;
     } 
   };
 
   struct range_parser {
-
     range_lexer lexer;
     range_token current_token;
 
-    constexpr range_parser(std::string_view str) : lexer(str), current_token(range_token_type::none) {
+    constexpr range_parser(std::string_view str) : lexer{str}, current_token{range_token_type::none} {
       advance_token();
     }
 
@@ -610,18 +589,18 @@ private:
     constexpr range_unit parse_range() {
       if (current_token.type == range_token_type::number) {
         const auto version = parse_version();
-        return { range_operator::equal, version };
+        return {range_operator::equal, version};
       } else if (current_token.type == range_token_type::range_operator) {
         const auto range_operator = current_token.op;
         advance_token();
         const auto version = parse_version();
-        return { range_operator, version };
+        return {range_operator, version};
       }
 
       // this should never happen
       // todo handle error
-      
-      return { range_operator::equal, version() };
+
+      return {range_operator::equal, version{}};
     }
 
     constexpr version parse_version() {
@@ -639,20 +618,20 @@ private:
         }
       }
 
-      return { major, minor, patch };
+      return {major, minor, patch};
     }
 
     constexpr std::uint8_t parse_number() {
       const auto token = current_token;
       advance_token();
+
       return token.number;
     }
   };
+
+  std::string_view str_; // TODO: do we need store str_? maybe range::contains(std::string_view str, const version& ver).
+                         // TODO: need clear API, beter that js
 };
-
-namespace ranges {
-
-} // namespace semver::ranges
 
 // Version lib semver.
 inline constexpr auto semver_verion = version{SEMVER_VERSION_MAJOR, SEMVER_VERSION_MINOR, SEMVER_VERSION_PATCH};
