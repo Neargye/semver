@@ -122,6 +122,18 @@ constexpr bool is_digit(char c) noexcept {
   return c >= '0' && c <= '9';
 }
 
+constexpr bool is_space(char c) noexcept {
+  return c == ' ';
+}
+
+constexpr bool is_operator(char c) noexcept {
+  return c == '<' || c == '>' || c == '=';
+}
+
+constexpr bool is_dot(char c) noexcept {
+  return c == '.';
+}
+
 constexpr std::uint8_t to_digit(char c) noexcept {
   return static_cast<std::uint8_t>(c - '0');
 }
@@ -427,6 +439,7 @@ inline std::basic_ostream<Char, Traits>& operator<<(std::basic_ostream<Char, Tra
 }
 
 class range {
+public:
   constexpr explicit range(std::string_view str) : str_{str} {}
 
   constexpr bool contains(const version& ver) const {
@@ -494,22 +507,22 @@ private:
     constexpr range_token get_next_token() {
       while (!end_of_line()) {
 
-        if (isspace(text[pos])) {
+        if (detail::is_space(text[pos])) {
           advance();
           continue;
         }
 
-        if (is_operator()) {
+        if (detail::is_operator(text[pos])) {
           const auto op = get_operator();
           return {range_token_type::range_operator, 0, op};
         }
 
-        if (isdigit(text[pos])) {
+        if (detail::is_digit(text[pos])) {
           const auto number = get_number();
           return {range_token_type::number, number};
         }
 
-        if (is_dot()) {
+        if (detail::is_dot(text[pos])) {
           advance();
           return {range_token_type::dot};
         }
@@ -526,15 +539,6 @@ private:
 
     constexpr void advance() {
       pos++;
-    }
-
-    constexpr bool is_operator() const {
-      const auto c = text[pos];
-      return c == '<' || c == '>' || c == '=';
-    }
-
-    constexpr bool is_dot() const {
-      return text[pos] == '.';
     }
 
     constexpr range_operator get_operator() {
@@ -598,7 +602,7 @@ private:
       }
 
       // this should never happen
-      // todo handle error
+      // TODO: handle error
 
       return {range_operator::equal, version{}};
     }

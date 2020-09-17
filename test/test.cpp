@@ -411,14 +411,27 @@ TEST_CASE("from/to string") {
 }
 
 TEST_CASE("ranges") {
-  SECTION("basic") {
-    struct TestCase {
-      std::string_view range;
-      version ver;
-      bool contains;
-    };
+  SECTION("constructor") {
+    constexpr version v1{"1.2.3"};
+    constexpr range r1{">1.0.0 <=2.0.0"};    
+    STATIC_REQUIRE(r1.contains(v1));
 
-    constexpr std::array<TestCase, 6> tests = {{
+    constexpr version v2{"2.1.0"};
+    STATIC_REQUIRE_FALSE(r1.contains(v2));
+
+    constexpr range r2{"1.1.1"};
+    constexpr version v3{"1.1.1"};
+    STATIC_REQUIRE(r2.contains(v3));
+  }
+
+  struct range_test_case {
+    std::string_view str_range;
+    version ver;
+    bool contains;
+  };  
+
+  SECTION("one comparator set") {
+    constexpr std::array<range_test_case, 6> tests = {{
       {"> 1.2.3", {1, 2, 5}, true},
       {"> 1.2.3", {1, 1, 0}, false},
       {">=1.2.0 <2.0.0", {1, 2, 5}, true},
@@ -428,8 +441,12 @@ TEST_CASE("ranges") {
     }};
 
     for (const auto& test : tests) {
-      range range(test.str_range);
+      const range range(test.str_range);
       REQUIRE(range.contains(test.ver) == test.contains);
     }
+  }
+
+  SECTION("multiple comparators set") {
+    
   }
 }
