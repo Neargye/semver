@@ -134,6 +134,10 @@ constexpr bool is_dot(char c) noexcept {
   return c == '.';
 }
 
+constexpr bool is_logical_or(char c) noexcept {
+  return c == '|';
+}
+
 constexpr std::uint8_t to_digit(char c) noexcept {
   return static_cast<std::uint8_t>(c - '0');
 }
@@ -445,14 +449,41 @@ public:
   constexpr bool contains(const version& ver) const {
     range_parser parser{str_};
 
-    while (parser.current_token.type == range_token_type::range_operator || parser.current_token.type == range_token_type::number) {
-      const auto range = parser.parse_range();
-      if (!range.contains(ver)) {
-        return false;
-      }
-    }
+    auto is_logical_or = [&parser]() constexpr -> bool {
+      return parser.current_token.type == range_token_type::logical_or;
+    };
 
-    return true;
+    auto is_operator = [&parser]() constexpr -> bool {
+      return parser.current_token.type == range_token_type::range_operator;
+    };
+
+    auto is_number = [&parser]() constexpr -> bool {
+      return parser.current_token.type == range_token_type::number;
+    };
+
+    do
+    {
+      if (is_logical_or()) {
+        parser.advance_token();
+      }
+
+      auto contains = true;
+
+      while (is_operator() || is_number()) {
+        const auto range = parser.parse_range();
+        if (!range.contains(ver)) {
+          contains = false;
+          break;
+        }
+      }
+
+      if (contains) {
+        return true;
+      }
+
+    } while (is_logical_or());
+    
+    return false;
   }
 
 private:
@@ -489,6 +520,7 @@ private:
     number,
     range_operator,
     dot,
+    logical_or,
     end_of_line
   };
 
@@ -510,6 +542,13 @@ private:
         if (detail::is_space(text[pos])) {
           advance();
           continue;
+        }
+
+        if (detail::is_logical_or(text[pos])) {
+          for (size_t i = 0; i < 2; i++) {
+            advance();
+          }
+          return {range_token_type::logical_or}; 
         }
 
         if (detail::is_operator(text[pos])) {
@@ -584,7 +623,7 @@ private:
 
     constexpr range_parser(std::string_view str) : lexer{str}, current_token{range_token_type::none} {
       advance_token();
-    }
+    } 
 
     constexpr void advance_token() {
       current_token = lexer.get_next_token();
