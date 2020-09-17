@@ -617,7 +617,7 @@ class range {
   
     constexpr std::uint8_t get_number() {
       std::uint8_t number = 0;
-      while (detail::is_digit(text[pos])) {
+      while (!end_of_line() && detail::is_digit(text[pos])) {
         number = (number * 10) + detail::to_digit(text[pos]);
         advance();
       }
