@@ -447,6 +447,17 @@ TEST_CASE("ranges") {
   }
 
   SECTION("multiple comparators set") {
-    
+    constexpr range range{"1.2.7 || >=1.2.9 <2.0.0"};
+    constexpr version v1{"1.2.7"};
+    constexpr version v2{"1.2.9"};
+    constexpr version v3{"1.4.6"};
+    constexpr version v4{"1.2.8"};
+    constexpr version v5{"2.0.0"};
+
+    STATIC_REQUIRE(range.contains(v1));
+    STATIC_REQUIRE(range.contains(v2));
+    STATIC_REQUIRE(range.contains(v3));
+    STATIC_REQUIRE_FALSE(range.contains(v4));
+    STATIC_REQUIRE_FALSE(range.contains(v5));
   }
 }
