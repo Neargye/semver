@@ -64,6 +64,14 @@
 #  define NEARGYE_THROW(exception) std::abort()
 #endif
 
+#ifdef _MSC_VER
+#    define NEARGYE_NODEFAULT __assume(0);
+#elif defined(__clang__) || defined(__GNUC__)
+#    define NEARGYE_NODEFAULT __builtin_unreachable();
+#else
+#    define NEARGYE_NODEFAULT
+#endif
+
 #if defined(__clang__)
 #  pragma clang diagnostic push
 #  pragma clang diagnostic ignored "-Wmissing-braces" // Ignore warning: suggest braces around initialization of subobject 'return {first, std::errc::invalid_argument};'.
@@ -443,7 +451,7 @@ inline std::basic_ostream<Char, Traits>& operator<<(std::basic_ostream<Char, Tra
 }
 
 class range {
-public:
+ public:
   constexpr explicit range(std::string_view str) : str_{str} {}
 
   constexpr bool contains(const version& ver) const {
@@ -486,7 +494,7 @@ public:
     return false;
   }
 
-private:
+ private:
   enum struct range_operator : std::uint8_t {
     less,
     less_or_equal,
@@ -512,6 +520,7 @@ private:
         case range_operator::less_or_equal:
           return version <= ver;
       }
+      NEARGYE_NODEFAULT
     }
   };
 
@@ -614,7 +623,7 @@ private:
       }
 
       return number;
-    } 
+    }
   };
 
   struct range_parser {
@@ -682,6 +691,7 @@ inline constexpr auto semver_verion = version{SEMVER_VERSION_MAJOR, SEMVER_VERSI
 } // namespace semver
 
 #undef NEARGYE_THROW
+#undef NEARGYE_NODEFAULT
 
 #if defined(__clang__)
 #  pragma clang diagnostic pop

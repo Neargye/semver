@@ -413,7 +413,7 @@ TEST_CASE("from/to string") {
 TEST_CASE("ranges") {
   SECTION("constructor") {
     constexpr version v1{"1.2.3"};
-    constexpr range r1{">1.0.0 <=2.0.0"};    
+    constexpr range r1{">1.0.0 <=2.0.0"};
     STATIC_REQUIRE(r1.contains(v1));
 
     constexpr version v2{"2.1.0"};
@@ -428,7 +428,7 @@ TEST_CASE("ranges") {
     std::string_view str_range;
     version ver;
     bool contains;
-  };  
+  };
 
   SECTION("one comparator set") {
     constexpr std::array<range_test_case, 6> tests = {{
