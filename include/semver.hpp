@@ -528,11 +528,11 @@ class range {
   };
 
   struct range_unit {
-    range_operator range_operator;
+    range_operator op;
     version ver;
 
     constexpr bool contains(const version& version) const {
-      switch (range_operator) {
+      switch (op) {
         case range_operator::equal:
           return version == ver;
         case range_operator::greater:
