@@ -146,6 +146,14 @@ constexpr bool is_logical_or(char c) noexcept {
   return c == '|';
 }
 
+constexpr bool is_hyphen(char c) noexcept {
+  return c == '-';
+}
+
+constexpr bool is_letter(char c) noexcept {
+  return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+}
+
 constexpr std::uint8_t to_digit(char c) noexcept {
   return static_cast<std::uint8_t>(c - '0');
 }
@@ -383,6 +391,10 @@ struct version {
 
     return 0;
   }
+
+  constexpr bool same_major_minor_patch(const version& other) const {
+    return major == other.major && minor == other.minor && patch == other.patch;
+  }
 };
 
 [[nodiscard]] constexpr bool operator==(const version& lhs, const version& rhs) noexcept {
@@ -469,6 +481,8 @@ class range {
       return parser.current_token.type == range_token_type::number;
     };
 
+    const auto has_prerelease = ver.prerelease_type != prerelease::none;
+
     do
     {
       if (is_logical_or()) {
@@ -476,16 +490,26 @@ class range {
       }
 
       auto contains = true;
+      auto allow_compare = false;
 
       while (is_operator() || is_number()) {
         const auto range = parser.parse_range();
+
+        if (has_prerelease && ver.same_major_minor_patch(range.ver)) {
+          allow_compare = true;
+        }
+
         if (!range.contains(ver)) {
           contains = false;
           break;
         }
       }
 
-      if (contains) {
+      if (has_prerelease) {
+        if (allow_compare && contains) {
+          return true;
+        }
+      } else if (contains) {
         return true;
       }
 
@@ -530,6 +554,8 @@ class range {
     range_operator,
     dot,
     logical_or,
+    hyphen,
+    prerelease,
     end_of_line
   };
 
@@ -537,6 +563,7 @@ class range {
     range_token_type type = range_token_type::none;
     std::uint8_t number = 0;
     range_operator op = range_operator::equal;
+    prerelease prerelease_type = prerelease::none;
   };
 
   struct range_lexer {
@@ -554,9 +581,7 @@ class range {
         }
 
         if (detail::is_logical_or(text[pos])) {
-          for (size_t i = 0; i < 2; i++) {
-            advance();
-          }
+          advanceBy(2);
           return {range_token_type::logical_or}; 
         }
 
@@ -575,6 +600,16 @@ class range {
           return {range_token_type::dot};
         }
 
+        if (detail::is_hyphen(text[pos])) {
+          advance();
+          return {range_token_type::hyphen};
+        }
+
+        if (detail::is_letter(text[pos])) {
+          const auto prerelease = get_prerelease();
+          return {range_token_type::prerelease, 0, range_operator::equal, prerelease};
+        }
+
         // TODO: handle unexpected symbol
       }
 
@@ -587,6 +622,11 @@ class range {
 
     constexpr void advance() {
       pos++;
+    }
+
+    constexpr void advanceBy(std::size_t i) {
+      for (std::size_t k = 0; k < i; ++k)
+        advance();
     }
 
     constexpr range_operator get_operator() {
@@ -624,6 +664,31 @@ class range {
 
       return number;
     }
+
+    constexpr prerelease get_prerelease() {
+      const auto first = text.data() + pos;
+      const auto last = text.data() + text.length();
+
+      if (first > last) {
+        advance();
+        return prerelease::none;
+      }
+
+      if (detail::equals(first, last, "alpha")) {
+        advanceBy(5);
+        return prerelease::alpha;
+      } else if (detail::equals(first, last, "beta")) {
+        advanceBy(4);
+        return prerelease::beta;
+      } else if (detail::equals(first, last, "rc")) {
+        advanceBy(2);
+        return prerelease::rc;
+      }
+
+      advance();
+
+      return prerelease::none;
+    }
   };
 
   struct range_parser {
@@ -659,6 +724,8 @@ class range {
       std::uint8_t major = parse_number();
       std::uint8_t minor = 0;
       std::uint8_t patch = 0;
+      prerelease prerelease = prerelease::none;
+      std::uint8_t prerelease_number = 0;
 
       if (current_token.type == range_token_type::dot) {
         advance_token();
@@ -667,10 +734,20 @@ class range {
         if (current_token.type == range_token_type::dot) {
           advance_token();
           patch = parse_number();
+
+          if (current_token.type == range_token_type::hyphen) {
+            advance_token();
+            prerelease = parse_prerelease();
+
+            if (current_token.type == range_token_type::dot) {
+              advance_token();
+              prerelease_number = parse_number();
+            }
+          }
         }
       }
 
-      return {major, minor, patch};
+      return {major, minor, patch, prerelease, prerelease_number};
     }
 
     constexpr std::uint8_t parse_number() {
@@ -678,6 +755,13 @@ class range {
       advance_token();
 
       return token.number;
+    }
+
+    constexpr prerelease parse_prerelease() {
+      const auto token = current_token;
+      advance_token();
+
+      return token.prerelease_type;
     }
   };
 

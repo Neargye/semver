@@ -468,12 +468,18 @@ TEST_CASE("ranges with prerelase tags") {
     constexpr version v1{"1.2.3-alpha.7"};
     constexpr version v2{"3.4.5-alpha.9"};
     constexpr version v3{"3.4.5"};
-    constexpr version v4{"1.2.3-alpha.3"};
+    constexpr version v4{"1.2.3-alpha.4"};
 
     STATIC_REQUIRE(r1.contains(v1));
     STATIC_REQUIRE_FALSE(r1.contains(v2));
     STATIC_REQUIRE(r1.contains(v3));
     STATIC_REQUIRE(r1.contains(v4));
+
+    constexpr range r2{">=1.2.3 < 2.0.0"};
+    constexpr range r3{">=1.2.3-alpha.7 <2.0.0"};
+
+    STATIC_REQUIRE_FALSE(r2.contains(v1));
+    STATIC_REQUIRE(r3.contains(v1));
   }
 
   SECTION("prelease type comparison") {
@@ -481,10 +487,20 @@ TEST_CASE("ranges with prerelase tags") {
     constexpr version v2{"1.0.0-beta.123"};
     constexpr version v3{"1.0.0-rc.123"};
 
-    constexpr range r1{"<1.2.3-alpha.124"};
-    constexpr range r2{"<1.0.0-beta.123"};
-    constexpr range r3{"<1.0.0-rc.124"};
+    constexpr range r1{"<=1.0.0-alpha.123"};
+    constexpr range r2{"<=1.0.0-beta.123"};
+    constexpr range r3{"<=1.0.0-rc.123"};
 
-    
+    STATIC_REQUIRE(r1.contains(v1));
+    STATIC_REQUIRE_FALSE(r1.contains(v2));
+    STATIC_REQUIRE_FALSE(r1.contains(v3));
+
+    STATIC_REQUIRE(r2.contains(v1));
+    STATIC_REQUIRE(r2.contains(v2));
+    STATIC_REQUIRE_FALSE(r2.contains(v3));
+
+    STATIC_REQUIRE(r3.contains(v1));
+    STATIC_REQUIRE(r3.contains(v2));
+    STATIC_REQUIRE(r3.contains(v3));
   }
 }
