@@ -607,7 +607,7 @@ class range {
           return {range_token_type::prerelease, 0, range_operator::equal, prerelease};
         }
 
-        // TODO: handle unexpected symbol
+        NEARGYE_THROW(std::invalid_argument{"semver::range unexpected symbol."});
       }
 
       return {range_token_type::end_of_line};
@@ -646,10 +646,7 @@ class range {
         return range_operator::equal;
       }
 
-      // this should never happen
-      // TODO: handle error
-
-      return range_operator::equal;
+      NEARGYE_THROW(std::invalid_argument{"semver::range unexpected symbol."});
     }
   
     constexpr std::uint8_t get_number() {
@@ -667,8 +664,7 @@ class range {
       const auto last = text.data() + text.length();
 
       if (first > last) {
-        advance();
-        return prerelease::none;
+        NEARGYE_THROW(std::invalid_argument{"semver::range invalid prerelease tag."});
       }
 
       if (detail::equals(first, last, "alpha")) {
@@ -682,9 +678,7 @@ class range {
         return prerelease::rc;
       }
 
-      advance();
-
-      return prerelease::none;
+      NEARGYE_THROW(std::invalid_argument{"semver::range invalid prerelease tag."});
     }
   };
 
@@ -711,10 +705,7 @@ class range {
         return {range_operator, version};
       }
 
-      // this should never happen
-      // TODO: handle error
-
-      return {range_operator::equal, version{}};
+      NEARGYE_THROW(std::invalid_argument{"semver::range unexpected token."});
     }
 
     constexpr version parse_version() {
