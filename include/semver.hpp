@@ -391,10 +391,6 @@ struct version {
 
     return 0;
   }
-
-  constexpr bool same_major_minor_patch(const version& other) const {
-    return major == other.major && minor == other.minor && patch == other.patch;
-  }
 };
 
 [[nodiscard]] constexpr bool operator==(const version& lhs, const version& rhs) noexcept {
@@ -494,8 +490,9 @@ class range {
 
       while (is_operator() || is_number()) {
         const auto range = parser.parse_range();
+        const auto equal_without_tags = (version{range.ver.major, range.ver.minor, range.ver.patch} == version{ver.major, ver.minor, ver.patch});
 
-        if (has_prerelease && ver.same_major_minor_patch(range.ver)) {
+        if (has_prerelease && equal_without_tags) {
           allow_compare = true;
         }
 

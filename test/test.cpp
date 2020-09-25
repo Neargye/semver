@@ -480,6 +480,18 @@ TEST_CASE("ranges with prerelase tags") {
 
     STATIC_REQUIRE_FALSE(r2.contains(v1));
     STATIC_REQUIRE(r3.contains(v1));
+
+    constexpr range r4{">1.2.3 <2.0.0-alpha.10"};
+    constexpr version v5{"2.0.0-alpha.5"};
+
+    STATIC_REQUIRE(r4.contains(v5));
+    STATIC_REQUIRE_FALSE(r4.contains(v1));
+
+    constexpr range r5{">1.2.3 <2.0.0-alpha.1 || <=2.0.0-alpha.5"};
+    STATIC_REQUIRE(r5.contains(v5));
+
+    constexpr range r6{"<=2.0.0-alpha.4"};
+    STATIC_REQUIRE_FALSE(r6.contains(v5));
   }
 
   SECTION("prelease type comparison") {
