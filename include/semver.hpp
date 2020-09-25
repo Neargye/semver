@@ -482,7 +482,7 @@ class range {
     do
     {
       if (is_logical_or()) {
-        parser.advance_token();
+        parser.advance_token(range_token_type::logical_or);
       }
 
       auto contains = true;
@@ -606,8 +606,6 @@ class range {
           const auto prerelease = get_prerelease();
           return {range_token_type::prerelease, 0, range_operator::equal, prerelease};
         }
-
-        NEARGYE_THROW(std::invalid_argument{"semver::range unexpected symbol."});
       }
 
       return {range_token_type::end_of_line};
@@ -646,7 +644,7 @@ class range {
         return range_operator::equal;
       }
 
-      NEARGYE_THROW(std::invalid_argument{"semver::range unexpected symbol."});
+      return range_operator::equal;
     }
   
     constexpr std::uint8_t get_number() {
@@ -664,7 +662,8 @@ class range {
       const auto last = text.data() + text.length();
 
       if (first > last) {
-        NEARGYE_THROW(std::invalid_argument{"semver::range invalid prerelease tag."});
+        advance();
+        return prerelease::none;
       }
 
       if (detail::equals(first, last, "alpha")) {
@@ -678,7 +677,9 @@ class range {
         return prerelease::rc;
       }
 
-      NEARGYE_THROW(std::invalid_argument{"semver::range invalid prerelease tag."});
+      advance();
+
+      return prerelease::none;
     }
   };
 
@@ -687,10 +688,13 @@ class range {
     range_token current_token;
 
     constexpr range_parser(std::string_view str) : lexer{str}, current_token{range_token_type::none} {
-      advance_token();
+      advance_token(range_token_type::none);
     } 
 
-    constexpr void advance_token() {
+    constexpr void advance_token(range_token_type token_type) {
+      if (current_token.type != token_type) {
+        NEARGYE_THROW(std::invalid_argument{"semver::range unexpected token."});
+      }
       current_token = lexer.get_next_token();
     }
 
@@ -700,54 +704,46 @@ class range {
         return {range_operator::equal, version};
       } else if (current_token.type == range_token_type::range_operator) {
         const auto range_operator = current_token.op;
-        advance_token();
+        advance_token(range_token_type::range_operator);
         const auto version = parse_version();
         return {range_operator, version};
       }
 
-      NEARGYE_THROW(std::invalid_argument{"semver::range unexpected token."});
+      return {range_operator::equal, version{}};
     }
 
     constexpr version parse_version() {
-      std::uint8_t major = parse_number();
-      std::uint8_t minor = 0;
-      std::uint8_t patch = 0;
+      const auto major = parse_number();
+
+      advance_token(range_token_type::dot);
+      const auto minor = parse_number();
+
+      advance_token(range_token_type::dot);
+      const auto patch = parse_number();
+
       prerelease prerelease = prerelease::none;
       std::uint8_t prerelease_number = 0;
 
-      if (current_token.type == range_token_type::dot) {
-        advance_token();
-        minor = parse_number();
-
-        if (current_token.type == range_token_type::dot) {
-          advance_token();
-          patch = parse_number();
-
-          if (current_token.type == range_token_type::hyphen) {
-            advance_token();
-            prerelease = parse_prerelease();
-
-            if (current_token.type == range_token_type::dot) {
-              advance_token();
-              prerelease_number = parse_number();
-            }
-          }
-        }
+      if (current_token.type == range_token_type::hyphen) {
+        advance_token(range_token_type::hyphen);
+        prerelease = parse_prerelease();
+        advance_token(range_token_type::dot);
+        prerelease_number = parse_number();
       }
-
+        
       return {major, minor, patch, prerelease, prerelease_number};
     }
 
     constexpr std::uint8_t parse_number() {
       const auto token = current_token;
-      advance_token();
+      advance_token(range_token_type::number);
 
       return token.number;
     }
 
     constexpr prerelease parse_prerelease() {
       const auto token = current_token;
-      advance_token();
+      advance_token(range_token_type::prerelease);
 
       return token.prerelease_type;
     }
