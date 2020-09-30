@@ -463,6 +463,15 @@ class range {
   constexpr explicit range(std::string_view str) : str_{str} {}
 
   constexpr bool contains(const version& ver) const {
+    return contains(ver, false);
+  }
+
+  constexpr bool contains_include_prerelease(const version& ver) const {
+    return contains(ver, true);
+  }
+
+private:
+  constexpr bool contains(const version& ver, bool include_prerelease) const {
     range_parser parser{str_};
 
     auto is_logical_or = [&parser]() constexpr -> bool {
@@ -486,7 +495,7 @@ class range {
       }
 
       auto contains = true;
-      auto allow_compare = false;
+      auto allow_compare = include_prerelease;
 
       while (is_operator() || is_number()) {
         const auto range = parser.parse_range();
@@ -515,7 +524,6 @@ class range {
     return false;
   }
 
- private:
   enum struct range_operator : std::uint8_t {
     less,
     less_or_equal,
