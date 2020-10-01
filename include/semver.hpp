@@ -532,7 +532,7 @@ private:
     equal
   };
 
-  struct range_unit {
+  struct range_comparator {
     range_operator op;
     version ver;
 
@@ -706,7 +706,7 @@ private:
       current_token = lexer.get_next_token();
     }
 
-    constexpr range_unit parse_range() {
+    constexpr range_comparator parse_range() {
       if (current_token.type == range_token_type::number) {
         const auto version = parse_version();
         return {range_operator::equal, version};
