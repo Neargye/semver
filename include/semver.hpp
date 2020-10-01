@@ -462,16 +462,16 @@ class range {
  public:
   constexpr explicit range(std::string_view str) : str_{str} {}
 
-  constexpr bool contains(const version& ver) const {
-    return contains(ver, false);
+  constexpr bool satisfies(const version& ver) const {
+    return satisfies(ver, false);
   }
 
-  constexpr bool contains_include_prerelease(const version& ver) const {
-    return contains(ver, true);
+  constexpr bool satisfies_include_prerelease(const version& ver) const {
+    return satisfies(ver, true);
   }
 
 private:
-  constexpr bool contains(const version& ver, bool include_prerelease) const {
+  constexpr bool satisfies(const version& ver, bool include_prerelease) const {
     range_parser parser{str_};
 
     auto is_logical_or = [&parser]() constexpr -> bool {
@@ -505,7 +505,7 @@ private:
           allow_compare = true;
         }
 
-        if (!range.contains(ver)) {
+        if (!range.satisfies(ver)) {
           contains = false;
           break;
         }
@@ -536,7 +536,7 @@ private:
     range_operator op;
     version ver;
 
-    constexpr bool contains(const version& version) const {
+    constexpr bool satisfies(const version& version) const {
       switch (op) {
         case range_operator::equal:
           return version == ver;
