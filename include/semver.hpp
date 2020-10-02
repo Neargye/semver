@@ -64,14 +64,6 @@
 #  define NEARGYE_THROW(exception) std::abort()
 #endif
 
-#ifdef _MSC_VER
-#    define NEARGYE_NODEFAULT __assume(0);
-#elif defined(__clang__) || defined(__GNUC__)
-#    define NEARGYE_NODEFAULT __builtin_unreachable();
-#else
-#    define NEARGYE_NODEFAULT
-#endif
-
 #if defined(__clang__)
 #  pragma clang diagnostic push
 #  pragma clang diagnostic ignored "-Wmissing-braces" // Ignore warning: suggest braces around initialization of subobject 'return {first, std::errc::invalid_argument};'.
@@ -549,7 +541,7 @@ private:
         case range_operator::less_or_equal:
           return version <= ver;
       }
-      NEARGYE_NODEFAULT
+      NEARGYE_THROW(std::invalid_argument{"semver::range unexpected operator."});
     }
   };
 
@@ -767,7 +759,6 @@ inline constexpr auto semver_verion = version{SEMVER_VERSION_MAJOR, SEMVER_VERSI
 } // namespace semver
 
 #undef NEARGYE_THROW
-#undef NEARGYE_NODEFAULT
 
 #if defined(__clang__)
 #  pragma clang diagnostic pop
