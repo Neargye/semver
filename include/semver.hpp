@@ -540,8 +540,9 @@ private:
           return version < ver;
         case range_operator::less_or_equal:
           return version <= ver;
+        default:
+          NEARGYE_THROW(std::invalid_argument{"semver::range unexpected operator."});
       }
-      NEARGYE_THROW(std::invalid_argument{"semver::range unexpected operator."});
     }
   };
 
