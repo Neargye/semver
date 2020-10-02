@@ -749,8 +749,7 @@ private:
     }
   };
 
-  std::string_view str_; // TODO: do we need store str_? maybe range::contains(std::string_view str, const version& ver).
-                         // TODO: need clear API, beter that js
+  std::string_view str_;
 };
 
 // Version lib semver.
