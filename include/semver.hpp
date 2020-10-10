@@ -452,14 +452,22 @@ inline std::basic_ostream<Char, Traits>& operator<<(std::basic_ostream<Char, Tra
 
 class range {
  public:
+  enum struct option: std::uint8_t {
+    exclude_prerelease,
+    include_prerelease
+  };
+
   constexpr explicit range(std::string_view str) : str_{str} {}
 
-  constexpr bool satisfies(const version& ver) const {
-    return satisfies(ver, false);
-  }
-
-  constexpr bool satisfies_include_prerelease(const version& ver) const {
-    return satisfies(ver, true);
+  constexpr bool satisfies(const version& ver, option prerelease_option = option::exclude_prerelease) const {
+    switch (prerelease_option) {
+    case option::exclude_prerelease:
+      return satisfies(ver, false);
+    case option::include_prerelease:
+      return satisfies(ver, true);
+    default:
+      NEARGYE_THROW(std::invalid_argument{"semver::range unexpected range_prerelease_option."});
+    }
   }
 
 private:

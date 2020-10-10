@@ -491,16 +491,16 @@ TEST_CASE("ranges with prerelase tags") {
     }
 
     SECTION("include prerelease") {
-      STATIC_REQUIRE(r1.satisfies_include_prerelease(v1));
-      STATIC_REQUIRE(r1.satisfies_include_prerelease(v2));
-      STATIC_REQUIRE(r1.satisfies_include_prerelease(v3));
-      STATIC_REQUIRE(r1.satisfies_include_prerelease(v4));
-      STATIC_REQUIRE_FALSE(r2.satisfies_include_prerelease(v1));
-      STATIC_REQUIRE(r3.satisfies_include_prerelease(v1));
-      STATIC_REQUIRE(r4.satisfies_include_prerelease(v5));
-      STATIC_REQUIRE_FALSE(r4.satisfies_include_prerelease(v1));
-      STATIC_REQUIRE(r5.satisfies_include_prerelease(v5));
-      STATIC_REQUIRE_FALSE(r6.satisfies_include_prerelease(v5));
+      STATIC_REQUIRE(r1.satisfies(v1, range::option::include_prerelease));
+      STATIC_REQUIRE(r1.satisfies(v2, range::option::include_prerelease));
+      STATIC_REQUIRE(r1.satisfies(v3, range::option::include_prerelease));
+      STATIC_REQUIRE(r1.satisfies(v4, range::option::include_prerelease));
+      STATIC_REQUIRE_FALSE(r2.satisfies(v1, range::option::include_prerelease));
+      STATIC_REQUIRE(r3.satisfies(v1, range::option::include_prerelease));
+      STATIC_REQUIRE(r4.satisfies(v5, range::option::include_prerelease));
+      STATIC_REQUIRE_FALSE(r4.satisfies(v1, range::option::include_prerelease));
+      STATIC_REQUIRE(r5.satisfies(v5, range::option::include_prerelease));
+      STATIC_REQUIRE_FALSE(r6.satisfies(v5, range::option::include_prerelease));
     }
 
   }
@@ -529,17 +529,17 @@ TEST_CASE("ranges with prerelase tags") {
     }
 
     SECTION("include prerelease") {
-      STATIC_REQUIRE(r1.satisfies_include_prerelease(v1));
-      STATIC_REQUIRE_FALSE(r1.satisfies_include_prerelease(v2));
-      STATIC_REQUIRE_FALSE(r1.satisfies_include_prerelease(v3));
+      STATIC_REQUIRE(r1.satisfies(v1, range::option::include_prerelease));
+      STATIC_REQUIRE_FALSE(r1.satisfies(v2, range::option::include_prerelease));
+      STATIC_REQUIRE_FALSE(r1.satisfies(v3, range::option::include_prerelease));
 
-      STATIC_REQUIRE(r2.satisfies_include_prerelease(v1));
-      STATIC_REQUIRE(r2.satisfies_include_prerelease(v2));
-      STATIC_REQUIRE_FALSE(r2.satisfies_include_prerelease(v3));
+      STATIC_REQUIRE(r2.satisfies(v1, range::option::include_prerelease));
+      STATIC_REQUIRE(r2.satisfies(v2, range::option::include_prerelease));
+      STATIC_REQUIRE_FALSE(r2.satisfies(v3, range::option::include_prerelease));
 
-      STATIC_REQUIRE(r3.satisfies_include_prerelease(v1));
-      STATIC_REQUIRE(r3.satisfies_include_prerelease(v2));
-      STATIC_REQUIRE(r3.satisfies_include_prerelease(v3));
+      STATIC_REQUIRE(r3.satisfies(v1, range::option::include_prerelease));
+      STATIC_REQUIRE(r3.satisfies(v2, range::option::include_prerelease));
+      STATIC_REQUIRE(r3.satisfies(v3, range::option::include_prerelease));
     }
   }
 }
