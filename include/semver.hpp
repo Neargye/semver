@@ -42,10 +42,10 @@
 #define SEMVER_VERSION_MINOR 2
 #define SEMVER_VERSION_PATCH 2
 
-#include <cstdint>
 #include <cstddef>
-#include <limits>
+#include <cstdint>
 #include <iosfwd>
+#include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -159,7 +159,7 @@ constexpr std::uint8_t length(prerelease t) noexcept {
     return 5;
   } else if (t == prerelease::beta) {
     return 4;
-  } else if(t == prerelease::rc) {
+  } else if (t == prerelease::rc) {
     return 2;
   }
 
@@ -452,7 +452,7 @@ inline std::basic_ostream<Char, Traits>& operator<<(std::basic_ostream<Char, Tra
 
 class range {
  public:
-  enum struct option: std::uint8_t {
+  enum struct option : std::uint8_t {
     exclude_prerelease,
     include_prerelease
   };
@@ -474,22 +474,15 @@ private:
   constexpr bool satisfies(const version& ver, bool include_prerelease) const {
     range_parser parser{str_};
 
-    auto is_logical_or = [&parser]() constexpr -> bool {
-      return parser.current_token.type == range_token_type::logical_or;
-    };
+    auto is_logical_or = [&parser]() constexpr->bool { return parser.current_token.type == range_token_type::logical_or; };
 
-    auto is_operator = [&parser]() constexpr -> bool {
-      return parser.current_token.type == range_token_type::range_operator;
-    };
+    auto is_operator = [&parser]() constexpr->bool { return parser.current_token.type == range_token_type::range_operator; };
 
-    auto is_number = [&parser]() constexpr -> bool {
-      return parser.current_token.type == range_token_type::number;
-    };
+    auto is_number = [&parser]() constexpr->bool { return parser.current_token.type == range_token_type::number; };
 
     const auto has_prerelease = ver.prerelease_type != prerelease::none;
 
-    do
-    {
+    do {
       if (is_logical_or()) {
         parser.advance_token(range_token_type::logical_or);
       }
@@ -538,18 +531,18 @@ private:
 
     constexpr bool satisfies(const version& version) const {
       switch (op) {
-        case range_operator::equal:
-          return version == ver;
-        case range_operator::greater:
-          return version > ver;
-        case range_operator::greater_or_equal:
-          return version >= ver;
-        case range_operator::less:
-          return version < ver;
-        case range_operator::less_or_equal:
-          return version <= ver;
-        default:
-          NEARGYE_THROW(std::invalid_argument{"semver::range unexpected operator."});
+      case range_operator::equal:
+        return version == ver;
+      case range_operator::greater:
+        return version > ver;
+      case range_operator::greater_or_equal:
+        return version >= ver;
+      case range_operator::less:
+        return version < ver;
+      case range_operator::less_or_equal:
+        return version <= ver;
+      default:
+        NEARGYE_THROW(std::invalid_argument{"semver::range unexpected operator."});
       }
     }
   };
@@ -588,7 +581,7 @@ private:
 
         if (detail::is_logical_or(text[pos])) {
           advanceBy(2);
-          return {range_token_type::logical_or}; 
+          return {range_token_type::logical_or};
         }
 
         if (detail::is_operator(text[pos])) {
@@ -620,13 +613,9 @@ private:
       return {range_token_type::end_of_line};
     }
 
-    constexpr bool end_of_line() const {
-      return pos >= text.length();
-    }
+    constexpr bool end_of_line() const { return pos >= text.length(); }
 
-    constexpr void advance() {
-      pos++;
-    }
+    constexpr void advance() { pos++; }
 
     constexpr void advanceBy(std::size_t i) {
       for (std::size_t k = 0; k < i; ++k)
@@ -655,7 +644,7 @@ private:
 
       return range_operator::equal;
     }
-  
+
     constexpr std::uint8_t get_number() {
       std::uint8_t number = 0;
       while (!end_of_line() && detail::is_digit(text[pos])) {
@@ -698,7 +687,7 @@ private:
 
     constexpr range_parser(std::string_view str) : lexer{str}, current_token{range_token_type::none} {
       advance_token(range_token_type::none);
-    } 
+    }
 
     constexpr void advance_token(range_token_type token_type) {
       if (current_token.type != token_type) {
@@ -739,7 +728,7 @@ private:
         advance_token(range_token_type::dot);
         prerelease_number = parse_number();
       }
-        
+
       return {major, minor, patch, prerelease, prerelease_number};
     }
 
