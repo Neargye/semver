@@ -409,3 +409,137 @@ TEST_CASE("from/to string") {
     REQUIRE(!semver::valid("1.2"));
   }
 }
+
+TEST_CASE("ranges") {
+  SECTION("constructor") {
+    constexpr version v1{"1.2.3"};
+    constexpr range r1{">1.0.0 <=2.0.0"};
+    STATIC_REQUIRE(r1.satisfies(v1));
+
+    constexpr version v2{"2.1.0"};
+    STATIC_REQUIRE_FALSE(r1.satisfies(v2));
+
+    constexpr range r2{"1.1.1"};
+    constexpr version v3{"1.1.1"};
+    STATIC_REQUIRE(r2.satisfies(v3));
+  }
+
+  struct range_test_case {
+    std::string_view str_range;
+    version ver;
+    bool contains;
+  };
+
+  SECTION("one comparator set") {
+    constexpr std::array<range_test_case, 6> tests = {{
+      {"> 1.2.3", {1, 2, 5}, true},
+      {"> 1.2.3", {1, 1, 0}, false},
+      {">=1.2.0 <2.0.0", {1, 2, 5}, true},
+      {">=1.2.0 <2.0.0", {2, 3, 0}, false},
+      {"1.0.0", {1, 0, 0}, true},
+      {"1.0.0 < 2.0.0", {1, 5, 0}, false}
+    }};
+
+    for (const auto& test : tests) {
+      const range range(test.str_range);
+      REQUIRE(range.satisfies(test.ver) == test.contains);
+    }
+  }
+
+  SECTION("multiple comparators set") {
+    constexpr range range{"1.2.7 || >=1.2.9 <2.0.0"};
+    constexpr version v1{"1.2.7"};
+    constexpr version v2{"1.2.9"};
+    constexpr version v3{"1.4.6"};
+    constexpr version v4{"1.2.8"};
+    constexpr version v5{"2.0.0"};
+
+    STATIC_REQUIRE(range.satisfies(v1));
+    STATIC_REQUIRE(range.satisfies(v2));
+    STATIC_REQUIRE(range.satisfies(v3));
+    STATIC_REQUIRE_FALSE(range.satisfies(v4));
+    STATIC_REQUIRE_FALSE(range.satisfies(v5));
+  }
+}
+
+TEST_CASE("ranges with prerelase tags") {
+  SECTION("prerelease tags") {
+    constexpr range r1{">1.2.3-alpha.3"};
+    constexpr range r2{">=1.2.3 < 2.0.0"};
+    constexpr range r3{">=1.2.3-alpha.7 <2.0.0"};
+    constexpr range r4{">1.2.3 <2.0.0-alpha.10"};
+    constexpr range r5{">1.2.3 <2.0.0-alpha.1 || <=2.0.0-alpha.5"};
+    constexpr range r6{"<=2.0.0-alpha.4"};
+
+    constexpr version v1{"1.2.3-alpha.7"};
+    constexpr version v2{"3.4.5-alpha.9"};
+    constexpr version v3{"3.4.5"};
+    constexpr version v4{"1.2.3-alpha.4"};
+    constexpr version v5{"2.0.0-alpha.5"};
+
+    SECTION("exclude prerelease") {
+      STATIC_REQUIRE(r1.satisfies(v1));
+      STATIC_REQUIRE_FALSE(r1.satisfies(v2));
+      STATIC_REQUIRE(r1.satisfies(v3));
+      STATIC_REQUIRE(r1.satisfies(v4));
+      STATIC_REQUIRE_FALSE(r2.satisfies(v1));
+      STATIC_REQUIRE(r3.satisfies(v1));
+      STATIC_REQUIRE(r4.satisfies(v5));
+      STATIC_REQUIRE_FALSE(r4.satisfies(v1));
+      STATIC_REQUIRE(r5.satisfies(v5));
+      STATIC_REQUIRE_FALSE(r6.satisfies(v5));
+    }
+
+    SECTION("include prerelease") {
+      STATIC_REQUIRE(r1.satisfies(v1, range::option::include_prerelease));
+      STATIC_REQUIRE(r1.satisfies(v2, range::option::include_prerelease));
+      STATIC_REQUIRE(r1.satisfies(v3, range::option::include_prerelease));
+      STATIC_REQUIRE(r1.satisfies(v4, range::option::include_prerelease));
+      STATIC_REQUIRE_FALSE(r2.satisfies(v1, range::option::include_prerelease));
+      STATIC_REQUIRE(r3.satisfies(v1, range::option::include_prerelease));
+      STATIC_REQUIRE(r4.satisfies(v5, range::option::include_prerelease));
+      STATIC_REQUIRE_FALSE(r4.satisfies(v1, range::option::include_prerelease));
+      STATIC_REQUIRE(r5.satisfies(v5, range::option::include_prerelease));
+      STATIC_REQUIRE_FALSE(r6.satisfies(v5, range::option::include_prerelease));
+    }
+
+  }
+
+  SECTION("prelease type comparison") {
+    constexpr version v1{"1.0.0-alpha.123"};
+    constexpr version v2{"1.0.0-beta.123"};
+    constexpr version v3{"1.0.0-rc.123"};
+
+    constexpr range r1{"<=1.0.0-alpha.123"};
+    constexpr range r2{"<=1.0.0-beta.123"};
+    constexpr range r3{"<=1.0.0-rc.123"};
+
+    SECTION("exclude prerelease") {
+      STATIC_REQUIRE(r1.satisfies(v1));
+      STATIC_REQUIRE_FALSE(r1.satisfies(v2));
+      STATIC_REQUIRE_FALSE(r1.satisfies(v3));
+
+      STATIC_REQUIRE(r2.satisfies(v1));
+      STATIC_REQUIRE(r2.satisfies(v2));
+      STATIC_REQUIRE_FALSE(r2.satisfies(v3));
+
+      STATIC_REQUIRE(r3.satisfies(v1));
+      STATIC_REQUIRE(r3.satisfies(v2));
+      STATIC_REQUIRE(r3.satisfies(v3));
+    }
+
+    SECTION("include prerelease") {
+      STATIC_REQUIRE(r1.satisfies(v1, range::option::include_prerelease));
+      STATIC_REQUIRE_FALSE(r1.satisfies(v2, range::option::include_prerelease));
+      STATIC_REQUIRE_FALSE(r1.satisfies(v3, range::option::include_prerelease));
+
+      STATIC_REQUIRE(r2.satisfies(v1, range::option::include_prerelease));
+      STATIC_REQUIRE(r2.satisfies(v2, range::option::include_prerelease));
+      STATIC_REQUIRE_FALSE(r2.satisfies(v3, range::option::include_prerelease));
+
+      STATIC_REQUIRE(r3.satisfies(v1, range::option::include_prerelease));
+      STATIC_REQUIRE(r3.satisfies(v2, range::option::include_prerelease));
+      STATIC_REQUIRE(r3.satisfies(v3, range::option::include_prerelease));
+    }
+  }
+}

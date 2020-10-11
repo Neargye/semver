@@ -42,10 +42,10 @@
 #define SEMVER_VERSION_MINOR 2
 #define SEMVER_VERSION_PATCH 2
 
-#include <cstdint>
 #include <cstddef>
-#include <limits>
+#include <cstdint>
 #include <iosfwd>
+#include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -122,6 +122,30 @@ constexpr bool is_digit(char c) noexcept {
   return c >= '0' && c <= '9';
 }
 
+constexpr bool is_space(char c) noexcept {
+  return c == ' ';
+}
+
+constexpr bool is_operator(char c) noexcept {
+  return c == '<' || c == '>' || c == '=';
+}
+
+constexpr bool is_dot(char c) noexcept {
+  return c == '.';
+}
+
+constexpr bool is_logical_or(char c) noexcept {
+  return c == '|';
+}
+
+constexpr bool is_hyphen(char c) noexcept {
+  return c == '-';
+}
+
+constexpr bool is_letter(char c) noexcept {
+  return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+}
+
 constexpr std::uint8_t to_digit(char c) noexcept {
   return static_cast<std::uint8_t>(c - '0');
 }
@@ -135,7 +159,7 @@ constexpr std::uint8_t length(prerelease t) noexcept {
     return 5;
   } else if (t == prerelease::beta) {
     return 4;
-  } else if(t == prerelease::rc) {
+  } else if (t == prerelease::rc) {
     return 2;
   }
 
@@ -426,9 +450,305 @@ inline std::basic_ostream<Char, Traits>& operator<<(std::basic_ostream<Char, Tra
   return os;
 }
 
-namespace ranges {
+class range {
+ public:
+  enum struct option : std::uint8_t {
+    exclude_prerelease,
+    include_prerelease
+  };
 
-} // namespace semver::ranges
+  constexpr explicit range(std::string_view str) : str_{str} {}
+
+  constexpr bool satisfies(const version& ver, option prerelease_option = option::exclude_prerelease) const {
+    switch (prerelease_option) {
+    case option::exclude_prerelease:
+      return satisfies(ver, false);
+    case option::include_prerelease:
+      return satisfies(ver, true);
+    default:
+      NEARGYE_THROW(std::invalid_argument{"semver::range unexpected range_prerelease_option."});
+    }
+  }
+
+private:
+  constexpr bool satisfies(const version& ver, bool include_prerelease) const {
+    range_parser parser{str_};
+
+    auto is_logical_or = [&parser]() constexpr -> bool { return parser.current_token.type == range_token_type::logical_or; };
+
+    auto is_operator = [&parser]() constexpr -> bool { return parser.current_token.type == range_token_type::range_operator; };
+
+    auto is_number = [&parser]() constexpr -> bool { return parser.current_token.type == range_token_type::number; };
+
+    const auto has_prerelease = ver.prerelease_type != prerelease::none;
+
+    do {
+      if (is_logical_or()) {
+        parser.advance_token(range_token_type::logical_or);
+      }
+
+      auto contains = true;
+      auto allow_compare = include_prerelease;
+
+      while (is_operator() || is_number()) {
+        const auto range = parser.parse_range();
+        const auto equal_without_tags = (version{range.ver.major, range.ver.minor, range.ver.patch} == version{ver.major, ver.minor, ver.patch});
+
+        if (has_prerelease && equal_without_tags) {
+          allow_compare = true;
+        }
+
+        if (!range.satisfies(ver)) {
+          contains = false;
+          break;
+        }
+      }
+
+      if (has_prerelease) {
+        if (allow_compare && contains) {
+          return true;
+        }
+      } else if (contains) {
+        return true;
+      }
+
+    } while (is_logical_or());
+    
+    return false;
+  }
+
+  enum struct range_operator : std::uint8_t {
+    less,
+    less_or_equal,
+    greater,
+    greater_or_equal,
+    equal
+  };
+
+  struct range_comparator {
+    range_operator op;
+    version ver;
+
+    constexpr bool satisfies(const version& version) const {
+      switch (op) {
+        case range_operator::equal:
+          return version == ver;
+        case range_operator::greater:
+          return version > ver;
+        case range_operator::greater_or_equal:
+          return version >= ver;
+        case range_operator::less:
+          return version < ver;
+        case range_operator::less_or_equal:
+          return version <= ver;
+        default:
+          NEARGYE_THROW(std::invalid_argument{"semver::range unexpected operator."});
+      }
+    }
+  };
+
+  enum struct range_token_type : std::uint8_t {
+    none,
+    number,
+    range_operator,
+    dot,
+    logical_or,
+    hyphen,
+    prerelease,
+    end_of_line
+  };
+
+  struct range_token {
+    range_token_type type      = range_token_type::none;
+    std::uint8_t number        = 0;
+    range_operator op          = range_operator::equal;
+    prerelease prerelease_type = prerelease::none;
+  };
+
+  struct range_lexer {
+    std::string_view text;
+    std::size_t pos;
+
+    constexpr range_lexer(std::string_view text) : text{text}, pos{0} {}
+
+    constexpr range_token get_next_token() {
+      while (!end_of_line()) {
+
+        if (detail::is_space(text[pos])) {
+          advance();
+          continue;
+        }
+
+        if (detail::is_logical_or(text[pos])) {
+          advanceBy(2);
+          return {range_token_type::logical_or};
+        }
+
+        if (detail::is_operator(text[pos])) {
+          const auto op = get_operator();
+          return {range_token_type::range_operator, 0, op};
+        }
+
+        if (detail::is_digit(text[pos])) {
+          const auto number = get_number();
+          return {range_token_type::number, number};
+        }
+
+        if (detail::is_dot(text[pos])) {
+          advance();
+          return {range_token_type::dot};
+        }
+
+        if (detail::is_hyphen(text[pos])) {
+          advance();
+          return {range_token_type::hyphen};
+        }
+
+        if (detail::is_letter(text[pos])) {
+          const auto prerelease = get_prerelease();
+          return {range_token_type::prerelease, 0, range_operator::equal, prerelease};
+        }
+      }
+
+      return {range_token_type::end_of_line};
+    }
+
+    constexpr bool end_of_line() const { return pos >= text.length(); }
+
+    constexpr void advance() { pos++; }
+
+    constexpr void advanceBy(std::size_t i) {
+      for (std::size_t k = 0; k < i; ++k)
+        advance();
+    }
+
+    constexpr range_operator get_operator() {
+      if (text[pos] == '<') {
+        advance();
+        if (text[pos] == '=') {
+          advance();
+          return range_operator::less_or_equal;
+        }
+        return range_operator::less;
+      } else if (text[pos] == '>') {
+        advance();
+        if (text[pos] == '=') {
+          advance();
+          return range_operator::greater_or_equal;
+        }
+        return range_operator::greater;
+      } else if (text[pos] == '=') {
+        advance();
+        return range_operator::equal;
+      }
+
+      return range_operator::equal;
+    }
+
+    constexpr std::uint8_t get_number() {
+      std::uint8_t number = 0;
+      while (!end_of_line() && detail::is_digit(text[pos])) {
+        number = (number * 10) + detail::to_digit(text[pos]);
+        advance();
+      }
+
+      return number;
+    }
+
+    constexpr prerelease get_prerelease() {
+      const auto first = text.data() + pos;
+      const auto last = text.data() + text.length();
+
+      if (first > last) {
+        advance();
+        return prerelease::none;
+      }
+
+      if (detail::equals(first, last, "alpha")) {
+        advanceBy(5);
+        return prerelease::alpha;
+      } else if (detail::equals(first, last, "beta")) {
+        advanceBy(4);
+        return prerelease::beta;
+      } else if (detail::equals(first, last, "rc")) {
+        advanceBy(2);
+        return prerelease::rc;
+      }
+
+      advance();
+
+      return prerelease::none;
+    }
+  };
+
+  struct range_parser {
+    range_lexer lexer;
+    range_token current_token;
+
+    constexpr range_parser(std::string_view str) : lexer{str}, current_token{range_token_type::none} {
+      advance_token(range_token_type::none);
+    }
+
+    constexpr void advance_token(range_token_type token_type) {
+      if (current_token.type != token_type) {
+        NEARGYE_THROW(std::invalid_argument{"semver::range unexpected token."});
+      }
+      current_token = lexer.get_next_token();
+    }
+
+    constexpr range_comparator parse_range() {
+      if (current_token.type == range_token_type::number) {
+        const auto version = parse_version();
+        return {range_operator::equal, version};
+      } else if (current_token.type == range_token_type::range_operator) {
+        const auto range_operator = current_token.op;
+        advance_token(range_token_type::range_operator);
+        const auto version = parse_version();
+        return {range_operator, version};
+      }
+
+      return {range_operator::equal, version{}};
+    }
+
+    constexpr version parse_version() {
+      const auto major = parse_number();
+
+      advance_token(range_token_type::dot);
+      const auto minor = parse_number();
+
+      advance_token(range_token_type::dot);
+      const auto patch = parse_number();
+
+      prerelease prerelease = prerelease::none;
+      std::uint8_t prerelease_number = 0;
+
+      if (current_token.type == range_token_type::hyphen) {
+        advance_token(range_token_type::hyphen);
+        prerelease = parse_prerelease();
+        advance_token(range_token_type::dot);
+        prerelease_number = parse_number();
+      }
+
+      return {major, minor, patch, prerelease, prerelease_number};
+    }
+
+    constexpr std::uint8_t parse_number() {
+      const auto token = current_token;
+      advance_token(range_token_type::number);
+
+      return token.number;
+    }
+
+    constexpr prerelease parse_prerelease() {
+      const auto token = current_token;
+      advance_token(range_token_type::prerelease);
+
+      return token.prerelease_type;
+    }
+  };
+
+  std::string_view str_;
+};
 
 // Version lib semver.
 inline constexpr auto semver_verion = version{SEMVER_VERSION_MAJOR, SEMVER_VERSION_MINOR, SEMVER_VERSION_PATCH};
