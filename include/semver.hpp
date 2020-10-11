@@ -474,11 +474,11 @@ private:
   constexpr bool satisfies(const version& ver, bool include_prerelease) const {
     range_parser parser{str_};
 
-    auto is_logical_or = [&parser]() constexpr->bool { return parser.current_token.type == range_token_type::logical_or; };
+    auto is_logical_or = [&parser]() constexpr -> bool { return parser.current_token.type == range_token_type::logical_or; };
 
-    auto is_operator = [&parser]() constexpr->bool { return parser.current_token.type == range_token_type::range_operator; };
+    auto is_operator = [&parser]() constexpr -> bool { return parser.current_token.type == range_token_type::range_operator; };
 
-    auto is_number = [&parser]() constexpr->bool { return parser.current_token.type == range_token_type::number; };
+    auto is_number = [&parser]() constexpr -> bool { return parser.current_token.type == range_token_type::number; };
 
     const auto has_prerelease = ver.prerelease_type != prerelease::none;
 
@@ -531,18 +531,18 @@ private:
 
     constexpr bool satisfies(const version& version) const {
       switch (op) {
-      case range_operator::equal:
-        return version == ver;
-      case range_operator::greater:
-        return version > ver;
-      case range_operator::greater_or_equal:
-        return version >= ver;
-      case range_operator::less:
-        return version < ver;
-      case range_operator::less_or_equal:
-        return version <= ver;
-      default:
-        NEARGYE_THROW(std::invalid_argument{"semver::range unexpected operator."});
+        case range_operator::equal:
+          return version == ver;
+        case range_operator::greater:
+          return version > ver;
+        case range_operator::greater_or_equal:
+          return version >= ver;
+        case range_operator::less:
+          return version < ver;
+        case range_operator::less_or_equal:
+          return version <= ver;
+        default:
+          NEARGYE_THROW(std::invalid_argument{"semver::range unexpected operator."});
       }
     }
   };
@@ -559,9 +559,9 @@ private:
   };
 
   struct range_token {
-    range_token_type type = range_token_type::none;
-    std::uint8_t number = 0;
-    range_operator op = range_operator::equal;
+    range_token_type type      = range_token_type::none;
+    std::uint8_t number        = 0;
+    range_operator op          = range_operator::equal;
     prerelease prerelease_type = prerelease::none;
   };
 
