@@ -27,4 +27,4 @@ int main() {
     static_assert(r3.satisfies("3.4.5-alpha.9"_version, range::option::include_prerelease));
 
     return 0;
-} 
+}
