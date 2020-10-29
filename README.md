@@ -32,8 +32,9 @@ C++ library compare and manipulate versions are available as extensions to the `
 * Constexpr comparison: <, <=, ==, !=, > >=
 * Constexpr from string
 * Constexpr to string
+* Constexpr range matching
 
-## [Examples](example/example.cpp)
+## [Examples](example/)
 
 * Create
 
@@ -102,7 +103,29 @@ C++ library compare and manipulate versions are available as extensions to the `
   v7.from_string(s); // constexpr and may throw.
   bool success = v8.from_string_noexcept(s); // constexpr and no throw.
   ```
+  
+* Range matching
 
+  ```cpp
+  constexpr auto range = semver::range(">=1.0.0 <2.0.0 || >3.2.1");
+  constexpr auto version = semver::version("1.2.3");
+  if (range.satisfies(version)) {
+    // Do something.
+  }
+  ```
+  
+* Range matching with prerelease tag
+
+  ```cpp
+  constexpr auto range = semver::range(">1.2.3-beta.1");
+  constexpr auto version = semver::version("3.4.5-alpha.0");
+
+  // By default, version is allowed to satisfy range if at least one comparator with the same [major, minor, patch] has a prerelease tag.
+  static_assert(!range.satisfies(version));
+  // Suppress this behavior and treat prerelease versions as normal.
+  static_assert(range.satisfies(version, semver::range::option::include_prerelease));
+  ```
+  
 ## Integration
 
 You should add required file [semver.hpp](include/semver.hpp).
