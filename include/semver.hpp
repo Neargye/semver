@@ -569,7 +569,7 @@ private:
     std::string_view text;
     std::size_t pos;
 
-    constexpr range_lexer(std::string_view text) : text{text}, pos{0} {}
+    constexpr explicit range_lexer(std::string_view text) : text{text}, pos{0} {}
 
     constexpr range_token get_next_token() {
       while (!end_of_line()) {
@@ -685,7 +685,7 @@ private:
     range_lexer lexer;
     range_token current_token;
 
-    constexpr range_parser(std::string_view str) : lexer{str}, current_token{range_token_type::none} {
+    constexpr explicit range_parser(std::string_view str) : lexer{str}, current_token{range_token_type::none} {
       advance_token(range_token_type::none);
     }
 
