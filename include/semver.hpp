@@ -640,7 +640,9 @@ private:
     }
 
     constexpr std::uint8_t get_number() noexcept {
-      if (std::uint8_t n = 0; from_chars(text.data() + pos, text.data() + text.length(), n) != nullptr) {
+      const auto first = text.data() + pos;
+      const auto last = text.data() + text.length();
+      if (std::uint8_t n = 0; from_chars(first, last, n) != nullptr) {
         advance(length(n));
         return n;
       }
@@ -651,7 +653,6 @@ private:
     constexpr prerelease get_prerelease() noexcept {
       const auto first = text.data() + pos;
       const auto last = text.data() + text.length();
-
       if (first > last) {
         advance(1);
         return prerelease::none;
