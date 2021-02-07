@@ -457,6 +457,46 @@ inline std::basic_ostream<Char, Traits>& operator<<(std::basic_ostream<Char, Tra
   return os;
 }
 
+inline namespace comparators {
+
+enum struct comparators_option : std::uint8_t {
+  exclude_prerelease,
+  include_prerelease
+};
+
+[[nodiscard]] constexpr int compare(const version& lhs, const version& rhs, comparators_option option = comparators_option::include_prerelease) noexcept {
+  if (option == comparators_option::exclude_prerelease) {
+    return version{lhs.major, lhs.minor, lhs.patch}.compare(version{rhs.major, rhs.minor, rhs.patch});
+  }
+  return lhs.compare(rhs);
+}
+
+[[nodiscard]] constexpr bool equal_to(const version& lhs, const version& rhs, comparators_option option = comparators_option::include_prerelease) noexcept {
+  return compare(lhs, rhs, option) == 0;
+}
+
+[[nodiscard]] constexpr bool not_equal_to(const version& lhs, const version& rhs, comparators_option option = comparators_option::include_prerelease) noexcept {
+  return compare(lhs, rhs, option) != 0;
+}
+
+[[nodiscard]] constexpr bool greater(const version& lhs, const version& rhs, comparators_option option = comparators_option::include_prerelease) noexcept {
+  return compare(lhs, rhs, option) > 0;
+}
+
+[[nodiscard]] constexpr bool greater_equal(const version& lhs, const version& rhs, comparators_option option = comparators_option::include_prerelease) noexcept {
+  return compare(lhs, rhs, option) >= 0;
+}
+
+[[nodiscard]] constexpr bool less(const version& lhs, const version& rhs, comparators_option option = comparators_option::include_prerelease) noexcept {
+  return compare(lhs, rhs, option) < 0;
+}
+
+[[nodiscard]] constexpr bool less_equal(const version& lhs, const version& rhs, comparators_option option = comparators_option::include_prerelease) noexcept {
+  return compare(lhs, rhs, option) <= 0;
+}
+
+} // namespace semver::comparators
+
 namespace range {
 
 namespace detail {
@@ -488,7 +528,7 @@ class range {
 
       while (is_operator() || is_number()) {
         const auto range = parser.parse_range();
-        const auto equal_without_tags = version{range.ver.major, range.ver.minor, range.ver.patch} == version{ver.major, ver.minor, ver.patch};
+        const auto equal_without_tags = equal_to(range.ver, ver, comparators_option::exclude_prerelease);
 
         if (has_prerelease && equal_without_tags) {
           allow_compare = true;
