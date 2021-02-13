@@ -156,11 +156,11 @@ constexpr std::uint8_t length(std::uint8_t x) noexcept {
 
 constexpr std::uint8_t length(prerelease t) noexcept {
   if (t == prerelease::alpha) {
-    return alpha.length();
+    return static_cast<std::uint8_t>(alpha.length());
   } else if (t == prerelease::beta) {
-    return beta.length();
+    return static_cast<std::uint8_t>(beta.length());
   } else if (t == prerelease::rc) {
-    return rc.length();
+    return static_cast<std::uint8_t>(rc.length());
   }
 
   return 0;
