@@ -107,9 +107,9 @@ inline constexpr auto max_version_string_length = std::size_t{21};
 
 namespace detail {
 
-inline constexpr std::string_view alpha = {"alpha", 5};
-inline constexpr std::string_view beta  = {"beta", 4};
-inline constexpr std::string_view rc    = {"rc", 2};
+inline constexpr auto alpha = std::string_view{"alpha", 5};
+inline constexpr auto beta  = std::string_view{"beta", 4};
+inline constexpr auto rc    = std::string_view{"rc", 2};
 
 // Min version string length = 1(<major>) + 1(.) + 1(<minor>) + 1(.) + 1(<patch>) = 5.
 inline constexpr auto min_version_string_length = 5;
@@ -433,7 +433,7 @@ struct version {
 }
 
 [[nodiscard]] constexpr std::optional<version> from_string_noexcept(std::string_view str) noexcept {
-  if (auto v = version{}; v.from_string_noexcept(str)) {
+  if (version v{}; v.from_string_noexcept(str)) {
     return v;
   }
 
@@ -523,12 +523,12 @@ class range {
         parser.advance_token(range_token_type::logical_or);
       }
 
-      auto contains = true;
-      auto allow_compare = include_prerelease;
+      bool contains = true;
+      bool allow_compare = include_prerelease;
 
       while (is_operator() || is_number()) {
         const auto range = parser.parse_range();
-        const auto equal_without_tags = equal_to(range.ver, ver, comparators_option::exclude_prerelease);
+        const bool equal_without_tags = equal_to(range.ver, ver, comparators_option::exclude_prerelease);
 
         if (has_prerelease && equal_without_tags) {
           allow_compare = true;
@@ -682,7 +682,7 @@ private:
     constexpr std::uint8_t get_number() noexcept {
       const auto first = text.data() + pos;
       const auto last = text.data() + text.length();
-      if (std::uint8_t n = 0; from_chars(first, last, n) != nullptr) {
+      if (std::uint8_t n{}; from_chars(first, last, n) != nullptr) {
         advance(length(n));
         return n;
       }
@@ -698,7 +698,7 @@ private:
         return prerelease::none;
       }
 
-      if (auto p = prerelease::none; from_chars(first, last, p) != nullptr) {
+      if (prerelease p{}; from_chars(first, last, p) != nullptr) {
         advance(length(p));
         return p;
       }
