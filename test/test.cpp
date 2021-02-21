@@ -1,6 +1,6 @@
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018 - 2020 Daniil Goncharov <neargye@gmail.com>.
+// Copyright (c) 2018 - 2021 Daniil Goncharov <neargye@gmail.com>.
 //
 // Permission is hereby  granted, free of charge, to any  person obtaining a copy
 // of this software and associated  documentation files (the "Software"), to deal
@@ -221,10 +221,12 @@ TEST_CASE("operators") {
     constexpr version v1{1, 2, 3, prerelease::rc, 4};
     constexpr version v2 = v1;
     STATIC_CHECK_OP_AND_REVERSE(v1, ==, v2);
+    static_assert(compare(v1, v2) == 0);
+    static_assert(compare(v2, v1) == 0);
 
     for (std::size_t i = 0; i < versions.size(); ++i) {
-      version v_temp = versions[i];
-      CHECK_OP_AND_REVERSE(v_temp, ==, versions[i]);
+      version v = versions[i];
+      CHECK_OP_AND_REVERSE(v, ==, versions[i]);
     }
   }
 
@@ -234,8 +236,13 @@ TEST_CASE("operators") {
     STATIC_CHECK_OP_AND_REVERSE(v1, ==, v2);
 
     for (std::size_t i = 0; i < versions.size(); ++i) {
-      version v_temp = versions[i];
-      CHECK_OP_AND_REVERSE(v_temp, ==, versions[i]);
+      version v = versions[i];
+      CHECK_OP_AND_REVERSE(v, ==, versions[i]);
+
+      REQUIRE(compare(v, versions[i], comparators_option::include_prerelease) == 0);
+      REQUIRE(compare(versions[i], v, comparators_option::include_prerelease) == 0);
+      REQUIRE(compare(v, versions[i], comparators_option::exclude_prerelease) == 0);
+      REQUIRE(compare(versions[i], v, comparators_option::exclude_prerelease) == 0);
     }
   }
 
@@ -247,6 +254,16 @@ TEST_CASE("operators") {
     for (std::size_t i = 1; i < versions.size(); ++i) {
       for (std::size_t j = 1; j < i; ++j) {
         CHECK_OP_AND_REVERSE(versions[i], !=, versions[i - j]);
+
+        REQUIRE(compare(versions[i], versions[i - j], comparators_option::include_prerelease) != 0);
+        REQUIRE(compare(versions[i - j], versions[i], comparators_option::include_prerelease) != 0);
+        if ((i - j) / 7 == i / 7) {
+          REQUIRE(compare(versions[i], versions[i - j], comparators_option::exclude_prerelease) == 0);
+          REQUIRE(compare(versions[i - j], versions[i], comparators_option::exclude_prerelease) == 0);
+        } else {
+          REQUIRE(compare(versions[i], versions[i - j], comparators_option::exclude_prerelease) != 0);
+          REQUIRE(compare(versions[i - j], versions[i], comparators_option::exclude_prerelease) != 0);
+        }
       }
     }
   }
@@ -259,6 +276,16 @@ TEST_CASE("operators") {
     for (std::size_t i = 1; i < versions.size(); ++i) {
       for (std::size_t j = 1; j < i; ++j) {
         CHECK_OP_AND_REVERSE_FALSE(versions[i], >, versions[i - j]);
+
+        REQUIRE(greater(versions[i], versions[i - j], comparators_option::include_prerelease));
+        REQUIRE_FALSE(greater(versions[i - j], versions[i], comparators_option::include_prerelease));
+        if ((i - j) / 7 == i / 7) {
+          REQUIRE_FALSE(greater(versions[i], versions[i - j], comparators_option::exclude_prerelease));
+          REQUIRE_FALSE(greater(versions[i - j], versions[i], comparators_option::exclude_prerelease));
+        } else {
+          REQUIRE(greater(versions[i], versions[i - j], comparators_option::exclude_prerelease));
+          REQUIRE_FALSE(greater(versions[i - j], versions[i], comparators_option::exclude_prerelease));
+        }
       }
     }
   }
@@ -272,9 +299,23 @@ TEST_CASE("operators") {
 
     for (std::size_t i = 1; i < versions.size(); ++i) {
       for (std::size_t j = 1; j < i; ++j) {
-        version v_temp = versions[i];
+        version v = versions[i];
         CHECK_OP_AND_REVERSE_FALSE(versions[i], >=, versions[i - j]);
-        CHECK_OP_AND_REVERSE(v_temp, >=, versions[i]);
+        CHECK_OP_AND_REVERSE(v, >=, versions[i]);
+
+        REQUIRE(greater_equal(versions[i], versions[i - j], comparators_option::include_prerelease));
+        REQUIRE_FALSE(greater_equal(versions[i - j], versions[i], comparators_option::include_prerelease));
+        REQUIRE(greater_equal(versions[i], v, comparators_option::include_prerelease));
+        REQUIRE(greater_equal(v, versions[i], comparators_option::include_prerelease));
+        if ((i - j) / 7 == i / 7) {
+          REQUIRE(greater_equal(versions[i], versions[i - j], comparators_option::exclude_prerelease));
+          REQUIRE(greater_equal(versions[i - j], versions[i], comparators_option::exclude_prerelease));
+          REQUIRE(greater_equal(versions[i], v, comparators_option::exclude_prerelease));
+          REQUIRE(greater_equal(v, versions[i], comparators_option::exclude_prerelease));
+        } else {
+          REQUIRE(greater_equal(versions[i], versions[i - j], comparators_option::exclude_prerelease));
+          REQUIRE_FALSE(greater_equal(versions[i - j], versions[i], comparators_option::exclude_prerelease));
+        }
       }
     }
   }
@@ -287,6 +328,16 @@ TEST_CASE("operators") {
     for (std::size_t i = 1; i < versions.size(); ++i) {
       for (std::size_t j = 1; j < i; ++j) {
         CHECK_OP_AND_REVERSE_FALSE(versions[i - j], <, versions[i]);
+
+        REQUIRE(less(versions[i - j], versions[i], comparators_option::include_prerelease));
+        REQUIRE_FALSE(less(versions[i], versions[i - j], comparators_option::include_prerelease));
+        if ((i - j) / 7 == i / 7) {
+          REQUIRE_FALSE(less(versions[i - j], versions[i], comparators_option::exclude_prerelease));
+          REQUIRE_FALSE(less(versions[i], versions[i - j], comparators_option::exclude_prerelease));
+        } else {
+          REQUIRE(less(versions[i - j], versions[i], comparators_option::exclude_prerelease));
+          REQUIRE_FALSE(less(versions[i], versions[i - j], comparators_option::exclude_prerelease));
+        }
       }
     }
   }
@@ -300,9 +351,21 @@ TEST_CASE("operators") {
 
     for (std::size_t i = 1; i < versions.size(); ++i) {
       for (std::size_t j = 1; j < i; ++j) {
-        version v_temp = versions[i - j];
+        version v = versions[i - j];
         CHECK_OP_AND_REVERSE_FALSE(versions[i - j], <=, versions[i]);
-        CHECK_OP_AND_REVERSE(v_temp, <=, versions[i - j]);
+        CHECK_OP_AND_REVERSE(v, <=, versions[i - j]);
+
+        REQUIRE(less_equal(versions[i - j], versions[i], comparators_option::include_prerelease));
+        REQUIRE_FALSE(less_equal(versions[i], versions[i - j], comparators_option::include_prerelease));
+        REQUIRE(less_equal(v, versions[i - j], comparators_option::include_prerelease));
+        REQUIRE(less_equal(versions[i - j], v, comparators_option::include_prerelease));
+        if ((i - j) / 7 == i / 7) {
+          REQUIRE(less_equal(versions[i - j], versions[i], comparators_option::exclude_prerelease));
+          REQUIRE(less_equal(versions[i], versions[i - j], comparators_option::exclude_prerelease));
+        } else {
+          REQUIRE(less_equal(versions[i - j], versions[i], comparators_option::exclude_prerelease));
+          REQUIRE_FALSE(less_equal(versions[i], versions[i - j], comparators_option::exclude_prerelease));
+        }
       }
     }
   }

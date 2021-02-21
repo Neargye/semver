@@ -15,7 +15,7 @@
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018 - 2020 Daniil Goncharov <neargye@gmail.com>.
+// Copyright (c) 2018 - 2021 Daniil Goncharov <neargye@gmail.com>.
 //
 // Permission is hereby  granted, free of charge, to any  person obtaining a copy
 // of this software and associated  documentation files (the "Software"), to deal
@@ -107,9 +107,9 @@ inline constexpr auto max_version_string_length = std::size_t{21};
 
 namespace detail {
 
-inline constexpr std::string_view _alpha = {"-alpha", 6};
-inline constexpr std::string_view _beta  = {"-beta", 5};
-inline constexpr std::string_view _rc    = {"-rc", 3};
+inline constexpr auto alpha = std::string_view{"alpha", 5};
+inline constexpr auto beta  = std::string_view{"beta", 4};
+inline constexpr auto rc    = std::string_view{"rc", 2};
 
 // Min version string length = 1(<major>) + 1(.) + 1(<minor>) + 1(.) + 1(<patch>) = 5.
 inline constexpr auto min_version_string_length = 5;
@@ -156,11 +156,11 @@ constexpr std::uint8_t length(std::uint8_t x) noexcept {
 
 constexpr std::uint8_t length(prerelease t) noexcept {
   if (t == prerelease::alpha) {
-    return 5;
+    return static_cast<std::uint8_t>(alpha.length());
   } else if (t == prerelease::beta) {
-    return 4;
+    return static_cast<std::uint8_t>(beta.length());
   } else if (t == prerelease::rc) {
-    return 2;
+    return static_cast<std::uint8_t>(rc.length());
   }
 
   return 0;
@@ -191,15 +191,18 @@ constexpr char* to_chars(char* str, std::uint8_t x, bool dot = true) noexcept {
 
 constexpr char* to_chars(char* str, prerelease t) noexcept {
   const auto p = t == prerelease::alpha
-                     ? _alpha
+                     ? alpha
                      : t == prerelease::beta
-                           ? _beta
+                           ? beta
                            : t == prerelease::rc
-                                 ? _rc
+                                 ? rc
                                  : std::string_view{};
 
-  for (auto it = p.rbegin(); it != p.rend(); ++it) {
-    *(--str) = *it;
+  if (p.size() > 0) {
+    for (auto it = p.rbegin(); it != p.rend(); ++it) {
+      *(--str) = *it;
+    }
+    *(--str) = '-';
   }
 
   return str;
@@ -221,15 +224,19 @@ constexpr const char* from_chars(const char* first, const char* last, std::uint8
 }
 
 constexpr const char* from_chars(const char* first, const char* last, prerelease& p) noexcept {
-  if (equals(first, last, _alpha)) {
+  if (is_hyphen(*first)) {
+    ++first;
+  }
+
+  if (equals(first, last, alpha)) {
     p = prerelease::alpha;
-    return first + _alpha.length();
-  } else if (equals(first, last, _beta)) {
+    return first + alpha.length();
+  } else if (equals(first, last, beta)) {
     p = prerelease::beta;
-    return first + _beta.length();
-  } else if (equals(first, last, _rc)) {
+    return first + beta.length();
+  } else if (equals(first, last, rc)) {
     p = prerelease::rc;
-    return first + _rc.length();
+    return first + rc.length();
   }
 
   return nullptr;
@@ -426,7 +433,7 @@ struct version {
 }
 
 [[nodiscard]] constexpr std::optional<version> from_string_noexcept(std::string_view str) noexcept {
-  if (auto v = version{}; v.from_string_noexcept(str)) {
+  if (version v{}; v.from_string_noexcept(str)) {
     return v;
   }
 
@@ -450,6 +457,46 @@ inline std::basic_ostream<Char, Traits>& operator<<(std::basic_ostream<Char, Tra
   return os;
 }
 
+inline namespace comparators {
+
+enum struct comparators_option : std::uint8_t {
+  exclude_prerelease,
+  include_prerelease
+};
+
+[[nodiscard]] constexpr int compare(const version& lhs, const version& rhs, comparators_option option = comparators_option::include_prerelease) noexcept {
+  if (option == comparators_option::exclude_prerelease) {
+    return version{lhs.major, lhs.minor, lhs.patch}.compare(version{rhs.major, rhs.minor, rhs.patch});
+  }
+  return lhs.compare(rhs);
+}
+
+[[nodiscard]] constexpr bool equal_to(const version& lhs, const version& rhs, comparators_option option = comparators_option::include_prerelease) noexcept {
+  return compare(lhs, rhs, option) == 0;
+}
+
+[[nodiscard]] constexpr bool not_equal_to(const version& lhs, const version& rhs, comparators_option option = comparators_option::include_prerelease) noexcept {
+  return compare(lhs, rhs, option) != 0;
+}
+
+[[nodiscard]] constexpr bool greater(const version& lhs, const version& rhs, comparators_option option = comparators_option::include_prerelease) noexcept {
+  return compare(lhs, rhs, option) > 0;
+}
+
+[[nodiscard]] constexpr bool greater_equal(const version& lhs, const version& rhs, comparators_option option = comparators_option::include_prerelease) noexcept {
+  return compare(lhs, rhs, option) >= 0;
+}
+
+[[nodiscard]] constexpr bool less(const version& lhs, const version& rhs, comparators_option option = comparators_option::include_prerelease) noexcept {
+  return compare(lhs, rhs, option) < 0;
+}
+
+[[nodiscard]] constexpr bool less_equal(const version& lhs, const version& rhs, comparators_option option = comparators_option::include_prerelease) noexcept {
+  return compare(lhs, rhs, option) <= 0;
+}
+
+} // namespace semver::comparators
+
 namespace range {
 
 namespace detail {
@@ -469,19 +516,19 @@ class range {
 
     auto is_number = [&parser]() constexpr noexcept -> bool { return parser.current_token.type == range_token_type::number; };
 
-    const auto has_prerelease = ver.prerelease_type != prerelease::none;
+    const bool has_prerelease = ver.prerelease_type != prerelease::none;
 
     do {
       if (is_logical_or()) {
         parser.advance_token(range_token_type::logical_or);
       }
 
-      auto contains = true;
-      auto allow_compare = include_prerelease;
+      bool contains = true;
+      bool allow_compare = include_prerelease;
 
       while (is_operator() || is_number()) {
         const auto range = parser.parse_range();
-        const auto equal_without_tags = (version{range.ver.major, range.ver.minor, range.ver.patch} == version{ver.major, ver.minor, ver.patch});
+        const bool equal_without_tags = equal_to(range.ver, ver, comparators_option::exclude_prerelease);
 
         if (has_prerelease && equal_without_tags) {
           allow_compare = true;
@@ -633,33 +680,27 @@ private:
     }
 
     constexpr std::uint8_t get_number() noexcept {
-      std::uint8_t number = 0;
-      while (!end_of_line() && is_digit(text[pos])) {
-        number = (number * 10) + to_digit(text[pos]);
-        advance(1);
+      const auto first = text.data() + pos;
+      const auto last = text.data() + text.length();
+      if (std::uint8_t n{}; from_chars(first, last, n) != nullptr) {
+        advance(length(n));
+        return n;
       }
 
-      return number;
+      return 0;
     }
 
     constexpr prerelease get_prerelease() noexcept {
       const auto first = text.data() + pos;
       const auto last = text.data() + text.length();
-
       if (first > last) {
         advance(1);
         return prerelease::none;
       }
 
-      if (equals(first, last, "alpha")) {
-        advance(5);
-        return prerelease::alpha;
-      } else if (equals(first, last, "beta")) {
-        advance(4);
-        return prerelease::beta;
-      } else if (equals(first, last, "rc")) {
-        advance(2);
-        return prerelease::rc;
+      if (prerelease p{}; from_chars(first, last, p) != nullptr) {
+        advance(length(p));
+        return p;
       }
 
       advance(1);
@@ -744,14 +785,14 @@ enum struct satisfies_option : std::uint8_t {
   include_prerelease
 };
 
-constexpr bool satisfies(const version& ver, std::string_view str, satisfies_option prerelease_option = satisfies_option::exclude_prerelease) {
-  switch (prerelease_option) {
+constexpr bool satisfies(const version& ver, std::string_view str, satisfies_option option = satisfies_option::exclude_prerelease) {
+  switch (option) {
   case satisfies_option::exclude_prerelease:
     return detail::range{str}.satisfies(ver, false);
   case satisfies_option::include_prerelease:
     return detail::range{str}.satisfies(ver, true);
   default:
-    NEARGYE_THROW(std::invalid_argument{"semver::range unexpected range_prerelease_option."});
+    NEARGYE_THROW(std::invalid_argument{"semver::range unexpected satisfies_option."});
   }
 }
 
