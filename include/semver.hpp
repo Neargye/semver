@@ -256,15 +256,15 @@ struct version {
   std::uint8_t prerelease_number = 0;
 
   constexpr version(std::uint8_t mj,
-                    std::uint8_t mr,
-                    std::uint8_t ph,
-                    prerelease pt = prerelease::none,
-                    std::uint8_t pn = 0) noexcept
+                    std::uint8_t mn,
+                    std::uint8_t pt,
+                    prerelease prt = prerelease::none,
+                    std::uint8_t prn = 0) noexcept
       : major{mj},
-        minor{mr},
-        patch{ph},
-        prerelease_type{pt},
-        prerelease_number{pt == prerelease::none ? static_cast<std::uint8_t>(0) : pn} {
+        minor{mn},
+        patch{pt},
+        prerelease_type{prt},
+        prerelease_number{prt == prerelease::none ? static_cast<std::uint8_t>(0) : prn} {
   }
 
   explicit constexpr version(std::string_view str) : version(0, 0, 0, prerelease::none, 0) {
