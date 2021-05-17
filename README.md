@@ -17,6 +17,7 @@ __      __           _             _                _____
 
 [![Github releases](https://img.shields.io/github/release/Neargye/semver.svg)](https://github.com/Neargye/semver/releases)
 [![Vcpkg package](https://img.shields.io/badge/Vcpkg-package-blueviolet)](https://github.com/microsoft/vcpkg/tree/master/ports/neargye-semver)
+[![Conan package](https://img.shields.io/badge/Conan-package-blueviolet)](https://github.com/conan-io/conan-center-index/tree/master/recipes/neargye-semver)
 [![License](https://img.shields.io/github/license/Neargye/semver.svg)](LICENSE)
 
 C++ library compare and manipulate versions are available as extensions to the `<major>.<minor>.<patch>-<prerelease_type>.<prerelease_number>` format complying with [Semantic Versioning 2.0.0](semver.org)
@@ -127,7 +128,7 @@ C++ library compare and manipulate versions are available as extensions to the `
 
 You should add required file [semver.hpp](include/semver.hpp).
 
-If you are using [vcpkg](https://github.com/Microsoft/vcpkg/) on your project for external dependencies, then you can use the [neargye-semver package](https://github.com/microsoft/vcpkg/tree/master/ports/neargye-semver).
+If you are using [vcpkg](https://vcpkg.io) or [conan](https://conan.io) to manage dependencies, there is `neargye-semver` package you can use – [vcpkg:neargye-semver](https://vcpkg.io/en/packages.html?query=neargye-semver), [conan:neargye-semver](https://conan.io/center/neargye-semver).
 
 Alternatively, you can use something like [CPM](https://github.com/TheLartians/CPM) which is based on CMake's `Fetch_Content` module.
 
