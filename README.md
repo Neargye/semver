@@ -20,7 +20,7 @@ __      __           _             _                _____
 [![Conan package](https://img.shields.io/badge/Conan-package-blueviolet)](https://conan.io/center/neargye-semver)
 [![License](https://img.shields.io/github/license/Neargye/semver.svg)](LICENSE)
 
-C++ library compare and manipulate versions are available as extensions to the `<major>.<minor>.<patch>-<prerelease_type>.<prerelease_number>` format complying with [Semantic Versioning 2.0.0](semver.org)
+C++ library compare and manipulate versions are available as extensions to the `<major>.<minor>.<patch>-<prerelease_type>.<prerelease_number>` format complying with [Semantic Versioning 2.0.0](https://semver.org)
 
 ## Features
 
