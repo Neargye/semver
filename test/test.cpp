@@ -34,9 +34,9 @@
 
 using namespace semver;
 
-static_assert(semver_verion.major == SEMVER_VERSION_MAJOR);
-static_assert(semver_verion.minor == SEMVER_VERSION_MINOR);
-static_assert(semver_verion.patch == SEMVER_VERSION_PATCH);
+static_assert(semver_version.major == SEMVER_VERSION_MAJOR);
+static_assert(semver_version.minor == SEMVER_VERSION_MINOR);
+static_assert(semver_version.patch == SEMVER_VERSION_PATCH);
 
 static_assert(alignof(version) == 1);
 static_assert(alignof(prerelease) == 1);
