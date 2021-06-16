@@ -800,7 +800,7 @@ constexpr bool satisfies(const version& ver, std::string_view str, satisfies_opt
 } // namespace semver::range
 
 // Version lib semver.
-inline constexpr auto semver_verion = version{SEMVER_VERSION_MAJOR, SEMVER_VERSION_MINOR, SEMVER_VERSION_PATCH};
+inline constexpr auto semver_version = version{SEMVER_VERSION_MAJOR, SEMVER_VERSION_MINOR, SEMVER_VERSION_PATCH};
 
 } // namespace semver
 
