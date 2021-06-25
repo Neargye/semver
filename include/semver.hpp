@@ -322,19 +322,19 @@ private:
   constexpr bool eol() const noexcept { return pos >= text.size(); }
 
   constexpr token_range get_int_range() noexcept {
-    std::size_t pos = this->pos;
+    std::size_t initial_pos = pos;
     std::size_t len = 0;
 
-    while (!eol() && is_digit(text[this->pos])) {
+    while (!eol() && is_digit(text[pos])) {
       len++;
       advance(1);
     }
 
-    return { pos, len };
+    return { initial_pos, len };
   }
 
   constexpr token_range get_operator_range() noexcept {
-    std::size_t pos = this->pos;
+    std::size_t initial_pos = pos;
     std::size_t len = 0;
 
     for (std::size_t i = 0; i < 2; ++i) {
@@ -344,7 +344,7 @@ private:
       }
     }
 
-    return { pos, len };
+    return { initial_pos, len };
   }
 
   constexpr void advance(std::size_t step) noexcept { pos += step; }
@@ -353,8 +353,10 @@ private:
 class version_parser {
 
 public:
-  constexpr explicit version_parser(const lexer& lexer) : lexer(lexer), token(token_type::none, {}) {
-    advance(token_type::none);
+  constexpr explicit version_parser(lexer& lexer, const token& initial_token) : lexer(lexer), token(initial_token) {
+    if (initial_token.type == token_type::none) {
+      advance(token_type::none);
+    }
     skip_whitespaces();
   }
 
@@ -420,13 +422,15 @@ public:
     return lexer.get_string(pos, len);
   }
 
+  constexpr token get_token() const noexcept { return token; }
+
 private:
-  lexer lexer;
+  lexer& lexer;
   token token;
 
   constexpr void skip_whitespaces() {
     while (token.type == token_type::space) {
-        advance(token_type::space);
+      advance(token_type::space);
     }
   }
 
@@ -498,7 +502,7 @@ public:
     }
 
     detail::lexer lexer(std::string_view(first, last - first));
-    detail::version_parser parser(lexer);
+    detail::version_parser parser(lexer, detail::token(detail::token_type::none, {}));
 
     const auto& core = parser.parse_core();
     major = core[0];
@@ -733,6 +737,7 @@ class range {
     do {
       if (is_logical_or()) {
         parser.advance_token(token_type::logical_or);
+        parser.skip_whitespaces();
       }
 
       bool contains = true;
@@ -750,6 +755,8 @@ class range {
           contains = false;
           break;
         }
+
+        parser.skip_whitespaces();
       }
 
       if (has_prerelease) {
@@ -759,6 +766,8 @@ class range {
       } else if (contains) {
         return true;
       }
+
+      parser.skip_whitespaces();
 
     } while (is_logical_or());
     
@@ -803,6 +812,12 @@ private:
       current_token = lexer.get_next_token();
     }
 
+    constexpr void skip_whitespaces() {
+      while (current_token.type == token_type::space) {
+        advance_token(token_type::space);
+      }
+    }
+
     constexpr range_comparator parse_range() {
       if (current_token.type == token_type::integer) {
         const auto version = parse_version();
@@ -819,11 +834,13 @@ private:
     }
 
     constexpr version parse_version() {
-      version_parser version_parser(lexer);
+      version_parser version_parser(lexer, current_token);
 
       const auto core = version_parser.parse_core();
       const auto prerelease_tag = version_parser.parse_prerelease_tag();
       const auto build_metadata = version_parser.parse_build();
+
+      current_token = version_parser.get_token();
 
       return {core[0], core[1], core[2], prerelease_tag, build_metadata};
     }

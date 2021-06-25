@@ -452,56 +452,56 @@ TEST_CASE("constructors") {
 //   }
 // }
 
-// TEST_CASE("ranges") {
-//   SECTION("constructor") {
-//     constexpr version v1{"1.2.3"};
-//     constexpr std::string_view r1{">1.0.0 <=2.0.0"};
-//     STATIC_REQUIRE(range::satisfies(v1, r1));
+TEST_CASE("ranges") {
+  SECTION("constructor") {
+    constexpr version v1{"1.2.3"};
+    constexpr std::string_view r1{">1.0.0 <=2.0.0"};
+    STATIC_REQUIRE(range::satisfies(v1, r1));
 
-//     constexpr version v2{"2.1.0"};
-//     STATIC_REQUIRE_FALSE(range::satisfies(v2, r1));
+    constexpr version v2{"2.1.0"};
+    STATIC_REQUIRE_FALSE(range::satisfies(v2, r1));
 
-//     constexpr std::string_view r2{"1.1.1"};
-//     constexpr version v3{"1.1.1"};
-//     STATIC_REQUIRE(range::satisfies(v3, r2));
-//   }
+    constexpr std::string_view r2{"1.1.1"};
+    constexpr version v3{"1.1.1"};
+    STATIC_REQUIRE(range::satisfies(v3, r2));
+  }
 
-//   struct range_test_case {
-//     std::string_view range;
-//     version ver;
-//     bool contains;
-//   };
+  struct range_test_case {
+    std::string_view range;
+    version ver;
+    bool contains;
+  };
 
-//   SECTION("one comparator set") {
-//     constexpr std::array<range_test_case, 6> tests = {{
-//       {"> 1.2.3", {1, 2, 5}, true},
-//       {"> 1.2.3", {1, 1, 0}, false},
-//       {">=1.2.0 <2.0.0", {1, 2, 5}, true},
-//       {">=1.2.0 <2.0.0", {2, 3, 0}, false},
-//       {"1.0.0", {1, 0, 0}, true},
-//       {"1.0.0 < 2.0.0", {1, 5, 0}, false}
-//     }};
+  SECTION("one comparator set") {
+    constexpr std::array<range_test_case, 6> tests = {{
+      {"> 1.2.3", {1, 2, 5}, true},
+      {"> 1.2.3", {1, 1, 0}, false},
+      {">=1.2.0 <2.0.0", {1, 2, 5}, true},
+      {">=1.2.0 <2.0.0", {2, 3, 0}, false},
+      {"1.0.0", {1, 0, 0}, true},
+      {"1.0.0 < 2.0.0", {1, 5, 0}, false}
+    }};
 
-//     for (const auto& test : tests) {
-//       REQUIRE(range::satisfies(test.ver, test.range) == test.contains);
-//     }
-//   }
+    for (const auto& test : tests) {
+      REQUIRE(range::satisfies(test.ver, test.range) == test.contains);
+    }
+  }
 
-//   SECTION("multiple comparators set") {
-//     constexpr std::string_view range{"1.2.7 || >=1.2.9 <2.0.0"};
-//     constexpr version v1{"1.2.7"};
-//     constexpr version v2{"1.2.9"};
-//     constexpr version v3{"1.4.6"};
-//     constexpr version v4{"1.2.8"};
-//     constexpr version v5{"2.0.0"};
+  SECTION("multiple comparators set") {
+    constexpr std::string_view range{"1.2.7 || >=1.2.9 <2.0.0"};
+    constexpr version v1{"1.2.7"};
+    constexpr version v2{"1.2.9"};
+    constexpr version v3{"1.4.6"};
+    constexpr version v4{"1.2.8"};
+    constexpr version v5{"2.0.0"};
 
-//     STATIC_REQUIRE(range::satisfies(v1, range));
-//     STATIC_REQUIRE(range::satisfies(v2, range));
-//     STATIC_REQUIRE(range::satisfies(v3, range));
-//     STATIC_REQUIRE_FALSE(range::satisfies(v4, range));
-//     STATIC_REQUIRE_FALSE(range::satisfies(v5, range));
-//   }
-// }
+    STATIC_REQUIRE(range::satisfies(v1, range));
+    STATIC_REQUIRE(range::satisfies(v2, range));
+    STATIC_REQUIRE(range::satisfies(v3, range));
+    STATIC_REQUIRE_FALSE(range::satisfies(v4, range));
+    STATIC_REQUIRE_FALSE(range::satisfies(v5, range));
+  }
+}
 
 // TEST_CASE("ranges with prerelase tags") {
 //   SECTION("prerelease tags") {
