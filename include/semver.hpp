@@ -353,7 +353,7 @@ private:
 class version_parser {
 
 public:
-  constexpr explicit version_parser(lexer& lexer, const token& initial_token) : lexer(lexer), token(initial_token) {
+  constexpr explicit version_parser(const lexer& lexer, const token& initial_token) : lexer(lexer), token(initial_token) {
     if (initial_token.type == token_type::none) {
       advance(token_type::none);
     }
@@ -424,8 +424,10 @@ public:
 
   constexpr token get_token() const noexcept { return token; }
 
+  constexpr lexer get_lexer() const noexcept { return lexer; }
+
 private:
-  lexer& lexer;
+  lexer lexer;
   token token;
 
   constexpr void skip_whitespaces() {
@@ -841,6 +843,7 @@ private:
       const auto build_metadata = version_parser.parse_build();
 
       current_token = version_parser.get_token();
+      lexer = version_parser.get_lexer();
 
       return {core[0], core[1], core[2], prerelease_tag, build_metadata};
     }
