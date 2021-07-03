@@ -187,6 +187,15 @@ constexpr const char* from_chars(const char* first, const char* last, std::uint8
   return nullptr;
 }
 
+constexpr bool substr(std::string_view str, std::size_t pos, std::size_t len, std::string_view& result) noexcept {
+  if (pos > str.size())
+    return false;
+
+  result = std::string_view{str.data() + pos, len};
+
+  return true;
+}
+
 enum class token_type : std::uint8_t {
   none,
   eol,
@@ -233,46 +242,46 @@ struct token {
 class lexer {
 
 public:
-  constexpr explicit lexer(std::string_view text) : text(text), pos(0) { }
+  constexpr explicit lexer(std::string_view text) noexcept : text(text), pos(0) { }
 
-  constexpr token get_next_token() {
-    const auto pos = this->pos;
+  constexpr token get_next_token() noexcept {
+    const auto initial_pos = pos;
 
-    if (is_space(text[pos])) {
+    if (is_space(text[initial_pos])) {
       advance(1);
-      return { token_type::space, { pos, 1 } };
+      return { token_type::space, { initial_pos, 1 } };
     }
 
-    if (is_digit(text[pos])) {
+    if (is_digit(text[initial_pos])) {
       return { token_type::integer, get_int_range() };
     }
 
-    if (is_dot(text[pos])) {
+    if (is_dot(text[initial_pos])) {
       advance(1);
-      return { token_type::dot, { pos, 1 } };
+      return { token_type::dot, { initial_pos, 1 } };
     }
 
-    if (is_hyphen(text[pos])) {
+    if (is_hyphen(text[initial_pos])) {
       advance(1);
-      return { token_type::hyphen, { pos, 1 } };
+      return { token_type::hyphen, { initial_pos, 1 } };
     }
 
-    if (is_plus(text[pos])) {
+    if (is_plus(text[initial_pos])) {
       advance(1);
-      return { token_type::plus, { pos, 1 } };
+      return { token_type::plus, { initial_pos, 1 } };
     }
 
-    if (is_letter(text[pos])) {
+    if (is_letter(text[initial_pos])) {
       advance(1);
-      return { token_type::letter, { pos, 1 } };
+      return { token_type::letter, { initial_pos, 1 } };
     }
 
-    if(is_logical_or(text[pos])) {
+    if(is_logical_or(text[initial_pos])) {
       advance(2);
-      return { token_type::logical_or, { pos, 2 } };
+      return { token_type::logical_or, { initial_pos, 2 } };
     }
 
-    if (is_operator(text[pos])) {
+    if (is_operator(text[initial_pos])) {
       return { token_type::range_operator, get_operator_range() };
     }
 
@@ -283,36 +292,43 @@ public:
     return { token_type::eol, {} };
   }
 
-  constexpr std::uint8_t get_int(std::size_t pos, std::size_t len) const {
-    std::uint8_t value = 0;
-    
-    const auto result = from_chars(text.data() + pos, text.data() + pos + len, value);
-    if (!result) {
-      // TODO: throw invalid agrument or out of range
-      return 0;
+  constexpr bool get_int(std::size_t pos, std::size_t len, std::uint8_t& result) const noexcept {
+    if (!from_chars(text.data() + pos, text.data() + pos + len, result)) {
+      return false;
     }
 
-    return value;
+    return true;
   }
 
-  constexpr std::string_view get_string(std::size_t pos, std::size_t len) const {
-    return text.substr(pos, len);
+  constexpr bool get_string(std::size_t pos, std::size_t len, std::string_view& result) const noexcept {
+    if (!substr(text, pos, len, result)) {
+      return false;
+    }
+
+    return true;
   }
 
-  constexpr range_operator get_operator(std::size_t pos, std::size_t len) const {
-    const auto str = text.substr(pos, len);
+  constexpr bool get_operator(std::size_t pos, std::size_t len, range_operator& result) const noexcept {
+    std::string_view str;
+    if (!substr(text, pos, len, str)) {
+      return false;
+    }
 
-    if (str == "<") {
-      return range_operator::less;
+    if (str == "=") {
+      result = range_operator::equal;
+    } else if (str == "<") {
+      result = range_operator::less;
     } else if (str == "<=") {
-      return range_operator::less_or_equal;
+      result = range_operator::less_or_equal;
     } else if (str == ">") {
-      return range_operator::greater;
+      result = range_operator::greater;
     } else if (str == ">=") {
-      return range_operator::greater_or_equal;
+      result = range_operator::greater_or_equal;
+    } else {
+      return false;
     }
 
-    return range_operator::equal;
+    return true;
   }
 
 private:
@@ -361,15 +377,20 @@ public:
   }
 
   constexpr std::array<std::uint8_t, 3> parse_core() {
-    auto major = lexer.get_int(token.range.pos, token.range.len);
+    std::uint8_t major = 0;
+    if (!lexer.get_int(token.range.pos, token.range.len, major)) {
+
+    }
     advance(token_type::integer);
     advance(token_type::dot);
 
-    auto minor = lexer.get_int(token.range.pos, token.range.len);
+    std::uint8_t minor = 0;
+    lexer.get_int(token.range.pos, token.range.len, minor);
     advance(token_type::integer);
     advance(token_type::dot);
 
-    auto patch = lexer.get_int(token.range.pos, token.range.len);
+    std::uint8_t patch = 0;
+    lexer.get_int(token.range.pos, token.range.len, patch);
     advance(token_type::integer);
 
     return { major, minor, patch };
@@ -397,7 +418,10 @@ public:
       advance(token.type);
     }
 
-    return lexer.get_string(pos, len);
+    std::string_view result;
+    lexer.get_string(pos, len, result);
+
+    return result;
   }
 
   constexpr std::string_view parse_build() {
@@ -419,7 +443,10 @@ public:
       advance(token.type);
     }
 
-    return lexer.get_string(pos, len);
+    std::string_view result;
+    lexer.get_string(pos, len, result);
+
+    return result;
   }
 
   constexpr token get_token() const noexcept { return token; }
@@ -427,8 +454,8 @@ public:
   constexpr lexer get_lexer() const noexcept { return lexer; }
 
 private:
-  lexer lexer;
-  token token;
+  detail::lexer lexer;
+  detail::token token;
 
   constexpr void skip_whitespaces() {
     while (token.type == token_type::space) {
@@ -800,8 +827,8 @@ private:
   };
 
   struct range_parser {
-    lexer lexer;
-    token current_token;
+    detail::lexer lexer;
+    detail::token current_token;
 
     constexpr explicit range_parser(std::string_view str) : lexer{str}, current_token{token_type::none, {}} {
       advance_token(token_type::none);
@@ -825,7 +852,8 @@ private:
         const auto version = parse_version();
         return {range_operator::equal, version};
       } else if (current_token.type == token_type::range_operator) {
-        const auto range_operator = lexer.get_operator(current_token.range.pos, current_token.range.len);
+        auto range_operator = range_operator::equal;
+        lexer.get_operator(current_token.range.pos, current_token.range.len, range_operator);
         advance_token(token_type::range_operator);
         const auto version = parse_version();
         return {range_operator, version};
