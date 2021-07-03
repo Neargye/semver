@@ -43,7 +43,6 @@
 #define SEMVER_VERSION_MINOR 3
 #define SEMVER_VERSION_PATCH 0
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <iosfwd>
@@ -245,6 +244,10 @@ public:
   constexpr explicit lexer(std::string_view text) noexcept : text(text), current_pos(0) { }
 
   constexpr token get_next_token() noexcept {
+    if (eol()) {
+      return { token_type::eol, {} };
+    }
+
     const auto pos = current_pos;
 
     if (is_space(text[pos])) {
@@ -284,9 +287,6 @@ public:
     if (is_operator(text[pos])) {
       return { token_type::range_operator, get_operator_range() };
     }
-
-    if (eol())
-      return { token_type::eol, {} };
 
     // TODO: throw unexpected symbol
     return { token_type::eol, {} };
@@ -376,24 +376,17 @@ public:
     skip_whitespaces();
   }
 
-  constexpr std::array<std::uint8_t, 3> parse_core() {
-    std::uint8_t major = 0;
-    if (!lexer_.get_int(token_.range.pos, token_.range.len, major)) {
-
-    }
+  constexpr void parse_core(std::uint8_t& major, std::uint8_t& minor, std::uint8_t& patch) {
+    lexer_.get_int(token_.range.pos, token_.range.len, major);
     advance(token_type::integer);
     advance(token_type::dot);
 
-    std::uint8_t minor = 0;
     lexer_.get_int(token_.range.pos, token_.range.len, minor);
     advance(token_type::integer);
     advance(token_type::dot);
 
-    std::uint8_t patch = 0;
     lexer_.get_int(token_.range.pos, token_.range.len, patch);
     advance(token_type::integer);
-
-    return { major, minor, patch };
   }
 
   constexpr std::string_view parse_prerelease_tag() {
@@ -533,11 +526,7 @@ public:
     detail::lexer lexer(std::string_view(first, last - first));
     detail::version_parser parser(lexer, detail::token(detail::token_type::none, {}));
 
-    const auto& core = parser.parse_core();
-    major = core[0];
-    minor = core[1];
-    patch = core[2];
-
+    parser.parse_core(major, minor, patch);
     prerelease_tag = parser.parse_prerelease_tag();
     build_metadata = parser.parse_build();
 
@@ -866,14 +855,18 @@ private:
     constexpr version parse_version() {
       version_parser version_parser(lexer_, current_token);
 
-      const auto core = version_parser.parse_core();
+      std::uint8_t major = 0;
+      std::uint8_t minor = 0;
+      std::uint8_t patch = 0;
+      version_parser.parse_core(major, minor, patch);
+
       const auto prerelease_tag = version_parser.parse_prerelease_tag();
       const auto build_metadata = version_parser.parse_build();
 
       current_token = version_parser.get_token();
       lexer_ = version_parser.get_lexer();
 
-      return {core[0], core[1], core[2], prerelease_tag, build_metadata};
+      return {major, minor, patch, prerelease_tag, build_metadata};
     }
   };
 
