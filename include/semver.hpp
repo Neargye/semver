@@ -242,46 +242,46 @@ struct token {
 class lexer {
 
 public:
-  constexpr explicit lexer(std::string_view text) noexcept : text(text), pos(0) { }
+  constexpr explicit lexer(std::string_view text) noexcept : text(text), current_pos(0) { }
 
   constexpr token get_next_token() noexcept {
-    const auto initial_pos = pos;
+    const auto pos = current_pos;
 
-    if (is_space(text[initial_pos])) {
+    if (is_space(text[pos])) {
       advance(1);
-      return { token_type::space, { initial_pos, 1 } };
+      return { token_type::space, { pos, 1 } };
     }
 
-    if (is_digit(text[initial_pos])) {
+    if (is_digit(text[pos])) {
       return { token_type::integer, get_int_range() };
     }
 
-    if (is_dot(text[initial_pos])) {
+    if (is_dot(text[pos])) {
       advance(1);
-      return { token_type::dot, { initial_pos, 1 } };
+      return { token_type::dot, { pos, 1 } };
     }
 
-    if (is_hyphen(text[initial_pos])) {
+    if (is_hyphen(text[pos])) {
       advance(1);
-      return { token_type::hyphen, { initial_pos, 1 } };
+      return { token_type::hyphen, { pos, 1 } };
     }
 
-    if (is_plus(text[initial_pos])) {
+    if (is_plus(text[pos])) {
       advance(1);
-      return { token_type::plus, { initial_pos, 1 } };
+      return { token_type::plus, { pos, 1 } };
     }
 
-    if (is_letter(text[initial_pos])) {
+    if (is_letter(text[pos])) {
       advance(1);
-      return { token_type::letter, { initial_pos, 1 } };
+      return { token_type::letter, { pos, 1 } };
     }
 
-    if(is_logical_or(text[initial_pos])) {
+    if(is_logical_or(text[pos])) {
       advance(2);
-      return { token_type::logical_or, { initial_pos, 2 } };
+      return { token_type::logical_or, { pos, 2 } };
     }
 
-    if (is_operator(text[initial_pos])) {
+    if (is_operator(text[pos])) {
       return { token_type::range_operator, get_operator_range() };
     }
 
@@ -333,44 +333,44 @@ public:
 
 private:
   std::string_view text;
-  std::size_t pos;
+  std::size_t current_pos;
 
-  constexpr bool eol() const noexcept { return pos >= text.size(); }
+  constexpr bool eol() const noexcept { return current_pos >= text.size(); }
 
   constexpr token_range get_int_range() noexcept {
-    std::size_t initial_pos = pos;
+    std::size_t pos = current_pos;
     std::size_t len = 0;
 
-    while (!eol() && is_digit(text[pos])) {
+    while (!eol() && is_digit(text[current_pos])) {
       len++;
       advance(1);
     }
 
-    return { initial_pos, len };
+    return { pos, len };
   }
 
   constexpr token_range get_operator_range() noexcept {
-    std::size_t initial_pos = pos;
+    std::size_t pos = current_pos;
     std::size_t len = 0;
 
     for (std::size_t i = 0; i < 2; ++i) {
-      if (!eol() && is_operator(text[pos])) {
+      if (!eol() && is_operator(text[current_pos])) {
         len++;
         advance(1);
       }
     }
 
-    return { initial_pos, len };
+    return { pos, len };
   }
 
-  constexpr void advance(std::size_t step) noexcept { pos += step; }
+  constexpr void advance(std::size_t step) noexcept { current_pos += step; }
 };
 
 class version_parser {
 
 public:
-  constexpr explicit version_parser(const lexer& lexer, const token& initial_token) : lexer_(lexer), token_(initial_token) {
-    if (initial_token.type == token_type::none) {
+  constexpr explicit version_parser(const lexer& lexer, const token& token) : lexer_(lexer), token_(token) {
+    if (token.type == token_type::none) {
       advance(token_type::none);
     }
     skip_whitespaces();
