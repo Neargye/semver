@@ -369,7 +369,7 @@ private:
 class version_parser {
 
 public:
-  constexpr explicit version_parser(const lexer& lexer, const token& initial_token) : lexer(lexer), token(initial_token) {
+  constexpr explicit version_parser(const lexer& lexer, const token& initial_token) : lexer_(lexer), token_(initial_token) {
     if (initial_token.type == token_type::none) {
       advance(token_type::none);
     }
@@ -378,31 +378,31 @@ public:
 
   constexpr std::array<std::uint8_t, 3> parse_core() {
     std::uint8_t major = 0;
-    if (!lexer.get_int(token.range.pos, token.range.len, major)) {
+    if (!lexer_.get_int(token_.range.pos, token_.range.len, major)) {
 
     }
     advance(token_type::integer);
     advance(token_type::dot);
 
     std::uint8_t minor = 0;
-    lexer.get_int(token.range.pos, token.range.len, minor);
+    lexer_.get_int(token_.range.pos, token_.range.len, minor);
     advance(token_type::integer);
     advance(token_type::dot);
 
     std::uint8_t patch = 0;
-    lexer.get_int(token.range.pos, token.range.len, patch);
+    lexer_.get_int(token_.range.pos, token_.range.len, patch);
     advance(token_type::integer);
 
     return { major, minor, patch };
   }
 
   constexpr std::string_view parse_prerelease_tag() {
-    if (token.type != token_type::hyphen)
+    if (token_.type != token_type::hyphen)
       return {};
 
     advance(token_type::hyphen);
 
-    const auto pos = token.range.pos;
+    const auto pos = token_.range.pos;
     std::size_t len = 0;
 
     while (!is_eol()) {
@@ -414,23 +414,23 @@ public:
         break;
       }
 
-      len += token.range.len;
-      advance(token.type);
+      len += token_.range.len;
+      advance(token_.type);
     }
 
     std::string_view result;
-    lexer.get_string(pos, len, result);
+    lexer_.get_string(pos, len, result);
 
     return result;
   }
 
   constexpr std::string_view parse_build() {
-    if (token.type != token_type::plus)
+    if (token_.type != token_type::plus)
       return {};
 
     advance(token_type::plus);
 
-    const auto pos = token.range.pos;
+    const auto pos = token_.range.pos;
     std::size_t len = 0;
 
     while (!is_eol()) {
@@ -439,51 +439,51 @@ public:
         break;
       }
 
-      len += token.range.len;
-      advance(token.type);
+      len += token_.range.len;
+      advance(token_.type);
     }
 
     std::string_view result;
-    lexer.get_string(pos, len, result);
+    lexer_.get_string(pos, len, result);
 
     return result;
   }
 
-  constexpr token get_token() const noexcept { return token; }
+  constexpr token get_token() const noexcept { return token_; }
 
-  constexpr lexer get_lexer() const noexcept { return lexer; }
+  constexpr lexer get_lexer() const noexcept { return lexer_; }
 
 private:
-  detail::lexer lexer;
-  detail::token token;
+  lexer lexer_;
+  token token_;
 
   constexpr void skip_whitespaces() {
-    while (token.type == token_type::space) {
+    while (token_.type == token_type::space) {
       advance(token_type::space);
     }
   }
 
   constexpr void advance(token_type expected_token) {
-    if (token.type != expected_token) {
+    if (token_.type != expected_token) {
       // TODO: throw unexpected token
     }
-    token = lexer.get_next_token();
+    token_ = lexer_.get_next_token();
   }
 
   constexpr bool is_eol() const {
-    return token.type == token_type::eol;
+    return token_.type == token_type::eol;
   }
 
   constexpr bool is_plus() const {
-    return token.type == token_type::plus;
+    return token_.type == token_type::plus;
   }
 
   constexpr bool is_alphanumeric() const {
-    return token.type == token_type::letter || token.type == token_type::dot || token.type == token_type::hyphen;
+    return token_.type == token_type::letter || token_.type == token_type::dot || token_.type == token_type::hyphen;
   }
 
   constexpr bool is_integer() const {
-    return token.type == token_type::integer;
+    return token_.type == token_type::integer;
   }
 };
 
@@ -827,10 +827,10 @@ private:
   };
 
   struct range_parser {
-    detail::lexer lexer;
-    detail::token current_token;
+    lexer lexer_;
+    token current_token;
 
-    constexpr explicit range_parser(std::string_view str) : lexer{str}, current_token{token_type::none, {}} {
+    constexpr explicit range_parser(std::string_view str) : lexer_{str}, current_token{token_type::none, {}} {
       advance_token(token_type::none);
     }
 
@@ -838,7 +838,7 @@ private:
       if (current_token.type != token_type) {
         NEARGYE_THROW(std::invalid_argument{"semver::range unexpected token."});
       }
-      current_token = lexer.get_next_token();
+      current_token = lexer_.get_next_token();
     }
 
     constexpr void skip_whitespaces() {
@@ -853,7 +853,7 @@ private:
         return {range_operator::equal, version};
       } else if (current_token.type == token_type::range_operator) {
         auto range_operator = range_operator::equal;
-        lexer.get_operator(current_token.range.pos, current_token.range.len, range_operator);
+        lexer_.get_operator(current_token.range.pos, current_token.range.len, range_operator);
         advance_token(token_type::range_operator);
         const auto version = parse_version();
         return {range_operator, version};
@@ -864,14 +864,14 @@ private:
     }
 
     constexpr version parse_version() {
-      version_parser version_parser(lexer, current_token);
+      version_parser version_parser(lexer_, current_token);
 
       const auto core = version_parser.parse_core();
       const auto prerelease_tag = version_parser.parse_prerelease_tag();
       const auto build_metadata = version_parser.parse_build();
 
       current_token = version_parser.get_token();
-      lexer = version_parser.get_lexer();
+      lexer_ = version_parser.get_lexer();
 
       return {core[0], core[1], core[2], prerelease_tag, build_metadata};
     }
