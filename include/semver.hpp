@@ -195,6 +195,21 @@ constexpr bool substr(std::string_view str, std::size_t pos, std::size_t len, st
   return true;
 }
 
+constexpr int compare(std::string_view lhs, std::string_view rhs) {
+  for (std::size_t i = 0; i < std::min(lhs.size(), rhs.size()); ++i) {
+    if (static_cast<unsigned char>(lhs[i]) < static_cast<unsigned char>(rhs[i]))
+      return -1;
+    else if (static_cast<unsigned char>(lhs[i]) > static_cast<unsigned char>(rhs[i]))
+      return 1;
+  }
+
+  return lhs.size() < rhs.size() ? -1 : lhs.size() > rhs.size() ? 1 : 0;
+}
+
+constexpr bool compare_equal(std::string_view lhs, std::string_view rhs) {
+  return compare(lhs, rhs) == 0;
+}
+
 enum class token_type : std::uint8_t {
   none,
   eol,
@@ -314,15 +329,15 @@ public:
       return false;
     }
 
-    if (str == "=") {
+    if (compare_equal(str, "=")) {
       result = range_operator::equal;
-    } else if (str == "<") {
+    } else if (compare_equal(str, "<")) {
       result = range_operator::less;
-    } else if (str == "<=") {
+    } else if (compare_equal(str, "<=")) {
       result = range_operator::less_or_equal;
-    } else if (str == ">") {
+    } else if (compare_equal(str, ">")) {
       result = range_operator::greater;
-    } else if (str == ">=") {
+    } else if (compare_equal(str, ">=")) {
       result = range_operator::greater_or_equal;
     } else {
       return false;
@@ -602,12 +617,12 @@ public:
       return patch - other.patch;
     }
 
-    int pre_release_compare = prerelease_tag.compare(other.prerelease_tag);
+    int pre_release_compare = detail::compare(prerelease_tag, other.prerelease_tag);
     if (pre_release_compare != 0) {
         return pre_release_compare;
     }
 
-    int build_metadata_compare = build_metadata.compare(other.build_metadata);
+    int build_metadata_compare = detail::compare(build_metadata, other.build_metadata);
     if (build_metadata_compare != 0) {
         return build_metadata_compare;
     }
@@ -621,7 +636,7 @@ public:
 
   constexpr std::uint8_t get_patch() const noexcept { return patch; }
 
-  constexpr std::string_view get_prerelese_tag() const noexcept { return prerelease_tag; }
+  constexpr std::string_view get_prerelease_tag() const noexcept { return prerelease_tag; }
 
   constexpr std::string_view get_build_metadata() const noexcept { return build_metadata; }
 };
@@ -750,7 +765,7 @@ class range {
 
     auto is_int = [&parser]() constexpr noexcept -> bool { return parser.current_token.type == token_type::integer; };
 
-    const bool has_prerelease = !ver.get_prerelese_tag().empty();
+    const bool has_prerelease = !ver.get_prerelease_tag().empty();
 
     do {
       if (is_logical_or()) {
