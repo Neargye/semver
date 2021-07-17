@@ -39,9 +39,7 @@ static_assert(semver_version.get_minor() == SEMVER_VERSION_MINOR);
 static_assert(semver_version.get_patch() == SEMVER_VERSION_PATCH);
 
 // static_assert(alignof(version) == 1);
-// static_assert(alignof(prerelease) == 1);
 // static_assert(sizeof(version) == 5);
-// static_assert(sizeof(prerelease) == 1);
 
 #define STATIC_CHECK_OP_AND_REVERSE(v1, op, v2) \
   static_assert(v1 op v2);                      \
@@ -73,7 +71,7 @@ TEST_CASE("constructors") {
     static_assert(v0.get_major() == 0 &&
                       v0.get_minor() == 1 &&
                       v0.get_patch() == 0 &&
-                      v0.get_prerelease_tag().empty() &&
+                      v0.get_prerelease().empty() &&
                       v0.get_build_metadata().empty());
   }
 
@@ -82,50 +80,50 @@ TEST_CASE("constructors") {
     static_assert(v1.get_major() == 1 &&
                       v1.get_minor() == 2 &&
                       v1.get_patch() == 3 &&
-                      detail::compare_equal(v1.get_prerelease_tag(), "rc.0"));
+                      detail::compare_equal(v1.get_prerelease(), "rc.0"));
 
     constexpr version v2{1, 2, 3, "rc.4"};
     static_assert(v2.get_major() == 1 &&
                       v2.get_minor() == 2 &&
                       v2.get_patch() == 3 &&
-                      detail::compare_equal(v2.get_prerelease_tag(), "rc.4"));
+                      detail::compare_equal(v2.get_prerelease(), "rc.4"));
 
     constexpr version v3{1, 2, 3};
     static_assert(v3.get_major() == 1 &&
                       v3.get_minor() == 2 &&
                       v3.get_patch() == 3 &&
-                      v3.get_prerelease_tag().empty());
+                      v3.get_prerelease().empty());
 
     constexpr version v4{1, 2, 3, ""};
     static_assert(v4.get_major() == 1 &&
                       v4.get_minor() == 2 &&
                       v4.get_patch() == 3 &&
-                      detail::compare_equal(v4.get_prerelease_tag(), ""));
+                      detail::compare_equal(v4.get_prerelease(), ""));
 
     constexpr version v5{v4};
     static_assert(v5.get_major() == 1 &&
                       v5.get_minor() == 2 &&
                       v5.get_patch() == 3 &&
-                      v5.get_prerelease_tag().empty());
+                      v5.get_prerelease().empty());
 
     constexpr version v6{v5};
     static_assert(v6.get_major() == 1 &&
                       v6.get_minor() == 2 &&
                       v6.get_patch() == 3 &&
-                      v6.get_prerelease_tag().empty());
+                      v6.get_prerelease().empty());
 
     constexpr version v7{"1.2.3-alpha.4"};
     static_assert(v7.get_major() == 1 &&
                       v7.get_minor() == 2 &&
                       v7.get_patch() == 3 &&
-                      detail::compare_equal(v7.get_prerelease_tag(), "alpha.4"));
+                      detail::compare_equal(v7.get_prerelease(), "alpha.4"));
 
     std::string s = "1.1.1";
     version v10{s};
     REQUIRE(v10.get_major() == 1);
     REQUIRE(v10.get_minor() == 1);
     REQUIRE(v10.get_patch() == 1);
-    REQUIRE(v10.get_prerelease_tag().empty());
+    REQUIRE(v10.get_prerelease().empty());
   }
 }
 
@@ -354,6 +352,43 @@ TEST_CASE("constructors") {
 //     static_assert(v == version{1, 2, 3, prerelease::rc, 4});
 //   }
 // }
+
+TEST_CASE("from/to string") {
+  constexpr std::array<std::string_view, 32> versions_strings = {{
+      "0.0.4",
+      "1.2.3",
+      "10.20.30",
+      "1.1.2-prerelease+meta",
+      "1.1.2+meta",
+      "1.1.2+meta-valid",
+      "1.0.0-alpha",
+      "1.0.0-beta",
+      "1.0.0-alpha.beta",
+      "1.0.0-alpha.beta.1",
+      "1.0.0-alpha.1",
+      "1.0.0-alpha0.valid",
+      "1.0.0-alpha.0valid",
+      "1.0.0-alpha-a.b-c-somethinglong+build.1-aef.1-its-okay",
+      "1.2.3-rc.4",
+      "1.0.0-rc.1+build.1",
+      "2.0.0-rc.1+build.123",
+      "1.2.3-beta",
+      "10.2.3-DEV-SNAPSHOT",
+      "1.2.3-SNAPSHOT-123",
+      "1.0.0",
+      "2.0.0",
+      "1.1.7",
+      "2.0.0+build.1848",
+      "2.0.1-alpha.1227",
+      "1.0.0-alpha+beta",
+      "1.2.3----RC-SNAPSHOT.12.9.1--.12+788",
+      "1.2.3----R-S.12.9.1--.12+meta",
+      "1.2.3----RC-SNAPSHOT.12.9.1--.12",
+      "1.0.0+0.build.1-rc.10000aaa-kk-0.1",
+      "99999999999999999999999.999999999999999999.99999999999999999",
+      "1.0.0-0A.is.legal"
+  }};
+}
 
 // TEST_CASE("from/to string") {
 //   constexpr std::array<version, 19> versions = {{

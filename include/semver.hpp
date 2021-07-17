@@ -11,7 +11,7 @@
 //    \  /  __/ |  \__ \ | (_) | | | | | | | | (_| | | |____|_|   |_|
 //     \/ \___|_|  |___/_|\___/|_| |_|_|_| |_|\__, |  \_____|
 // https://github.com/Neargye/semver           __/ |
-// version 0.3.0                              |___/
+// version 0.4.0                              |___/
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
@@ -40,7 +40,7 @@
 #define NEARGYE_SEMANTIC_VERSIONING_HPP
 
 #define SEMVER_VERSION_MAJOR 0
-#define SEMVER_VERSION_MINOR 3
+#define SEMVER_VERSION_MINOR 4
 #define SEMVER_VERSION_PATCH 0
 
 #include <algorithm>
@@ -97,9 +97,6 @@ struct to_chars_result {
 };
 #endif
 
-// Max version string length = 3(<major>) + 1(.) + 3(<minor>) + 1(.) + 3(<patch>) + 1(-) + 5(<prerelease>) + 1(.) + 3(<prereleaseversion>) = 21.
-inline constexpr auto max_version_string_length = std::size_t{21};
-
 namespace detail {
 
 // Min version string length = 1(<major>) + 1(.) + 1(<minor>) + 1(.) + 1(<patch>) = 5.
@@ -145,8 +142,14 @@ constexpr std::uint8_t to_digit(char c) noexcept {
   return static_cast<std::uint8_t>(c - '0');
 }
 
-constexpr std::uint8_t length(std::uint8_t x) noexcept {
-  return x < 10 ? 1 : (x < 100 ? 2 : 3);
+constexpr std::size_t length(std::uint32_t x) noexcept {
+  std::size_t number_of_digits = 0;
+  do {
+    ++number_of_digits;
+    x /= 10;
+  } while (x != 0);
+
+  return number_of_digits;
 }
 
 constexpr bool equals(const char* first, const char* last, std::string_view str) noexcept {
@@ -159,7 +162,7 @@ constexpr bool equals(const char* first, const char* last, std::string_view str)
   return true;
 }
 
-constexpr char* to_chars(char* str, std::uint8_t x, bool dot = true) noexcept {
+constexpr char* to_chars(char* str, std::uint32_t x, bool dot = true) noexcept {
   do {
     *(--str) = static_cast<char>('0' + (x % 10));
     x /= 10;
@@ -172,14 +175,23 @@ constexpr char* to_chars(char* str, std::uint8_t x, bool dot = true) noexcept {
   return str;
 }
 
-constexpr const char* from_chars(const char* first, const char* last, std::uint8_t& d) noexcept {
+constexpr char* to_chars(char* str, std::string_view s) noexcept {
+  for (std::size_t i = s.size(); i > 0; --i) {
+    *(--str) = s[i - 1];
+  }
+
+  return str;
+}
+
+constexpr const char* from_chars(const char* first, const char* last, std::uint32_t& d) noexcept {
   if (first != last && is_digit(*first)) {
+    int i = 0;
     std::int32_t t = 0;
-    for (; first != last && is_digit(*first); ++first) {
+    for (; first != last && is_digit(*first); ++first, ++i) {
       t = t * 10 + to_digit(*first);
     }
-    if (t <= (std::numeric_limits<std::uint8_t>::max)()) {
-      d = static_cast<std::uint8_t>(t);
+    if (i <= std::numeric_limits<std::uint32_t>::digits10) {
+      d = t;
       return first;
     }
   }
@@ -197,14 +209,35 @@ constexpr bool substr(std::string_view str, std::size_t pos, std::size_t len, st
 }
 
 constexpr int compare(std::string_view lhs, std::string_view rhs) {
-  for (std::size_t i = 0; i < std::min(lhs.size(), rhs.size()); ++i) {
-    if (static_cast<unsigned char>(lhs[i]) < static_cast<unsigned char>(rhs[i]))
-      return -1;
-    else if (static_cast<unsigned char>(lhs[i]) > static_cast<unsigned char>(rhs[i]))
-      return 1;
-  }
+#if defined(_MSC_VER) && _MSC_VER < 1920 && !defined(__clang__)
+  // https://developercommunity.visualstudio.com/content/problem/360432/vs20178-regression-c-failed-in-test.html
+  // https://developercommunity.visualstudio.com/content/problem/232218/c-constexpr-string-view.html
+  constexpr bool workaround = true;
+#else
+  constexpr bool workaround = false;
+#endif
+  if constexpr (workaround) {
+    const auto size = std::min(lhs.size(), rhs.size());
+    for (std::size_t i = 0; i < size; ++i) {
+      if (lhs[i] < rhs[i]) {
+        return -1;
+      } else if (lhs[i] > rhs[i]) {
+        return 1;
+      }
+    }
 
-  return lhs.size() < rhs.size() ? -1 : lhs.size() > rhs.size() ? 1 : 0;
+    if (lhs.size() < rhs.size()) {
+      return -1;
+    }
+
+    if (lhs.size() > rhs.size()) {
+      return 1;
+    }
+
+    return 0;
+  } else {
+    return lhs.compare(rhs);
+  }
 }
 
 constexpr bool compare_equal(std::string_view lhs, std::string_view rhs) {
@@ -308,7 +341,7 @@ public:
     return { token_type::eol, {} };
   }
 
-  constexpr bool get_int(std::size_t pos, std::size_t len, std::uint8_t& result) const noexcept {
+  constexpr bool get_int(std::size_t pos, std::size_t len, std::uint32_t& result) const noexcept {
     if (!from_chars(text.data() + pos, text.data() + pos + len, result)) {
       return false;
     }
@@ -392,7 +425,7 @@ public:
     skip_whitespaces();
   }
 
-  constexpr void parse_core(std::uint8_t& major, std::uint8_t& minor, std::uint8_t& patch) {
+  constexpr void parse_core(std::uint32_t& major, std::uint32_t& minor, std::uint32_t& patch) {
     lexer_.get_int(token_.range.pos, token_.range.len, major);
     advance(token_type::integer);
     advance(token_type::dot);
@@ -405,7 +438,7 @@ public:
     advance(token_type::integer);
   }
 
-  constexpr std::string_view parse_prerelease_tag() {
+  constexpr std::string_view parse_prerelease() {
     if (token_.type != token_type::hyphen)
       return {};
 
@@ -499,23 +532,25 @@ private:
 } // namespace semver::detail
 
 class version {
-  std::uint8_t major             = 0;
-  std::uint8_t minor             = 1;
-  std::uint8_t patch             = 0;
-  std::string_view prerelease_tag = {};
+  std::uint32_t major              = 0;
+  std::uint32_t minor              = 1;
+  std::uint32_t patch              = 0;
+  std::string_view prerelease     = {};
   std::string_view build_metadata = {};
 
 public:
-  constexpr version(std::uint8_t major,
-                    std::uint8_t minor,
-                    std::uint8_t patch,
-                    std::string_view prerelease_tag = {},
-                    std::string_view build_metadata = {}) noexcept
-        : major(major),
-          minor(minor),
-          patch(patch),
-          prerelease_tag(prerelease_tag),
-          build_metadata(build_metadata) {
+  constexpr version(std::uint32_t mj,
+                    std::uint32_t mn,
+                    std::uint32_t pt,
+                    std::string_view pr = {},
+                    std::string_view bm = {}) noexcept
+        : major(mj),
+          minor(mn),
+          patch(pt),
+          prerelease(pr),
+          build_metadata(bm) {
+            // TODO: add validate prerelease
+            // TODO: add validate build_metadata
   }
 
   explicit constexpr version(std::string_view str) : version(0, 0, 0) {
@@ -541,9 +576,10 @@ public:
 
     detail::lexer lexer(std::string_view(first, last - first));
     detail::version_parser parser(lexer, detail::token(detail::token_type::none, {}));
+    // TODO: add error handle due std::errc
 
     parser.parse_core(major, minor, patch);
-    prerelease_tag = parser.parse_prerelease_tag();
+    prerelease = parser.parse_prerelease();
     build_metadata = parser.parse_build();
 
     return {first, std::errc{}};
@@ -551,30 +587,32 @@ public:
 
   [[nodiscard]] constexpr to_chars_result to_chars(char* first, char* last) const noexcept {
     const auto length = string_length();
-    if (first == nullptr || last == nullptr || (last - first) < length) {
+    if (first == nullptr || last == nullptr || (last - first) < 0 || static_cast<std::size_t>(last - first) < length) {
       return {last, std::errc::value_too_large};
     }
 
-    // auto next = first + length;
-    // if (prerelease_type != prerelease::none) {
-    //   if (prerelease_number != 0) {
-    //     next = detail::to_chars(next, prerelease_number);
-    //   }
-    //   next = detail::to_chars(next, prerelease_type);
-    // }
-    // next = detail::to_chars(next, patch);
-    // next = detail::to_chars(next, minor);
-    // next = detail::to_chars(next, major, false);
-
+    auto next = first + length;
+    if (prerelease.length() > 0) {
+      if (build_metadata.length() > 0) {
+        next = detail::to_chars(next, build_metadata);
+      }
+      next = detail::to_chars(next, prerelease);
+    }
+    next = detail::to_chars(next, patch);
+    next = detail::to_chars(next, minor);
+    next = detail::to_chars(next, major, false);
     return {first + length, std::errc{}};
   }
 
   [[nodiscard]] constexpr bool from_string_noexcept(std::string_view str) noexcept {
-    return from_chars(str.data(), str.data() + str.length());
+    const auto from_chars_result = from_chars(str.data(), str.data() + str.length());
+
+    return from_chars_result.ec != std::errc{};
   }
 
   constexpr version& from_string(std::string_view str) {
-    if (!from_string_noexcept(str)) {
+    const auto from_chars_result = from_chars(str.data(), str.data() + str.length());
+    if (from_chars_result.ec != std::errc{}) {
       NEARGYE_THROW(std::invalid_argument{"semver::version::from_string invalid version."});
     }
 
@@ -583,26 +621,17 @@ public:
 
   [[nodiscard]] std::string to_string() const {
     auto str = std::string(string_length(), '\0');
-    if (!to_chars(str.data(), str.data() + str.length())) {
+    const auto to_chars_result = to_chars(str.data(), str.data() + str.length());
+    if (to_chars_result.ec != std::errc{}) {
       NEARGYE_THROW(std::invalid_argument{"semver::version::to_string invalid version."});
     }
 
     return str;
   }
 
-  [[nodiscard]] constexpr std::uint8_t string_length() const noexcept {
-    // (<major>) + 1(.) + (<minor>) + 1(.) + (<patch>)
-    auto length = detail::length(major) + detail::length(minor) + detail::length(patch) + 2;
-    // if (prerelease_type != prerelease::none) {
-    //   // + 1(-) + (<prerelease>)
-    //   length += detail::length(prerelease_type) + 1;
-    //   if (prerelease_number != 0) {
-    //     // + 1(.) + (<prereleaseversion>)
-    //     length += detail::length(prerelease_number) + 1;
-    //   }
-    // }
-
-    return static_cast<std::uint8_t>(length);
+  [[nodiscard]] constexpr std::size_t string_length() const noexcept {
+    // length(<major>) + length(.) + length(<minor>) + length(.) + length(<patch>) + length(<prerelease>) + length(<build_metadata>)
+    return detail::length(major) + detail::length(minor) + detail::length(patch) + 2 + prerelease.length() + build_metadata.length();
   }
 
   [[nodiscard]] constexpr int compare(const version& other) const noexcept {
@@ -618,12 +647,12 @@ public:
       return patch - other.patch;
     }
 
-    int pre_release_compare = detail::compare(prerelease_tag, other.prerelease_tag);
+    const int pre_release_compare = detail::compare(prerelease, other.prerelease);
     if (pre_release_compare != 0) {
         return pre_release_compare;
     }
 
-    int build_metadata_compare = detail::compare(build_metadata, other.build_metadata);
+    const int build_metadata_compare = detail::compare(build_metadata, other.build_metadata);
     if (build_metadata_compare != 0) {
         return build_metadata_compare;
     }
@@ -631,15 +660,47 @@ public:
     return 0;
   }
 
-  constexpr std::uint8_t get_major() const noexcept { return major; }
+  [[nodiscard]] constexpr std::uint32_t get_major() const noexcept { return major; }
 
-  constexpr std::uint8_t get_minor() const noexcept { return minor; }
+  constexpr version& set_major(std::uint32_t mj) noexcept {
+    major = mj;
 
-  constexpr std::uint8_t get_patch() const noexcept { return patch; }
+    return *this;
+  }
 
-  constexpr std::string_view get_prerelease_tag() const noexcept { return prerelease_tag; }
+  [[nodiscard]] constexpr std::uint32_t get_minor() const noexcept { return minor; }
 
-  constexpr std::string_view get_build_metadata() const noexcept { return build_metadata; }
+  constexpr version& set_minor(std::uint32_t mn) noexcept {
+    minor = mn;
+
+    return *this;
+  }
+
+  [[nodiscard]] constexpr std::uint32_t get_patch() const noexcept { return patch; }
+
+  constexpr version& set_patch(std::uint32_t pt) noexcept {
+    patch = pt;
+
+    return *this;
+  }
+
+  [[nodiscard]] constexpr std::string_view get_prerelease() const noexcept { return prerelease; }
+
+  constexpr version& set_prerelease(std::string_view pr) {
+    // TODO: add validate prerelease
+    prerelease = pr;
+
+    return *this;
+  }
+
+  [[nodiscard]] constexpr std::string_view get_build_metadata() const noexcept { return build_metadata; }
+
+  constexpr version& set_build_metadata(std::string_view bm) {
+    // TODO: add validate build_metadata
+    build_metadata = bm;
+
+    return *this;
+  }
 };
 
 [[nodiscard]] constexpr bool operator==(const version& lhs, const version& rhs) noexcept {
@@ -683,11 +744,11 @@ public:
 }
 
 [[nodiscard]] constexpr std::optional<version> from_string_noexcept(std::string_view str) noexcept {
-  if (version v{}; v.from_string_noexcept(str)) {
+  if (version v; v.from_string_noexcept(str)) {
     return v;
   }
 
-  return std::nullopt;
+  return {};
 }
 
 [[nodiscard]] constexpr version from_string(std::string_view str) {
@@ -718,6 +779,7 @@ enum struct comparators_option : std::uint8_t {
   if (option == comparators_option::exclude_prerelease) {
     return version{lhs.get_major(), lhs.get_minor(), lhs.get_patch()}.compare(version{rhs.get_major(), rhs.get_minor(), rhs.get_patch()});
   }
+
   return lhs.compare(rhs);
 }
 
@@ -766,7 +828,7 @@ class range {
 
     auto is_int = [&parser]() constexpr noexcept -> bool { return parser.current_token.type == token_type::integer; };
 
-    const bool has_prerelease = !ver.get_prerelease_tag().empty();
+    const bool has_prerelease = !ver.get_prerelease().empty();
 
     do {
       if (is_logical_or()) {
@@ -871,18 +933,18 @@ private:
     constexpr version parse_version() {
       version_parser version_parser(lexer_, current_token);
 
-      std::uint8_t major = 0;
-      std::uint8_t minor = 0;
-      std::uint8_t patch = 0;
+      std::uint32_t major = 0;
+      std::uint32_t minor = 0;
+      std::uint32_t patch = 0;
       version_parser.parse_core(major, minor, patch);
 
-      const auto prerelease_tag = version_parser.parse_prerelease_tag();
+      const auto prerelease = version_parser.parse_prerelease();
       const auto build_metadata = version_parser.parse_build();
 
       current_token = version_parser.get_token();
       lexer_ = version_parser.get_lexer();
 
-      return {major, minor, patch, prerelease_tag, build_metadata};
+      return {major, minor, patch, prerelease, build_metadata};
     }
   };
 
