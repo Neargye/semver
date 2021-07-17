@@ -43,6 +43,7 @@
 #define SEMVER_VERSION_MINOR 3
 #define SEMVER_VERSION_PATCH 0
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <iosfwd>
