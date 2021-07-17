@@ -97,6 +97,8 @@ struct to_chars_result {
 };
 #endif
 
+using int_t = std::uint32_t;
+
 namespace detail {
 
 // Min version string length = 1(<major>) + 1(.) + 1(<minor>) + 1(.) + 1(<patch>) = 5.
@@ -142,7 +144,7 @@ constexpr std::uint8_t to_digit(char c) noexcept {
   return static_cast<std::uint8_t>(c - '0');
 }
 
-constexpr std::size_t length(std::uint32_t x) noexcept {
+constexpr std::size_t length(int_t x) noexcept {
   std::size_t number_of_digits = 0;
   do {
     ++number_of_digits;
@@ -162,7 +164,7 @@ constexpr bool equals(const char* first, const char* last, std::string_view str)
   return true;
 }
 
-constexpr char* to_chars(char* str, std::uint32_t x, bool dot = true) noexcept {
+constexpr char* to_chars(char* str, int_t x, bool dot = true) noexcept {
   do {
     *(--str) = static_cast<char>('0' + (x % 10));
     x /= 10;
@@ -183,14 +185,14 @@ constexpr char* to_chars(char* str, std::string_view s) noexcept {
   return str;
 }
 
-constexpr const char* from_chars(const char* first, const char* last, std::uint32_t& d) noexcept {
+constexpr const char* from_chars(const char* first, const char* last, int_t& d) noexcept {
   if (first != last && is_digit(*first)) {
-    int i = 0;
-    std::int32_t t = 0;
+    int i   = 0;
+    int_t t = 0;
     for (; first != last && is_digit(*first); ++first, ++i) {
       t = t * 10 + to_digit(*first);
     }
-    if (i <= std::numeric_limits<std::uint32_t>::digits10) {
+    if (i <= std::numeric_limits<int_t>::digits10) {
       d = t;
       return first;
     }
@@ -341,7 +343,7 @@ public:
     return { token_type::eol, {} };
   }
 
-  constexpr bool get_int(std::size_t pos, std::size_t len, std::uint32_t& result) const noexcept {
+  constexpr bool get_int(std::size_t pos, std::size_t len, int_t& result) const noexcept {
     if (!from_chars(text.data() + pos, text.data() + pos + len, result)) {
       return false;
     }
@@ -425,7 +427,7 @@ public:
     skip_whitespaces();
   }
 
-  constexpr void parse_core(std::uint32_t& major, std::uint32_t& minor, std::uint32_t& patch) {
+  constexpr void parse_core(int_t& major, int_t& minor, int_t& patch) {
     lexer_.get_int(token_.range.pos, token_.range.len, major);
     advance(token_type::integer);
     advance(token_type::dot);
@@ -532,16 +534,16 @@ private:
 } // namespace semver::detail
 
 class version {
-  std::uint32_t major              = 0;
-  std::uint32_t minor              = 1;
-  std::uint32_t patch              = 0;
+  int_t major                     = 0;
+  int_t minor                     = 1;
+  int_t patch                     = 0;
   std::string_view prerelease     = {};
   std::string_view build_metadata = {};
 
 public:
-  constexpr version(std::uint32_t mj,
-                    std::uint32_t mn,
-                    std::uint32_t pt,
+  constexpr version(int_t mj,
+                    int_t mn,
+                    int_t pt,
                     std::string_view pr = {},
                     std::string_view bm = {}) noexcept
         : major(mj),
@@ -549,8 +551,8 @@ public:
           patch(pt),
           prerelease(pr),
           build_metadata(bm) {
-            // TODO: add validate prerelease
-            // TODO: add validate build_metadata
+    // TODO: add validate prerelease
+    // TODO: add validate build_metadata
   }
 
   explicit constexpr version(std::string_view str) : version(0, 0, 0) {
@@ -660,25 +662,25 @@ public:
     return 0;
   }
 
-  [[nodiscard]] constexpr std::uint32_t get_major() const noexcept { return major; }
+  [[nodiscard]] constexpr int_t get_major() const noexcept { return major; }
 
-  constexpr version& set_major(std::uint32_t mj) noexcept {
+  constexpr version& set_major(int_t mj) noexcept {
     major = mj;
 
     return *this;
   }
 
-  [[nodiscard]] constexpr std::uint32_t get_minor() const noexcept { return minor; }
+  [[nodiscard]] constexpr int_t get_minor() const noexcept { return minor; }
 
-  constexpr version& set_minor(std::uint32_t mn) noexcept {
+  constexpr version& set_minor(int_t mn) noexcept {
     minor = mn;
 
     return *this;
   }
 
-  [[nodiscard]] constexpr std::uint32_t get_patch() const noexcept { return patch; }
+  [[nodiscard]] constexpr int_t get_patch() const noexcept { return patch; }
 
-  constexpr version& set_patch(std::uint32_t pt) noexcept {
+  constexpr version& set_patch(int_t pt) noexcept {
     patch = pt;
 
     return *this;
@@ -933,9 +935,9 @@ private:
     constexpr version parse_version() {
       version_parser version_parser(lexer_, current_token);
 
-      std::uint32_t major = 0;
-      std::uint32_t minor = 0;
-      std::uint32_t patch = 0;
+      int_t major = 0;
+      int_t minor = 0;
+      int_t patch = 0;
       version_parser.parse_core(major, minor, patch);
 
       const auto prerelease = version_parser.parse_prerelease();
