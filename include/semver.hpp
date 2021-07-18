@@ -141,6 +141,7 @@ constexpr std::uint8_t to_digit(char c) noexcept {
 }
 
 constexpr std::size_t length(int_t x) noexcept {
+  // TODO: more fast
   std::size_t number_of_digits = 0;
   do {
     ++number_of_digits;
@@ -184,12 +185,12 @@ constexpr const char* from_chars(const char* first, const char* last, int_t& d) 
 }
 
 constexpr bool substr(std::string_view str, std::size_t pos, std::size_t len, std::string_view& result) noexcept {
-  if (pos > str.size())
+  if (pos > str.size()) {
     return false;
+  }
 
   result = std::string_view{str.data() + pos, len};
-
-  return true;
+  return result.length() == len;
 }
 
 constexpr int compare(std::string_view lhs, std::string_view rhs) {
@@ -274,7 +275,7 @@ struct token {
 
 class lexer {
  public:
-  constexpr explicit lexer(std::string_view text_) noexcept : text_(text_), current_pos_(0) { }
+  constexpr explicit lexer(std::string_view text) noexcept : text_(text), current_pos_(0) { }
 
   constexpr token get_next_token() noexcept {
     if (eol()) {
@@ -326,19 +327,11 @@ class lexer {
   }
 
   constexpr bool get_int(std::size_t pos, std::size_t len, int_t& result) const noexcept {
-    if (!from_chars(text_.data() + pos, text_.data() + pos + len, result)) {
-      return false;
-    }
-
-    return true;
+    return from_chars(text_.data() + pos, text_.data() + pos + len, result);
   }
 
   constexpr bool get_string(std::size_t pos, std::size_t len, std::string_view& result) const noexcept {
-    if (!substr(text_, pos, len, result)) {
-      return false;
-    }
-
-    return true;
+    return substr(text_, pos, len, result);
   }
 
   constexpr bool get_operator(std::size_t pos, std::size_t len, range_operator& result) const noexcept {
@@ -401,29 +394,42 @@ private:
 
 class version_parser {
  public:
-  constexpr explicit version_parser(const lexer& lexer, const token& token) : lexer_(lexer), token_(token) {
+  constexpr explicit version_parser(const lexer& lexer, const token& token) : lexer_(lexer), token_(token), length_(0) {
     if (token.type == token_type::none) {
       advance(token_type::none);
     }
     skip_whitespaces();
   }
 
-  constexpr void parse_core(int_t& major, int_t& minor, int_t& patch) {
-    lexer_.get_int(token_.range.pos, token_.range.len, major);
-    advance(token_type::integer);
-    advance(token_type::dot);
+  constexpr bool parse_core(int_t& major, int_t& minor, int_t& patch) {
+    if (lexer_.get_int(token_.range.pos, token_.range.len, major)) {
+      advance(token_type::integer);
+      advance(token_type::dot);
+    } else {
+      return false;
+    }
 
-    lexer_.get_int(token_.range.pos, token_.range.len, minor);
-    advance(token_type::integer);
-    advance(token_type::dot);
+    if (lexer_.get_int(token_.range.pos, token_.range.len, minor)) {
+      advance(token_type::integer);
+      advance(token_type::dot);
+    } else {
+      return false;
+    }
 
-    lexer_.get_int(token_.range.pos, token_.range.len, patch);
-    advance(token_type::integer);
+    if (lexer_.get_int(token_.range.pos, token_.range.len, patch)) {
+      advance(token_type::integer);
+    } else {
+      return false;
+    }
+
+    return true;
   }
 
-  constexpr std::string_view parse_prerelease() {
-    if (token_.type != token_type::hyphen)
-      return {};
+  constexpr bool parse_prerelease(std::string_view& prerelease) {
+    if (token_.type != token_type::hyphen) {
+      prerelease = {};
+      return true;
+    }
 
     advance(token_type::hyphen);
 
@@ -435,23 +441,21 @@ class version_parser {
         break;
 
       if (!is_alphanumeric() && !is_integer()) {
-        // TODO: throw invalid version syntax
-        break;
+        return false;
       }
 
       len += token_.range.len;
       advance(token_.type);
     }
 
-    std::string_view result;
-    lexer_.get_string(pos, len, result);
-
-    return result;
+    return lexer_.get_string(pos, len, prerelease);
   }
 
-  constexpr std::string_view parse_build() {
-    if (token_.type != token_type::plus)
-      return {};
+  constexpr bool parse_build(std::string_view& build_metadata) {
+    if (token_.type != token_type::plus) {
+      build_metadata = {};
+      return true;
+    }
 
     advance(token_type::plus);
 
@@ -460,27 +464,26 @@ class version_parser {
 
     while (!is_eol()) {
       if (!is_alphanumeric() && !is_integer()) {
-        // TODO: throw invalid version syntax
-        break;
+        return false;
       }
 
       len += token_.range.len;
       advance(token_.type);
     }
 
-    std::string_view result;
-    lexer_.get_string(pos, len, result);
-
-    return result;
+    return lexer_.get_string(pos, len, build_metadata);
   }
 
   constexpr token get_token() const noexcept { return token_; }
 
   constexpr lexer get_lexer() const noexcept { return lexer_; }
 
+  constexpr std::size_t get_length() const noexcept { return length_; }
+
 private:
   lexer lexer_;
   token token_;
+  std::size_t length_;
 
   constexpr void skip_whitespaces() {
     while (token_.type == token_type::space) {
@@ -553,19 +556,20 @@ public:
   version& operator=(version&&) = default;
 
   [[nodiscard]] constexpr from_chars_result from_chars(const char* first, const char* last) noexcept {
-    if (first == nullptr || last == nullptr || (last - first) < detail::min_version_string_length) {
+    const auto length = (last - first);
+    if (first == nullptr || last == nullptr || length < 0 || length < detail::min_version_string_length) {
       return {first, std::errc::invalid_argument};
     }
 
-    detail::lexer lexer(std::string_view(first, last - first));
-    detail::version_parser parser(lexer, detail::token(detail::token_type::none, {}));
-    // TODO: add error handle due std::errc
+    detail::lexer lexer(std::string_view(first, static_cast<std::size_t>(length)));
+    detail::version_parser parser(lexer, detail::token(detail::token_type::none, {0, 0}));
 
-    parser.parse_core(major, minor, patch);
-    prerelease = parser.parse_prerelease();
-    build_metadata = parser.parse_build();
+    if (parser.parse_core(major, minor, patch) && parser.parse_prerelease(prerelease) && parser.parse_build(build_metadata)) {
+      return {first + parser.get_length(), std::errc{}};
+    }
 
-    return {first, std::errc{}};
+    //TODO: std::errc::result_out_of_range
+    return {first, std::errc::invalid_argument};
   }
 
   [[nodiscard]] constexpr to_chars_result to_chars(char* first, char* last) const noexcept {
@@ -920,8 +924,10 @@ private:
       int_t patch = 0;
       version_parser.parse_core(major, minor, patch);
 
-      const auto prerelease = version_parser.parse_prerelease();
-      const auto build_metadata = version_parser.parse_build();
+      std::string_view prerelease;
+      version_parser.parse_prerelease(prerelease);
+      std::string_view build_metadata;
+      version_parser.parse_build(build_metadata);
 
       current_token = version_parser.get_token();
       lexer_ = version_parser.get_lexer();
