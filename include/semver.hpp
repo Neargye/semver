@@ -150,15 +150,11 @@ constexpr std::size_t length(int_t x) noexcept {
   return number_of_digits;
 }
 
-constexpr char* to_chars(char* str, int_t x, bool dot = true) noexcept {
+constexpr char* to_chars(char* str, int_t x) noexcept {
   do {
     *(--str) = static_cast<char>('0' + (x % 10));
     x /= 10;
   } while (x != 0);
-
-  if (dot) {
-    *(--str) = '.';
-  }
 
   return str;
 }
@@ -586,20 +582,20 @@ public:
       next = detail::to_chars(next, prerelease);
     }
     next = detail::to_chars(next, patch);
+    *(--next) = '.';
     next = detail::to_chars(next, minor);
-    next = detail::to_chars(next, major, false);
+    *(--next) = '.';
+    next = detail::to_chars(next, major);
+
     return {first + length, std::errc{}};
   }
 
   [[nodiscard]] constexpr bool from_string_noexcept(std::string_view str) noexcept {
-    const auto from_chars_result = from_chars(str.data(), str.data() + str.length());
-
-    return from_chars_result.ec != std::errc{};
+    return from_chars(str.data(), str.data() + str.length());
   }
 
   constexpr version& from_string(std::string_view str) {
-    const auto from_chars_result = from_chars(str.data(), str.data() + str.length());
-    if (from_chars_result.ec != std::errc{}) {
+    if (!from_chars(str.data(), str.data() + str.length())) {
       NEARGYE_THROW(std::invalid_argument{"semver::version::from_string invalid version."});
     }
 
@@ -608,8 +604,7 @@ public:
 
   [[nodiscard]] std::string to_string() const {
     auto str = std::string(string_length(), '\0');
-    const auto to_chars_result = to_chars(str.data(), str.data() + str.length());
-    if (to_chars_result.ec != std::errc{}) {
+    if (!to_chars(str.data(), str.data() + str.length())) {
       NEARGYE_THROW(std::invalid_argument{"semver::version::to_string invalid version."});
     }
 
@@ -636,12 +631,12 @@ public:
 
     const int pre_release_compare = detail::compare(prerelease, other.prerelease);
     if (pre_release_compare != 0) {
-        return pre_release_compare;
+      return pre_release_compare;
     }
 
     const int build_metadata_compare = detail::compare(build_metadata, other.build_metadata);
     if (build_metadata_compare != 0) {
-        return build_metadata_compare;
+      return build_metadata_compare;
     }
 
     return 0;
@@ -735,7 +730,7 @@ public:
     return v;
   }
 
-  return {};
+  return std::nullopt;
 }
 
 [[nodiscard]] constexpr version from_string(std::string_view str) {

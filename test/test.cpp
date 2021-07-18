@@ -388,6 +388,7 @@ TEST_CASE("from/to string") {
       "99999999999999999999999.999999999999999999.99999999999999999",
       "1.0.0-0A.is.legal"
   }};
+  (void) versions_strings;
 }
 
 // TEST_CASE("from/to string") {
