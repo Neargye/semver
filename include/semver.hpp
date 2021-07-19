@@ -240,7 +240,8 @@ enum class token_type : std::uint8_t {
   hyphen,
   letter,
   range_operator,
-  logical_or
+  logical_or,
+  unexpected
 };
 
 enum class range_operator : std::uint8_t {
@@ -279,51 +280,50 @@ class lexer {
 
   constexpr token get_next_token() noexcept {
     if (eol()) {
-      return { token_type::eol, {} };
+      return {token_type::eol, {}};
     }
 
     const auto pos = current_pos_;
 
     if (is_space(text_[pos])) {
       advance(1);
-      return { token_type::space, { pos, 1 } };
+      return {token_type::space, {pos, 1}};
     }
 
     if (is_digit(text_[pos])) {
-      return { token_type::integer, get_int_range() };
+      return {token_type::integer, get_int_range()};
     }
 
     if (is_dot(text_[pos])) {
       advance(1);
-      return { token_type::dot, { pos, 1 } };
+      return {token_type::dot, {pos, 1}};
     }
 
     if (is_hyphen(text_[pos])) {
       advance(1);
-      return { token_type::hyphen, { pos, 1 } };
+      return {token_type::hyphen, {pos, 1}};
     }
 
     if (is_plus(text_[pos])) {
       advance(1);
-      return { token_type::plus, { pos, 1 } };
+      return {token_type::plus, {pos, 1}};
     }
 
     if (is_letter(text_[pos])) {
       advance(1);
-      return { token_type::letter, { pos, 1 } };
+      return {token_type::letter, {pos, 1}};
     }
 
-    if(is_logical_or(text_[pos])) {
+    if (is_logical_or(text_[pos])) {
       advance(2);
-      return { token_type::logical_or, { pos, 2 } };
+      return {token_type::logical_or, {pos, 2}};
     }
 
     if (is_operator(text_[pos])) {
-      return { token_type::range_operator, get_operator_range() };
+      return {token_type::range_operator, get_operator_range()};
     }
 
-    // TODO: throw unexpected symbol
-    return { token_type::eol, {} };
+    return {token_type::unexpected, {}};
   }
 
   constexpr bool get_int(std::size_t pos, std::size_t len, int_t& result) const noexcept {
@@ -357,7 +357,7 @@ class lexer {
     return true;
   }
 
-private:
+ private:
   std::string_view text_;
   std::size_t current_pos_;
 
@@ -372,7 +372,7 @@ private:
       advance(1);
     }
 
-    return { pos, len };
+    return {pos, len};
   }
 
   constexpr token_range get_operator_range() noexcept {
@@ -386,7 +386,7 @@ private:
       }
     }
 
-    return { pos, len };
+    return {pos, len};
   }
 
   constexpr void advance(std::size_t step) noexcept { current_pos_ += step; }
@@ -480,10 +480,10 @@ class version_parser {
 
   constexpr std::size_t get_length() const noexcept { return length_; }
 
-private:
+ private:
   lexer lexer_;
   token token_;
-  std::size_t length_;
+  std::size_t length_; // TODO: IMPL
 
   constexpr void skip_whitespaces() {
     while (token_.type == token_type::space) {
@@ -491,11 +491,13 @@ private:
     }
   }
 
-  constexpr void advance(token_type expected_token) {
+  [[nodiscard]] constexpr bool advance(token_type expected_token) {
     if (token_.type != expected_token) {
-      // TODO: throw unexpected token
+      return false;
     }
+
     token_ = lexer_.get_next_token();
+    return token_.type != token_type::unexpected;
   }
 
   constexpr bool is_eol() const {
@@ -524,7 +526,7 @@ class version {
   std::string_view prerelease     = {};
   std::string_view build_metadata = {};
 
-public:
+ public:
   constexpr version(int_t mj,
                     int_t mn,
                     int_t pt,
@@ -568,7 +570,7 @@ public:
       return {first + parser.get_length(), std::errc{}};
     }
 
-    //TODO: std::errc::result_out_of_range
+    // TODO: std::errc::result_out_of_range
     return {first, std::errc::invalid_argument};
   }
 
@@ -856,7 +858,7 @@ class range {
     return false;
   }
 
-private:
+ private:
   struct range_comparator {
     range_operator op;
     version ver;
