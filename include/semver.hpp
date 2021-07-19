@@ -395,34 +395,22 @@ class lexer {
 class version_parser {
  public:
   constexpr explicit version_parser(const lexer& lexer, const token& token) : lexer_(lexer), token_(token), length_(0) {
+    // TODO: err handle
     if (token.type == token_type::none) {
-      advance(token_type::none);
+      [[maybe_unused]] bool success = advance(token_type::none);
     }
-    skip_whitespaces();
+    [[maybe_unused]] bool success = skip_whitespaces();
   }
 
-  constexpr bool parse_core(int_t& major, int_t& minor, int_t& patch) {
-    if (lexer_.get_int(token_.range.pos, token_.range.len, major)) {
-      advance(token_type::integer);
-      advance(token_type::dot);
-    } else {
-      return false;
-    }
-
-    if (lexer_.get_int(token_.range.pos, token_.range.len, minor)) {
-      advance(token_type::integer);
-      advance(token_type::dot);
-    } else {
-      return false;
-    }
-
-    if (lexer_.get_int(token_.range.pos, token_.range.len, patch)) {
-      advance(token_type::integer);
-    } else {
-      return false;
-    }
-
-    return true;
+  constexpr bool parse_core(int_t &major, int_t &minor, int_t &patch) {
+    return lexer_.get_int(token_.range.pos, token_.range.len, major) &&
+           advance(token_type::integer) &&
+           advance(token_type::dot) &&
+           lexer_.get_int(token_.range.pos, token_.range.len, minor) &&
+           advance(token_type::integer) &&
+           advance(token_type::dot) &&
+           lexer_.get_int(token_.range.pos, token_.range.len, patch) &&
+           advance(token_type::integer);
   }
 
   constexpr bool parse_prerelease(std::string_view& prerelease) {
@@ -431,7 +419,9 @@ class version_parser {
       return true;
     }
 
-    advance(token_type::hyphen);
+    if (!advance(token_type::hyphen)) {
+      return false;
+    }
 
     const auto pos = token_.range.pos;
     std::size_t len = 0;
@@ -445,7 +435,9 @@ class version_parser {
       }
 
       len += token_.range.len;
-      advance(token_.type);
+      if (!advance(token_.type)) {
+        return false;
+      }
     }
 
     return lexer_.get_string(pos, len, prerelease);
@@ -457,7 +449,9 @@ class version_parser {
       return true;
     }
 
-    advance(token_type::plus);
+    if (!advance(token_type::plus)) {
+      return false;
+    }
 
     const auto pos = token_.range.pos;
     std::size_t len = 0;
@@ -468,7 +462,9 @@ class version_parser {
       }
 
       len += token_.range.len;
-      advance(token_.type);
+      if (!advance(token_.type)) {
+        return false;
+      }
     }
 
     return lexer_.get_string(pos, len, build_metadata);
@@ -485,10 +481,13 @@ class version_parser {
   token token_;
   std::size_t length_; // TODO: IMPL
 
-  constexpr void skip_whitespaces() {
+  constexpr bool skip_whitespaces() {
     while (token_.type == token_type::space) {
-      advance(token_type::space);
+      if (!advance(token_type::space)) {
+        return false;
+      }
     }
+    return true;
   }
 
   [[nodiscard]] constexpr bool advance(token_type expected_token) {
