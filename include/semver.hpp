@@ -616,6 +616,7 @@ class version {
     return str;
   }
 
+  // TODO: consider separator characters ('-' for prerelease, '+' for build metadata)
   [[nodiscard]] constexpr std::size_t string_length() const noexcept {
     // length(<major>) + length(.) + length(<minor>) + length(.) + length(<patch>) + length(<prerelease>) + length(<build_metadata>)
     return detail::length(major) + detail::length(minor) + detail::length(patch) + 2 + prerelease.length() + build_metadata.length();
@@ -634,14 +635,17 @@ class version {
       return patch - other.patch;
     }
 
-    const int pre_release_compare = detail::compare(prerelease, other.prerelease);
-    if (pre_release_compare != 0) {
-      return pre_release_compare;
+    int pre_release_compare = 0;
+    if (prerelease.empty() && !other.prerelease.empty()) {
+      pre_release_compare = 1;
+    } else if (!prerelease.empty() && other.prerelease.empty()) {
+      pre_release_compare = -1;
+    } else {
+      pre_release_compare = detail::compare(prerelease, other.prerelease);
     }
 
-    const int build_metadata_compare = detail::compare(build_metadata, other.build_metadata);
-    if (build_metadata_compare != 0) {
-      return build_metadata_compare;
+    if (pre_release_compare != 0) {
+      return pre_release_compare;
     }
 
     return 0;
