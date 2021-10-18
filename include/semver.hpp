@@ -56,13 +56,18 @@
 #include <system_error>
 #endif
 
-// Allow to disable exceptions.
-#if (defined(__cpp_exceptions) || defined(__EXCEPTIONS) || defined(_CPPUNWIND)) && !defined(SEMVER_NOEXCEPTION)
+#if defined(SEMVER_CONFIG_FILE)
+#include SEMVER_CONFIG_FILE
+#endif
+
+#if defined(SEMVER_THROW)
+// define SEMVER_THROW(exception) to override semver throw behavior.
+#elif defined(__cpp_exceptions) || defined(__EXCEPTIONS) || defined(_CPPUNWIND)
 #  include <stdexcept>
-#  define NEARGYE_THROW(exception) throw exception
+#  define SEMVER_THROW(exception) throw exception
 #else
 #  include <cstdlib>
-#  define NEARGYE_THROW(exception) std::abort()
+#  define SEMVER_THROW(exception) std::abort()
 #endif
 
 #if defined(__clang__)
@@ -338,7 +343,7 @@ struct version {
 
   constexpr version& from_string(std::string_view str) {
     if (!from_string_noexcept(str)) {
-      NEARGYE_THROW(std::invalid_argument{"semver::version::from_string invalid version."});
+      SEMVER_THROW(std::invalid_argument{"semver::version::from_string invalid version."});
     }
 
     return *this;
@@ -347,7 +352,7 @@ struct version {
   [[nodiscard]] std::string to_string() const {
     auto str = std::string(string_length(), '\0');
     if (!to_chars(str.data(), str.data() + str.length())) {
-      NEARGYE_THROW(std::invalid_argument{"semver::version::to_string invalid version."});
+      SEMVER_THROW(std::invalid_argument{"semver::version::to_string invalid version."});
     }
 
     return str;
@@ -580,7 +585,7 @@ private:
         case range_operator::less_or_equal:
           return version <= ver;
         default:
-          NEARGYE_THROW(std::invalid_argument{"semver::range unexpected operator."});
+          SEMVER_THROW(std::invalid_argument{"semver::range unexpected operator."});
       }
     }
   };
@@ -720,7 +725,7 @@ private:
 
     constexpr void advance_token(range_token_type token_type) {
       if (current_token.type != token_type) {
-        NEARGYE_THROW(std::invalid_argument{"semver::range unexpected token."});
+        SEMVER_THROW(std::invalid_argument{"semver::range unexpected token."});
       }
       current_token = lexer.get_next_token();
     }
@@ -793,7 +798,7 @@ constexpr bool satisfies(const version& ver, std::string_view str, satisfies_opt
   case satisfies_option::include_prerelease:
     return detail::range{str}.satisfies(ver, true);
   default:
-    NEARGYE_THROW(std::invalid_argument{"semver::range unexpected satisfies_option."});
+    SEMVER_THROW(std::invalid_argument{"semver::range unexpected satisfies_option."});
   }
 }
 
@@ -803,8 +808,6 @@ constexpr bool satisfies(const version& ver, std::string_view str, satisfies_opt
 inline constexpr auto semver_version = version{SEMVER_VERSION_MAJOR, SEMVER_VERSION_MINOR, SEMVER_VERSION_PATCH};
 
 } // namespace semver
-
-#undef NEARGYE_THROW
 
 #if defined(__clang__)
 #  pragma clang diagnostic pop
