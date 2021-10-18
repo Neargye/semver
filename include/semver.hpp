@@ -252,6 +252,20 @@ constexpr bool check_delimiter(const char* first, const char* last, char d) noex
   return first != last && first != nullptr && *first == d;
 }
 
+template <typename T, typename = void>
+struct resize_uninitialized {
+  static auto resize(T& str, std::size_t size) -> std::void_t<decltype(str.resize(size))> {
+    str.resize(size);
+  }
+};
+
+template <typename T>
+struct resize_uninitialized<T, std::void_t<decltype(std::declval<T>().__resize_default_init(42))>> {
+  static void resize(T& str, std::size_t size) {
+    str.__resize_default_init(size);
+  }
+};
+
 } // namespace semver::detail
 
 struct version {
@@ -350,7 +364,8 @@ struct version {
   }
 
   [[nodiscard]] std::string to_string() const {
-    auto str = std::string(string_length(), '\0');
+    auto str = std::string{};
+    detail::resize_uninitialized<std::string>::resize(str, string_length());
     if (!to_chars(str.data(), str.data() + str.length())) {
       SEMVER_THROW(std::invalid_argument{"semver::version::to_string invalid version."});
     }
