@@ -684,6 +684,14 @@ class version {
     return *this;
   }
 
+  constexpr bool set_prerelease_noexcept(std::string_view pr) noexcept{
+    if (bool valid = true) { // TODO: add validate prerelease
+      return prerelease = pr;
+    }
+
+    return false;
+  }
+
   [[nodiscard]] constexpr std::string_view get_build_metadata() const noexcept { return build_metadata; }
 
   constexpr version& set_build_metadata(std::string_view bm) {
@@ -691,6 +699,14 @@ class version {
     build_metadata = bm;
 
     return *this;
+  }
+
+  constexpr bool set_build_metadata_noexcept(std::string_view bm) noexcept {
+    if (bool valid = true) { // TODO: add validate prerelease
+      return build_metadata = bm;
+    }
+
+    return false;
   }
 };
 
