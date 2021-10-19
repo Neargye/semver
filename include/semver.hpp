@@ -61,13 +61,14 @@
 #endif
 
 #if defined(SEMVER_THROW)
-// define SEMVER_THROW(exception) to override semver throw behavior.
+// define SEMVER_THROW(msg) to override semver throw behavior.
 #elif defined(__cpp_exceptions) || defined(__EXCEPTIONS) || defined(_CPPUNWIND)
 #  include <stdexcept>
-#  define SEMVER_THROW(exception) throw exception
+#  define SEMVER_THROW(msg) (throw std::invalid_argument{msg})
 #else
+#  include <cassert>
 #  include <cstdlib>
-#  define SEMVER_THROW(exception) std::abort()
+#  define SEMVER_THROW(msg) (assert(!msg), std::abort())
 #endif
 
 #if defined(__clang__)
@@ -357,7 +358,7 @@ struct version {
 
   constexpr version& from_string(std::string_view str) {
     if (!from_string_noexcept(str)) {
-      SEMVER_THROW(std::invalid_argument{"semver::version::from_string invalid version."});
+      SEMVER_THROW("semver::version::from_string invalid version.");
     }
 
     return *this;
@@ -367,7 +368,7 @@ struct version {
     auto str = std::string{};
     detail::resize_uninitialized<std::string>::resize(str, string_length());
     if (!to_chars(str.data(), str.data() + str.length())) {
-      SEMVER_THROW(std::invalid_argument{"semver::version::to_string invalid version."});
+      SEMVER_THROW("semver::version::to_string invalid version.");
     }
 
     return str;
@@ -600,7 +601,7 @@ private:
         case range_operator::less_or_equal:
           return version <= ver;
         default:
-          SEMVER_THROW(std::invalid_argument{"semver::range unexpected operator."});
+          SEMVER_THROW("semver::range unexpected operator.");
       }
     }
   };
@@ -740,7 +741,7 @@ private:
 
     constexpr void advance_token(range_token_type token_type) {
       if (current_token.type != token_type) {
-        SEMVER_THROW(std::invalid_argument{"semver::range unexpected token."});
+        SEMVER_THROW("semver::range unexpected token.");
       }
       current_token = lexer.get_next_token();
     }
@@ -813,7 +814,7 @@ constexpr bool satisfies(const version& ver, std::string_view str, satisfies_opt
   case satisfies_option::include_prerelease:
     return detail::range{str}.satisfies(ver, true);
   default:
-    SEMVER_THROW(std::invalid_argument{"semver::range unexpected satisfies_option."});
+    SEMVER_THROW("semver::range unexpected satisfies_option.");
   }
 }
 
