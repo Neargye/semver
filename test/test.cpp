@@ -354,6 +354,41 @@ TEST_CASE("constructors") {
  }
 
 TEST_CASE("from/to string") {
+  constexpr std::array<version, 32> versions = {{
+    version{0, 0, 4},
+    version{1, 2, 3},
+    version{10, 20, 30},
+    version{1, 1, 2, "prerelease", "meta"},
+    version{1, 1, 2, "", "meta" },
+    version{1, 1, 2, "", "meta-valid" },
+    version{1, 0, 0, "alpha"},
+    version{1, 0, 0, "beta"},
+    version{1, 0, 0, "alpha.beta"},
+    version{1, 0, 0, "alpha.beta.1"},
+    version{1, 0, 0, "alpha.1"},
+    version{1, 0, 0, "alpha0.valid"},
+    version{1, 0, 0, "alpha.0valid"},
+    version{1, 0, 0, "alpha-a.b-c-somethinglong", "build.1-aef.1-its-okay"},
+    version{1, 2, 3, "rc.4"},
+    version{1, 0, 0, "rc.1", "build.1"},
+    version{2, 0, 0, "rc.1", "build.123"},
+    version{1, 2, 3, "beta"},
+    version{10, 2, 3, "DEV-SNAPSHOT"},
+    version{1, 2, 3, "SNAPSHOT-123"},
+    version{1, 0, 0},
+    version{2, 0, 0},
+    version{1, 1, 7},
+    version{2, 0, 0, "", "build.1848"},
+    version{2, 0, 1, "alpha.1227"},
+    version{1, 0, 0, "alpha", "beta"},
+    version{1, 2, 3, "---RC-SNAPSHOT.12.9.1--.12", "788"},
+    version{1, 2, 3, "---R-S.12.9.1--.12", "meta"},
+    version{1, 2, 3, "---RC-SNAPSHOT.12.9.1--.12"},
+    version{1, 0, 0, "", "0.build.1-rc.10000aaa-kk-0.1"},
+    version{999999999, 999999999, 999999999},
+    version{1, 0, 0, "0A.is.legal"}
+  }};
+
   constexpr std::array<std::string_view, 32> versions_strings = {{
       "0.0.4",
       "1.2.3",
@@ -385,108 +420,48 @@ TEST_CASE("from/to string") {
       "1.2.3----R-S.12.9.1--.12+meta",
       "1.2.3----RC-SNAPSHOT.12.9.1--.12",
       "1.0.0+0.build.1-rc.10000aaa-kk-0.1",
-      "99999999999999999999999.999999999999999999.99999999999999999",
+      "999999999.999999999.999999999",
       "1.0.0-0A.is.legal"
   }};
-  (void) versions_strings;
+
+  for (const auto& str: versions_strings) {
+    version v;
+    v.from_string(str);
+    CHECK(str == v.to_string());
+  }
+
+  SECTION("from chars") {
+    for (std::size_t i = 0; i < versions.size(); ++i) {
+      version v;
+      REQUIRE(v.from_chars(versions_strings[i].data(), versions_strings[i].data() + versions_strings[i].size()));
+      CHECK(v == versions[i]);
+    }
+  }
+
+  SECTION("to chars") {
+    for (std::size_t i = 0; i < versions.size(); ++i) {
+      std::array<char, 255> m = {};
+      REQUIRE(versions[i].to_chars(m.data(), m.data() + m.size()));
+      auto s = std::string_view{m.data()};
+      CHECK(s == versions_strings[i]);
+    }
+  }
+
+  SECTION("from string") {
+    for (std::size_t i = 0; i < versions.size(); ++i) {
+      version v;
+      v.from_string(versions_strings[i]);
+      CHECK(v == versions[i]);
+    }
+  }
+
+  SECTION("to string") {
+    for (std::size_t i = 0; i < versions.size(); ++i) {
+      auto s = versions[i].to_string();
+      CHECK(s == versions_strings[i]);
+    }
+  }
 }
-
-// TEST_CASE("from/to string") {
-//   constexpr std::array<version, 19> versions = {{
-//       version{1, 2, 3},
-//       version{255, 255, 255},
-//       version{0, 0, 0},
-//       //
-//       version{1, 2, 3, prerelease::none, 0},
-//       version{1, 2, 3, prerelease::none, 4},
-//       version{255, 255, 255, prerelease::none, 255},
-//       version{0, 0, 0, prerelease::none, 0},
-//       //
-//       version{1, 2, 3, prerelease::alpha, 0},
-//       version{1, 2, 3, prerelease::alpha, 4},
-//       version{255, 255, 255, prerelease::alpha, 255},
-//       version{0, 0, 0, prerelease::alpha, 0},
-//       //
-//       version{1, 2, 3, prerelease::beta, 0},
-//       version{1, 2, 3, prerelease::beta, 4},
-//       version{255, 255, 255, prerelease::beta, 255},
-//       version{0, 0, 0, prerelease::beta, 0},
-//       //
-//       version{1, 2, 3, prerelease::rc, 0},
-//       version{1, 2, 3, prerelease::rc, 4},
-//       version{255, 255, 255, prerelease::rc, 255},
-//       version{0, 0, 0, prerelease::rc, 0},
-//   }};
-
-//   constexpr std::array<std::string_view, 19> versions_strings = {{
-//       "1.2.3",
-//       "255.255.255",
-//       "0.0.0",
-//       //
-//       "1.2.3",
-//       "1.2.3",
-//       "255.255.255",
-//       "0.0.0",
-//       //
-//       "1.2.3-alpha",
-//       "1.2.3-alpha.4",
-//       "255.255.255-alpha.255",
-//       "0.0.0-alpha",
-//       //
-//       "1.2.3-beta",
-//       "1.2.3-beta.4",
-//       "255.255.255-beta.255",
-//       "0.0.0-beta",
-//       //
-//       "1.2.3-rc",
-//       "1.2.3-rc.4",
-//       "255.255.255-rc.255",
-//       "0.0.0-rc",
-//   }};
-
-//   SECTION("from chars") {
-//     version v;
-//     for (std::size_t i = 0; i < versions.size(); ++i) {
-//       REQUIRE(v.from_chars(versions_strings[i].data(), versions_strings[i].data() + versions_strings[i].size()));
-//       REQUIRE(versions[i] == v);
-//     }
-//   }
-
-//   SECTION("to chars") {
-//     for (std::size_t i = 0; i < versions.size(); ++i) {
-//       std::array<char, semver::max_version_string_length + 1> m = {};
-//       REQUIRE(versions[i].to_chars(m.data(), m.data() + m.size()));
-//       auto s = std::string_view{m.data()};
-//       REQUIRE(s == versions_strings[i]);
-//     }
-//   }
-
-//   SECTION("from string") {
-//     version v;
-//     for (std::size_t i = 0; i < versions.size(); ++i) {
-//       v.from_string(versions_strings[i]);
-//       REQUIRE(versions[i] == v);
-//     }
-//   }
-
-//   SECTION("to string") {
-//     for (std::size_t i = 0; i < versions.size(); ++i) {
-//       auto s = versions[i].to_string();
-//       REQUIRE(s == versions_strings[i]);
-//     }
-//   }
-
-//   SECTION("valid") {
-//     for (std::size_t i = 0; i < versions.size(); ++i) {
-//       REQUIRE(semver::valid(versions_strings[i]));
-//     }
-
-//     REQUIRE(!semver::valid("a"));
-//     REQUIRE(!semver::valid("1.2.3.4"));
-//     REQUIRE(!semver::valid("v1.2.4"));
-//     REQUIRE(!semver::valid("1.2"));
-//   }
-// }
 
 TEST_CASE("ranges") {
   SECTION("constructor") {

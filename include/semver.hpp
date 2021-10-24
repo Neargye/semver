@@ -190,6 +190,7 @@ constexpr const char* from_chars(const char* first, const char* last, int_t& d) 
   return nullptr;
 }
 
+// std implementation can throw
 constexpr bool substr(std::string_view str, std::size_t pos, std::size_t len, std::string_view& result) noexcept {
   if (pos > str.size()) {
     return false;
@@ -415,11 +416,13 @@ class lexer {
 class version_parser {
  public:
   constexpr explicit version_parser(const lexer& lexer, const token& token) : lexer_(lexer), token_(token), length_(0) {
-    // TODO: err handle
-    if (token.type == token_type::none) {
-      [[maybe_unused]] bool success = advance(token_type::none);
+  }
+
+  constexpr bool init() {
+    if (token_.type == token_type::none) {
+      return advance(token_type::none);
     }
-    [[maybe_unused]] bool success = skip_whitespaces();
+    return true;
   }
 
   constexpr bool parse_core(int_t &major, int_t &minor, int_t &patch) {
@@ -501,15 +504,6 @@ class version_parser {
   token token_;
   std::size_t length_; // TODO: IMPL
 
-  constexpr bool skip_whitespaces() {
-    while (token_.type == token_type::space) {
-      if (!advance(token_type::space)) {
-        return false;
-      }
-    }
-    return true;
-  }
-
   [[nodiscard]] constexpr bool advance(token_type expected_token) {
     if (token_.type != expected_token) {
       return false;
@@ -585,7 +579,7 @@ class version {
     detail::lexer lexer(std::string_view(first, static_cast<std::size_t>(length)));
     detail::version_parser parser(lexer, detail::token(detail::token_type::none, {0, 0}));
 
-    if (parser.parse_core(major, minor, patch) && parser.parse_prerelease(prerelease) && parser.parse_build(build_metadata)) {
+    if (parser.init() && parser.parse_core(major, minor, patch) && parser.parse_prerelease(prerelease) && parser.parse_build(build_metadata)) {
       return {first + parser.get_length(), std::errc{}};
     }
 
@@ -600,11 +594,13 @@ class version {
     }
 
     auto next = first + length;
+    if (build_metadata.length() > 0) {
+      next = detail::to_chars(next, build_metadata);
+      *(--next) = '+';
+    }
     if (prerelease.length() > 0) {
-      if (build_metadata.length() > 0) {
-        next = detail::to_chars(next, build_metadata);
-      }
       next = detail::to_chars(next, prerelease);
+      *(--next) = '-';
     }
     next = detail::to_chars(next, patch);
     *(--next) = '.';
@@ -637,10 +633,18 @@ class version {
     return str;
   }
 
-  // TODO: consider separator characters ('-' for prerelease, '+' for build metadata)
   [[nodiscard]] constexpr std::size_t string_length() const noexcept {
-    // length(<major>) + length(.) + length(<minor>) + length(.) + length(<patch>) + length(<prerelease>) + length(<build_metadata>)
-    return detail::length(major) + detail::length(minor) + detail::length(patch) + 2 + prerelease.length() + build_metadata.length();
+    // length(<major>) + length(.) + length(<minor>) + length(.) + length(<patch>)
+    std::size_t result = detail::length(major) + detail::length(minor) + detail::length(patch) + 2;
+    if (!prerelease.empty()) {
+     // length(-) + length(<prerelease>)
+     result += prerelease.length() + 1;
+    }
+    if (!build_metadata.empty()) {
+     // length(+) + length(<build_metadata>)
+     result += build_metadata.length() + 1;
+    }
+    return result;
   }
 
   [[nodiscard]] constexpr int compare(const version& other) const noexcept {
@@ -707,7 +711,8 @@ class version {
 
   constexpr bool set_prerelease_noexcept(std::string_view pr) noexcept{
     if (bool valid = true) { // TODO: add validate prerelease
-      return prerelease = pr;
+      prerelease = pr;
+      return valid;
     }
 
     return false;
@@ -724,7 +729,8 @@ class version {
 
   constexpr bool set_build_metadata_noexcept(std::string_view bm) noexcept {
     if (bool valid = true) { // TODO: add validate prerelease
-      return build_metadata = bm;
+      build_metadata = bm;
+      return valid;
     }
 
     return false;
@@ -958,8 +964,12 @@ class range {
       return {range_operator::equal, version{}};
     }
 
+    // TODO: err handle
     constexpr version parse_version() {
+      skip_whitespaces();
+
       version_parser version_parser(lexer_, current_token);
+      version_parser.init();
 
       int_t major = 0;
       int_t minor = 0;
