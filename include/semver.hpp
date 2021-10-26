@@ -645,12 +645,12 @@ class version {
     // length(<major>) + length(.) + length(<minor>) + length(.) + length(<patch>)
     std::size_t result = detail::length(major) + detail::length(minor) + detail::length(patch) + 2;
     if (!prerelease.empty()) {
-     // length(-) + length(<prerelease>)
-     result += prerelease.length() + 1;
+      // length(-) + length(<prerelease>)
+      result += prerelease.length() + 1;
     }
     if (!build_metadata.empty()) {
-     // length(+) + length(<build_metadata>)
-     result += build_metadata.length() + 1;
+      // length(+) + length(<build_metadata>)
+      result += build_metadata.length() + 1;
     }
     return result;
   }
@@ -705,6 +705,7 @@ class version {
     if (!set_prerelease_noexcept(pr)) {
       SEMVER_THROW("semver::version::set_prerelease invalid prerelease tag.");
     }
+
     return *this;
   }
 
@@ -713,6 +714,7 @@ class version {
     if (valid) {
       prerelease = pr;
     }
+
     return valid;
   }
 
@@ -731,6 +733,7 @@ class version {
     if (valid) {
       build_metadata = bm;
     }
+
     return valid;
   }
 };
