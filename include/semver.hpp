@@ -103,6 +103,7 @@ struct to_chars_result {
 };
 #endif
 
+// TODO: template str_t int_t
 using int_t = std::uint32_t;
 
 namespace detail {
@@ -246,8 +247,8 @@ struct resize_uninitialized {
 
 template <typename T>
 struct resize_uninitialized<T, std::void_t<decltype(std::declval<T>().__resize_default_init(42))>> {
-   static void resize( T& str, std::size_t size ) {
-      str.__resize_default_init( size );
+   static void resize(T& str, std::size_t size) {
+      str.__resize_default_init(size);
    }
 };
 
@@ -281,23 +282,11 @@ struct token_range {
 struct token {
   token_type type;
   token_range range;
-
-  constexpr token(token_type type, const token_range& range) : type(type), range(range) { }
-
-  constexpr token(const token&) = default;
-
-  constexpr token(token&&) = default;
-
-  constexpr token& operator=(const token&) = default;
-
-  constexpr token& operator=(token&&) = default;
-
-  ~token() = default;
 };
 
 class lexer {
  public:
-  constexpr explicit lexer(std::string_view text) noexcept : text_(text), current_pos_(0) { }
+  explicit constexpr lexer(std::string_view text) noexcept : text_{text}, current_pos_{0} {}
 
   constexpr token get_next_token() noexcept {
     if (eol()) {
@@ -415,7 +404,7 @@ class lexer {
 
 class version_parser {
  public:
-  constexpr explicit version_parser(const lexer& lexer, const token& token) : lexer_(lexer), token_(token), length_(0) {
+  constexpr version_parser(const lexer& lexer, const token& token) : lexer_{lexer}, token_{token}, length_{0} {
   }
 
   constexpr bool init() {
@@ -425,7 +414,7 @@ class version_parser {
     return true;
   }
 
-  constexpr bool parse_core(int_t &major, int_t &minor, int_t &patch) {
+  constexpr bool parse_core(int_t& major, int_t& minor, int_t& patch) {
     return lexer_.get_int(token_.range.pos, token_.range.len, major) &&
            advance(token_type::integer) &&
            advance(token_type::dot) &&
@@ -532,14 +521,14 @@ class version_parser {
 
 constexpr bool is_prerelease_valid(std::string_view pr) noexcept {
   lexer lexer(pr);
-  version_parser parser(lexer, detail::token(detail::token_type::hyphen, {0, 1}));
+  version_parser parser(lexer, detail::token{detail::token_type::hyphen, detail::token_range{0, 1}});
   std::string_view prerelease;
   return parser.init() && parser.parse_prerelease(prerelease);
 }
 
 constexpr bool is_build_metadata_valid(std::string_view bm) noexcept {
   lexer lexer(bm);
-  version_parser parser(lexer, detail::token(detail::token_type::plus, {0, 1}));
+  version_parser parser(lexer, detail::token{detail::token_type::plus, detail::token_range{0, 1}});
   std::string_view build_metadata;
   return parser.init() && parser.parse_build(build_metadata);
 }
@@ -596,7 +585,7 @@ class version {
     }
 
     detail::lexer lexer(std::string_view(first, static_cast<std::size_t>(length)));
-    detail::version_parser parser(lexer, detail::token(detail::token_type::none, {0, 0}));
+    detail::version_parser parser(lexer, detail::token{detail::token_type::none, detail::token_range{0, 0}});
 
     if (parser.init() && parser.parse_core(major, minor, patch) && parser.parse_prerelease(prerelease) && parser.parse_build(build_metadata)) {
       return {first + parser.get_length(), std::errc{}};
@@ -861,7 +850,7 @@ using namespace semver::detail;
 
 class range {
  public:
-  constexpr explicit range(std::string_view str) noexcept : str_{str} {}
+  explicit constexpr range(std::string_view str) noexcept : str_{str} {}
 
   constexpr bool satisfies(const version& ver, bool include_prerelease) const {
     range_parser parser{str_};
@@ -941,7 +930,7 @@ class range {
     lexer lexer_;
     token current_token;
 
-    constexpr explicit range_parser(std::string_view str) : lexer_{str}, current_token{token_type::none, {}} {
+    explicit constexpr range_parser(std::string_view str) : lexer_{str}, current_token{token_type::none, token_range{}} {
       advance_token(token_type::none);
     }
 
