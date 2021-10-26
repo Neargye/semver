@@ -569,6 +569,113 @@ TEST_CASE("validation") {
       CHECK(v.get_prerelease().empty());
     }
   }
+
+  SECTION("constexpr build_metadata tag validation") {
+    constexpr std::string_view bm = "build";
+    STATIC_REQUIRE(detail::is_build_metadata_valid(bm));
+
+    constexpr std::string_view bm2 = "meta-valid";
+    STATIC_REQUIRE(detail::is_build_metadata_valid(bm2));
+
+    constexpr std::string_view bm3 = "build.1-aef.1-its-okay";
+    STATIC_REQUIRE(detail::is_build_metadata_valid(bm3));
+
+    constexpr std::string_view bm4 = "build.1";
+    STATIC_REQUIRE(detail::is_build_metadata_valid(bm4));
+
+    constexpr std::string_view bm5 = "build.123";
+    STATIC_REQUIRE(detail::is_build_metadata_valid(bm5));
+
+    constexpr std::string_view bm6 = "-DEV-SNAPSHOT";
+    STATIC_REQUIRE(detail::is_build_metadata_valid(bm6));
+
+    constexpr std::string_view bm7 = "788";
+    STATIC_REQUIRE(detail::is_build_metadata_valid(bm7));
+
+    constexpr std::string_view bm8 = "999999999.999999999.999999999";
+    STATIC_REQUIRE(detail::is_build_metadata_valid(bm8));
+
+    constexpr std::string_view bm9 = "+build.1848";
+    STATIC_REQUIRE(!detail::is_build_metadata_valid(bm9));
+
+    constexpr std::string_view bm10 = "alpha+beta";
+    STATIC_REQUIRE(!detail::is_build_metadata_valid(bm10));
+
+    constexpr std::string_view bm11 = "build++";
+    STATIC_REQUIRE(!detail::is_build_metadata_valid(bm11));
+
+    constexpr std::string_view bm12 = "some.build!";
+    STATIC_REQUIRE(!detail::is_build_metadata_valid(bm12));
+
+    constexpr std::string_view bm13 = "some.build?";
+    STATIC_REQUIRE(!detail::is_build_metadata_valid(bm13));
+
+    constexpr std::string_view bm14 = "//thebestbuild";
+    STATIC_REQUIRE(!detail::is_build_metadata_valid(bm14));
+
+    constexpr std::string_view bm15 = "meta_2021_10_26";
+    STATIC_REQUIRE(!detail::is_build_metadata_valid(bm15));
+  }
+
+  SECTION("build_metadata tag validation") {
+    constexpr std::array<std::string_view, 20> valid_build_metadata = {{
+      "build",
+      "meta-valid",
+      "build.1-aef.1-its-okay",
+      "build.1",
+      "build.123",
+      "-DEV-SNAPSHOT",
+      "build.1848",
+      "alpha.beta",
+      "788",
+      "999999999.999999999.999999999",
+      "exp.sha.5114f85",
+      "-",
+      "build-meta-data",
+      "my.cat.is.very.cute",
+      "...",
+      "000001",
+      "we.cant.use.plus.sign",
+      "--and-hyphen-too-",
+      "-123-456--",
+      "21AF26D3--117B344092BD"
+    }};
+
+    for (const auto& bm: valid_build_metadata) {
+      version v;
+      CHECK(v.set_build_metadata_noexcept(bm));
+      CHECK(detail::compare_equal(bm, v.get_build_metadata()));
+    }
+
+    constexpr std::array<std::string_view, 20> invalid_build_metadata = {{
+      "some.build!",
+      "some.build?",
+      "//thebestbuild",
+      "meta_2021_10_26",
+      "%meta_dAtA%",
+      "мета",
+      "we&have&some&build",
+      "cat*has*generated*this*meta",
+      "_notvalidbuildmeta",
+      "#",
+      "#123",
+      "no/",
+      "you-shall-not-pass!",
+      "(this-meta-invalid-too)",
+      "[some-data-001]",
+      "<and.this.invalid>",
+      ">>>",
+      "build@1937",
+      "build^extrainfo",
+      "additional;info;"
+    }};
+
+    for (const auto& bm: invalid_build_metadata) {
+      version v;
+      CHECK(!v.set_build_metadata_noexcept(bm));
+      CHECK(v.get_build_metadata().empty());
+    }
+  }
 }
 
 TEST_CASE("ranges") {

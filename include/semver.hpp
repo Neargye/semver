@@ -530,11 +530,18 @@ class version_parser {
   }
 };
 
-constexpr bool is_prerelease_valid(std::string_view pr) {
+constexpr bool is_prerelease_valid(std::string_view pr) noexcept {
   lexer lexer(pr);
   version_parser parser(lexer, detail::token(detail::token_type::hyphen, {0, 1}));
   std::string_view prerelease;
   return parser.init() && parser.parse_prerelease(prerelease);
+}
+
+constexpr bool is_build_metadata_valid(std::string_view bm) noexcept {
+  lexer lexer(bm);
+  version_parser parser(lexer, detail::token(detail::token_type::plus, {0, 1}));
+  std::string_view build_metadata;
+  return parser.init() && parser.parse_build(build_metadata);
 }
 
 } // namespace semver::detail
@@ -560,7 +567,10 @@ class version {
     if (!prerelease.empty() && !detail::is_prerelease_valid(prerelease)) {
       SEMVER_THROW("semver::version invalid prerelease tag.");
     }
-    // TODO: add validate build_metadata
+
+    if (!build_metadata.empty() && !detail::is_build_metadata_valid(build_metadata)) {
+      SEMVER_THROW("semver::version invalid build metadata.");
+    }
   }
 
   explicit constexpr version(std::string_view str) : version(0, 0, 0) {
@@ -718,13 +728,12 @@ class version {
     return *this;
   }
 
-  constexpr bool set_prerelease_noexcept(std::string_view pr) noexcept{
-    if (detail::is_prerelease_valid(pr)) {
+  constexpr bool set_prerelease_noexcept(std::string_view pr) noexcept {
+    const bool valid = detail::is_prerelease_valid(pr);
+    if (valid) {
       prerelease = pr;
-      return true;
     }
-
-    return false;
+    return valid;
   }
 
   [[nodiscard]] constexpr std::string_view get_build_metadata() const noexcept { return build_metadata; }
@@ -738,12 +747,11 @@ class version {
   }
 
   constexpr bool set_build_metadata_noexcept(std::string_view bm) noexcept {
-    if (bool valid = true) { // TODO: add validate build_metadata
+    const bool valid = detail::is_build_metadata_valid(bm);
+    if (valid) {
       build_metadata = bm;
-      return valid;
     }
-
-    return false;
+    return valid;
   }
 };
 
