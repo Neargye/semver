@@ -439,7 +439,7 @@ TEST_CASE("from/to string") {
       REQUIRE(v == ver);
     }
 
-    for (const auto str : invalid_versions) {
+    for (const auto& str : invalid_versions) {
       version v;
       //REQUIRE_FALSE(v.from_chars(str.data(), str.data() + str.size()));
     }
@@ -449,7 +449,7 @@ TEST_CASE("from/to string") {
     for (const auto& [ver, str] : valid_versions) {
       std::array<char, 255> m = {'\0'};
       REQUIRE(ver.to_chars(m.data(), m.data() + m.size()));
-      auto s = std::string_view{m.data()};
+      const auto s = std::string_view{m.data()};
       REQUIRE(s == str);
     }
   }
@@ -461,7 +461,7 @@ TEST_CASE("from/to string") {
       REQUIRE(v == ver);
     }
 
-     for (const auto str : invalid_versions) {
+     for (const auto& str : invalid_versions) {
       version v;
       //REQUIRE_THROWS(v.from_string(str));
     }
@@ -474,7 +474,7 @@ TEST_CASE("from/to string") {
       REQUIRE(v == ver);
     }
 
-     for (const auto str : invalid_versions) {
+     for (const auto& str : invalid_versions) {
       version v;
       //REQUIRE_FALSE(v.from_string_noexcept(str));
     }
