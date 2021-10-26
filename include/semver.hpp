@@ -211,21 +211,21 @@ constexpr int compare(std::string_view lhs, std::string_view rhs) {
 #endif
 
   if constexpr (workaround) {
-    const auto size = std::min(lhs.size(), rhs.size());
-    for (std::size_t i = 0; i < size; ++i) {
-      if (lhs[i] < rhs[i]) {
-        return -1;
-      } else if (lhs[i] > rhs[i]) {
-        return 1;
-      }
-    }
-
     if (lhs.size() < rhs.size()) {
       return -1;
     }
 
     if (lhs.size() > rhs.size()) {
       return 1;
+    }
+
+    const auto size = lhs.size();
+    for (std::size_t i = 0; i < size; ++i) {
+      if (lhs[i] < rhs[i]) {
+        return -1;
+      } else if (lhs[i] > rhs[i]) {
+        return 1;
+      }
     }
 
     return 0;
@@ -657,23 +657,22 @@ class version {
 
   [[nodiscard]] constexpr int compare(const version& other) const noexcept {
     if (major != other.major) {
-      return major - other.major;
+      return static_cast<int>(major - other.major);
     }
 
     if (minor != other.minor) {
-      return minor - other.minor;
+      return static_cast<int>(minor - other.minor);
     }
 
     if (patch != other.patch) {
-      return patch - other.patch;
+      return static_cast<int>(patch - other.patch);
     }
 
-    const int pre_release_compare = detail::compare(prerelease, other.prerelease);
-    if (pre_release_compare != 0) {
-      return pre_release_compare;
+    if (prerelease.empty() != other.prerelease.empty()) {
+      return static_cast<int>(other.prerelease.size() - prerelease.size());
     }
 
-    return 0;
+    return detail::compare(prerelease, other.prerelease);
   }
 
   [[nodiscard]] constexpr int_t get_major() const noexcept { return major; }
