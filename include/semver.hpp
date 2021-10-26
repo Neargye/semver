@@ -530,6 +530,13 @@ class version_parser {
   }
 };
 
+constexpr bool is_prerelease_valid(std::string_view pr) {
+  lexer lexer(pr);
+  version_parser parser(lexer, detail::token(detail::token_type::hyphen, {0, 1}));
+  std::string_view prerelease;
+  return parser.init() && parser.parse_prerelease(prerelease);
+}
+
 } // namespace semver::detail
 
 class version {
@@ -544,13 +551,15 @@ class version {
                     int_t mn,
                     int_t pt,
                     std::string_view pr = {},
-                    std::string_view bm = {}) noexcept
+                    std::string_view bm = {})
         : major(mj),
           minor(mn),
           patch(pt),
           prerelease(pr),
           build_metadata(bm) {
-    // TODO: add validate prerelease
+    if (!prerelease.empty() && !detail::is_prerelease_valid(prerelease)) {
+      SEMVER_THROW("semver::version invalid prerelease tag.");
+    }
     // TODO: add validate build_metadata
   }
 
@@ -703,16 +712,16 @@ class version {
   [[nodiscard]] constexpr std::string_view get_prerelease() const noexcept { return prerelease; }
 
   constexpr version& set_prerelease(std::string_view pr) {
-    // TODO: add validate prerelease
-    prerelease = pr;
-
+    if (!set_prerelease_noexcept(pr)) {
+      SEMVER_THROW("semver::version::set_prerelease invalid prerelease tag.");
+    }
     return *this;
   }
 
   constexpr bool set_prerelease_noexcept(std::string_view pr) noexcept{
-    if (bool valid = true) { // TODO: add validate prerelease
+    if (detail::is_prerelease_valid(pr)) {
       prerelease = pr;
-      return valid;
+      return true;
     }
 
     return false;
@@ -721,14 +730,15 @@ class version {
   [[nodiscard]] constexpr std::string_view get_build_metadata() const noexcept { return build_metadata; }
 
   constexpr version& set_build_metadata(std::string_view bm) {
-    // TODO: add validate build_metadata
-    build_metadata = bm;
+    if (!set_build_metadata_noexcept(bm)) {
+      SEMVER_THROW("semver::version::set_build_metadata invalid build metadata.");
+    }
 
     return *this;
   }
 
   constexpr bool set_build_metadata_noexcept(std::string_view bm) noexcept {
-    if (bool valid = true) { // TODO: add validate prerelease
+    if (bool valid = true) { // TODO: add validate build_metadata
       build_metadata = bm;
       return valid;
     }

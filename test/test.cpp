@@ -463,6 +463,114 @@ TEST_CASE("from/to string") {
   }
 }
 
+TEST_CASE("validation") {
+  SECTION("constexpr prerelease tag validation") {
+    constexpr std::string_view pre = "alpha";
+    STATIC_REQUIRE(detail::is_prerelease_valid(pre));
+
+    constexpr std::string_view pre2 = "alpha.1";
+    STATIC_REQUIRE(detail::is_prerelease_valid(pre2));
+
+    constexpr std::string_view pre3 = "alpha.beta";
+    STATIC_REQUIRE(detail::is_prerelease_valid(pre3));
+
+    constexpr std::string_view pre4 = "alpha.beta.1";
+    STATIC_REQUIRE(detail::is_prerelease_valid(pre4));
+
+    constexpr std::string_view pre5 = "alpha0.valid";
+    STATIC_REQUIRE(detail::is_prerelease_valid(pre5));
+
+    constexpr std::string_view pre6 = "alpha.0valid";
+    STATIC_REQUIRE(detail::is_prerelease_valid(pre6));
+
+    constexpr std::string_view pre7 = "somethinglong.1-aef.1-its-okay";
+    STATIC_REQUIRE(detail::is_prerelease_valid(pre7));
+
+    constexpr std::string_view pre8 = "---R-S.12.9.1--.12";
+    STATIC_REQUIRE(detail::is_prerelease_valid(pre8));
+
+    constexpr std::string_view v_str = "1.2.3-alpha.3";
+    constexpr std::string_view pre9 = {v_str.data() + 6, 7};
+    STATIC_REQUIRE(detail::is_prerelease_valid(pre9));
+
+    constexpr std::string_view pre10 = "%alpha%";
+    STATIC_REQUIRE(!detail::is_prerelease_valid(pre10));
+
+    constexpr std::string_view pre11 = "rc*123";
+    STATIC_REQUIRE(!detail::is_prerelease_valid(pre11));
+
+    constexpr std::string_view pre12 = "tag_with_underscores";
+    STATIC_REQUIRE(!detail::is_prerelease_valid(pre12));
+
+    constexpr std::string_view pre13 = "dev/snapshot-1.2.3";
+    STATIC_REQUIRE(!detail::is_prerelease_valid(pre13));
+
+    constexpr std::string_view pre14 = "alpha.beta@146";
+    STATIC_REQUIRE(!detail::is_prerelease_valid(pre14));
+  }
+
+  SECTION("prerelease tag validation") {
+    constexpr std::array<std::string_view, 20> valid_prerelease_tags = {{
+      "prerelease",
+      "alpha",
+      "beta",
+      "alpha.beta",
+      "alpha.beta.1",
+      "alpha.1",
+      "alpha0.valid",
+      "alpha.0valid",
+      "alpha-a.b-c-somethinglong",
+      "rc.4",
+      "1.2.3-beta",
+      "DEV-SNAPSHOT",
+      "SNAPSHOT-123",
+      "1227",
+      "---RC-SNAPSHOT.12.9.1--.12",
+      "---R-S.12.9.1--.12",
+      "----RC-SNAPSHOT.12.9.1--.12",
+      "-rc.10000aaa-kk-0.1",
+      "999999999.999999999.999999999",
+      "1.0.0-0A.is.legal"
+    }};
+
+    for (const auto& prerelease: valid_prerelease_tags) {
+      version v;
+      CHECK(v.set_prerelease_noexcept(prerelease));
+      CHECK(detail::compare_equal(prerelease, v.get_prerelease()));
+    }
+
+    constexpr std::array<std::string_view, 21> invalid_prerelease_tags = {{
+      "%alpha%",
+      "rc*123",
+      "tag_with_underscores",
+      "dev/snapshot-1.2.3",
+      "alpha.beta@146",
+      "--rc.1.best_release_ever",
+      "___main.01",
+      "!tag",
+      "^caret^tag^",
+      "{alpha.beta.rc.0}",
+      "alpha;beta.1",
+      "////|\\\\",
+      "$dev.0001",
+      "beta#123",
+      "snapshot№1",
+      "???",
+      "beta&alpha&rc",
+      "<some.tag>",
+      ">_<",
+      "(((ololo)))",
+      ":prerelease:"
+    }};
+
+    for (const auto& prerelease: invalid_prerelease_tags) {
+      version v;
+      CHECK(!v.set_prerelease_noexcept(prerelease));
+      CHECK(v.get_prerelease().empty());
+    }
+  }
+}
+
 TEST_CASE("ranges") {
   SECTION("constructor") {
     constexpr version v1{"1.2.3"};
