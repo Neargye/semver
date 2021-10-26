@@ -127,7 +127,7 @@ TEST_CASE("constructors") {
   }
 }
 
- TEST_CASE("operators") {
+TEST_CASE("operators") {
    constexpr std::array<version, 56> versions = {{
        version{0, 0, 0, "alpha.0"},
        version{0, 0, 0, "alpha.1"},
@@ -351,7 +351,7 @@ TEST_CASE("constructors") {
      constexpr version v = "1.2.3-rc.4"_version;
      static_assert(v == version{1, 2, 3, "rc.4"});
    }
- }
+}
 
 TEST_CASE("from/to string") {
   constexpr std::array<version, 32> versions = {{
@@ -424,17 +424,59 @@ TEST_CASE("from/to string") {
       "1.0.0-0A.is.legal"
   }};
 
-  for (const auto& str: versions_strings) {
-    version v;
-    v.from_string(str);
-    CHECK(str == v.to_string());
-  }
+  constexpr std::array<std::string_view, 40> invalid_versions = {{
+      "1"
+      "1.2"
+      "1.2.3-0123"
+      "1.2.3-0123.0123"
+      "1.1.2+.123"
+      "+invalid"
+      "-invalid"
+      "-invalid+invalid"
+      "-invalid.01"
+      "alpha"
+      "alpha.beta"
+      "alpha.beta.1"
+      "alpha.1"
+      "alpha+beta"
+      "alpha_beta"
+      "alpha."
+      "alpha.."
+      "beta"
+      "1.0.0-alpha_beta"
+      "-alpha."
+      "1.0.0-alpha.."
+      "1.0.0-alpha..1"
+      "1.0.0-alpha...1"
+      "1.0.0-alpha....1"
+      "1.0.0-alpha.....1"
+      "1.0.0-alpha......1"
+      "1.0.0-alpha.......1"
+      "01.1.1"
+      "1.01.1"
+      "1.1.01"
+      "1.2"
+      "1.2.3.DEV"
+      "1.2-SNAPSHOT"
+      "1.2.31.2.3----RC-SNAPSHOT.12.09.1--..12+788"
+      "1.2-RC-SNAPSHOT"
+      "-1.0.3-gamma+b7718"
+      "+justmeta"
+      "9.8.7+meta+meta"
+      "9.8.7-whatever+meta+meta"
+      "99999999999999999999999.999999999999999999.99999999999999999----RC-SNAPSHOT.12.09.1--------------------------------..12"
+  }};
 
   SECTION("from chars") {
     for (std::size_t i = 0; i < versions.size(); ++i) {
       version v;
       REQUIRE(v.from_chars(versions_strings[i].data(), versions_strings[i].data() + versions_strings[i].size()));
-      CHECK(v == versions[i]);
+      REQUIRE(v == versions[i]);
+    }
+
+    for (std::size_t i = 0; i < invalid_versions.size(); ++i) {
+      version v;
+      REQUIRE_FALSE(v.from_chars(invalid_versions[i].data(), invalid_versions[i].data() + invalid_versions[i].size()));
     }
   }
 
@@ -443,7 +485,7 @@ TEST_CASE("from/to string") {
       std::array<char, 255> m = {};
       REQUIRE(versions[i].to_chars(m.data(), m.data() + m.size()));
       auto s = std::string_view{m.data()};
-      CHECK(s == versions_strings[i]);
+      REQUIRE(s == versions_strings[i]);
     }
   }
 
@@ -451,14 +493,32 @@ TEST_CASE("from/to string") {
     for (std::size_t i = 0; i < versions.size(); ++i) {
       version v;
       v.from_string(versions_strings[i]);
-      CHECK(v == versions[i]);
+      REQUIRE(v == versions[i]);
+    }
+
+    for (std::size_t i = 0; i < invalid_versions.size(); ++i) {
+      version v;
+      REQUIRE_THROWS(v.from_string(invalid_versions[i]));
+    }
+  }
+
+  SECTION("from string noexcept") {
+    for (std::size_t i = 0; i < versions.size(); ++i) {
+      version v;
+      REQUIRE(v.from_string_noexcept(versions_strings[i]));
+      REQUIRE(v == versions[i]);
+    }
+
+    for (std::size_t i = 0; i < invalid_versions.size(); ++i) {
+      version v;
+      REQUIRE_FALSE(v.from_string_noexcept(invalid_versions[i]));
     }
   }
 
   SECTION("to string") {
     for (std::size_t i = 0; i < versions.size(); ++i) {
       auto s = versions[i].to_string();
-      CHECK(s == versions_strings[i]);
+      REQUIRE(s == versions_strings[i]);
     }
   }
 }
@@ -535,8 +595,8 @@ TEST_CASE("validation") {
 
     for (const auto& prerelease: valid_prerelease_tags) {
       version v;
-      CHECK(v.set_prerelease_noexcept(prerelease));
-      CHECK(detail::compare_equal(prerelease, v.get_prerelease()));
+      REQUIRE(v.set_prerelease_noexcept(prerelease));
+      REQUIRE(detail::compare_equal(prerelease, v.get_prerelease()));
     }
 
     constexpr std::array<std::string_view, 21> invalid_prerelease_tags = {{
@@ -565,8 +625,8 @@ TEST_CASE("validation") {
 
     for (const auto& prerelease: invalid_prerelease_tags) {
       version v;
-      CHECK(!v.set_prerelease_noexcept(prerelease));
-      CHECK(v.get_prerelease().empty());
+      REQUIRE(!v.set_prerelease_noexcept(prerelease));
+      REQUIRE(v.get_prerelease().empty());
     }
   }
 
@@ -643,8 +703,8 @@ TEST_CASE("validation") {
 
     for (const auto& bm: valid_build_metadata) {
       version v;
-      CHECK(v.set_build_metadata_noexcept(bm));
-      CHECK(detail::compare_equal(bm, v.get_build_metadata()));
+      REQUIRE(v.set_build_metadata_noexcept(bm));
+      REQUIRE(detail::compare_equal(bm, v.get_build_metadata()));
     }
 
     constexpr std::array<std::string_view, 20> invalid_build_metadata = {{
@@ -672,8 +732,8 @@ TEST_CASE("validation") {
 
     for (const auto& bm: invalid_build_metadata) {
       version v;
-      CHECK(!v.set_build_metadata_noexcept(bm));
-      CHECK(v.get_build_metadata().empty());
+      REQUIRE(!v.set_build_metadata_noexcept(bm));
+      REQUIRE(v.get_build_metadata().empty());
     }
   }
 }
