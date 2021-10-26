@@ -679,15 +679,7 @@ class version {
       return patch - other.patch;
     }
 
-    int pre_release_compare = 0;
-    if (prerelease.empty() && !other.prerelease.empty()) {
-      pre_release_compare = 1;
-    } else if (!prerelease.empty() && other.prerelease.empty()) {
-      pre_release_compare = -1;
-    } else {
-      pre_release_compare = detail::compare(prerelease, other.prerelease);
-    }
-
+    const int pre_release_compare = detail::compare(prerelease, other.prerelease);
     if (pre_release_compare != 0) {
       return pre_release_compare;
     }
