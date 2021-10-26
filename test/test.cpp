@@ -439,10 +439,10 @@ TEST_CASE("from/to string") {
       REQUIRE(v == ver);
     }
 
-    for (const auto& str : invalid_versions) {
-      version v;
-      //REQUIRE_FALSE(v.from_chars(str.data(), str.data() + str.size()));
-    }
+    //for (const auto& str : invalid_versions) {
+    //  version v;
+    //  REQUIRE_FALSE(v.from_chars(str.data(), str.data() + str.size()));
+    //}
   }
 
   SECTION("to chars") {
@@ -461,10 +461,10 @@ TEST_CASE("from/to string") {
       REQUIRE(v == ver);
     }
 
-     for (const auto& str : invalid_versions) {
-      version v;
-      //REQUIRE_THROWS(v.from_string(str));
-    }
+    // for (const auto& str : invalid_versions) {
+    //  version v;
+    //  REQUIRE_THROWS(v.from_string(str));
+    //}
   }
 
   SECTION("from string noexcept") {
@@ -474,10 +474,10 @@ TEST_CASE("from/to string") {
       REQUIRE(v == ver);
     }
 
-     for (const auto& str : invalid_versions) {
-      version v;
-      //REQUIRE_FALSE(v.from_string_noexcept(str));
-    }
+    // for (const auto& str : invalid_versions) {
+    //  version v;
+    //  REQUIRE_FALSE(v.from_string_noexcept(str));
+    //}
   }
 
   SECTION("to string") {
