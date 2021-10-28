@@ -344,6 +344,10 @@ class lexer {
     return substr(text_, pos, len, result);
   }
 
+  constexpr char get_letter_at(std::size_t pos) const noexcept {
+    return text_[pos];
+  }
+
   constexpr bool get_operator(std::size_t pos, std::size_t len, range_operator& result) const noexcept {
     std::string_view str;
     if (!substr(text_, pos, len, str)) {
@@ -415,13 +419,13 @@ class version_parser {
   }
 
   constexpr bool parse_core(int_t& major, int_t& minor, int_t& patch) {
-    return lexer_.get_int(token_.range.pos, token_.range.len, major) &&
+    return parse_integer(major) &&
            advance(token_type::integer) &&
            advance(token_type::dot) &&
-           lexer_.get_int(token_.range.pos, token_.range.len, minor) &&
+           parse_integer(minor) &&
            advance(token_type::integer) &&
            advance(token_type::dot) &&
-           lexer_.get_int(token_.range.pos, token_.range.len, patch) &&
+           parse_integer(patch) &&
            advance(token_type::integer);
   }
 
@@ -438,15 +442,36 @@ class version_parser {
     const auto pos = token_.range.pos;
     std::size_t len = 0;
 
-    while (!is_eol()) {
-      if (is_plus())
-        break;
+    bool identifier_expected = true;
 
-      if (!is_alphanumeric() && !is_integer()) {
+    while (identifier_expected || !is_eol()) {
+      if (token_.range.len == 0) {
+       return false;
+      }
+
+      if (is_plus()) {
+        break;
+      }
+
+      if (is_dot()) {
+        if (identifier_expected) {
+          return false;
+        }
+        identifier_expected = true;
+      } else {
+        if (!is_letter() && !is_hyphen() && !is_integer()) {
+          return false;
+        }
+        identifier_expected = false;
+      }
+
+      // numeric identifiers with leading zeros are invalid in prerelease tag.
+      if (is_integer() && has_leading_zero()) {
         return false;
       }
 
       len += token_.range.len;
+
       if (!advance(token_.type)) {
         return false;
       }
@@ -458,7 +483,7 @@ class version_parser {
   constexpr bool parse_build(std::string_view& build_metadata) {
     if (token_.type != token_type::plus) {
       build_metadata = {};
-      return true;
+      return is_eol();
     }
 
     if (!advance(token_type::plus)) {
@@ -468,18 +493,41 @@ class version_parser {
     const auto pos = token_.range.pos;
     std::size_t len = 0;
 
-    while (!is_eol()) {
-      if (!is_alphanumeric() && !is_integer()) {
+    bool identifier_expected = true;
+
+    while (identifier_expected || !is_eol()) {
+      if (token_.range.len == 0) {
         return false;
       }
 
+      if (is_dot()) {
+        if (identifier_expected) {
+          return false;
+        }
+        identifier_expected = true;
+      } else {
+        if (!is_letter() && !is_hyphen() && !is_integer()) {
+          return false;
+        }
+        identifier_expected = false;
+      }
+
       len += token_.range.len;
+
       if (!advance(token_.type)) {
         return false;
       }
     }
 
     return lexer_.get_string(pos, len, build_metadata);
+  }
+
+  constexpr bool parse_integer(int_t& value) {
+    // version with leading zeros in [major, minor, patch] is invalid.
+    if (has_leading_zero())
+      return false;
+
+    return lexer_.get_int(token_.range.pos, token_.range.len, value);
   }
 
   constexpr token get_token() const noexcept { return token_; }
@@ -502,6 +550,10 @@ class version_parser {
     return token_.type != token_type::unexpected;
   }
 
+  constexpr bool has_leading_zero() const {
+    return token_.range.len > 1 && lexer_.get_letter_at(token_.range.pos) == '0';
+  }
+
   constexpr bool is_eol() const {
     return token_.type == token_type::eol;
   }
@@ -510,8 +562,16 @@ class version_parser {
     return token_.type == token_type::plus;
   }
 
-  constexpr bool is_alphanumeric() const {
-    return token_.type == token_type::letter || token_.type == token_type::dot || token_.type == token_type::hyphen;
+  constexpr bool is_letter() const {
+    return token_.type == token_type::letter;
+  }
+
+  constexpr bool is_hyphen() const {
+    return token_.type == token_type::hyphen;
+  }
+
+  constexpr bool is_dot() const {
+    return token_.type == token_type::dot;
   }
 
   constexpr bool is_integer() const {

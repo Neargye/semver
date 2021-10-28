@@ -389,46 +389,51 @@ TEST_CASE("from/to string") {
     {version{1, 0, 0, "0A.is.legal"}, "1.0.0-0A.is.legal"}
   }};
 
-  constexpr std::array<std::string_view, 40> invalid_versions = {{
-    "1"
-    "1.2"
-    "1.2.3-0123"
-    "1.2.3-0123.0123"
-    "1.1.2+.123"
-    "+invalid"
-    "-invalid"
-    "-invalid+invalid"
-    "-invalid.01"
-    "alpha"
-    "alpha.beta"
-    "alpha.beta.1"
-    "alpha.1"
-    "alpha+beta"
-    "alpha_beta"
-    "alpha."
-    "alpha.."
-    "beta"
-    "1.0.0-alpha_beta"
-    "-alpha."
-    "1.0.0-alpha.."
-    "1.0.0-alpha..1"
-    "1.0.0-alpha...1"
-    "1.0.0-alpha....1"
-    "1.0.0-alpha.....1"
-    "1.0.0-alpha......1"
-    "1.0.0-alpha.......1"
-    "01.1.1"
-    "1.01.1"
-    "1.1.01"
-    "1.2"
-    "1.2.3.DEV"
-    "1.2-SNAPSHOT"
-    "1.2.31.2.3----RC-SNAPSHOT.12.09.1--..12+788"
-    "1.2-RC-SNAPSHOT"
-    "-1.0.3-gamma+b7718"
-    "+justmeta"
-    "9.8.7+meta+meta"
-    "9.8.7-whatever+meta+meta"
+  constexpr std::array<std::string_view, 45> invalid_versions = {{
+    "1",
+    "1.2",
+    "1.2.3-0123",
+    "1.2.3-0123.0123",
+    "1.0.0-",
+    "1.0.0+",
+    "1.0.0-.",
+    "1.0.0+.",
+    "1.0.0-.+.",
+    "1.1.2+.123",
+    "+invalid",
+    "-invalid",
+    "-invalid+invalid",
+    "-invalid.01",
+    "alpha",
+    "alpha.beta",
+    "alpha.beta.1",
+    "alpha.1",
+    "alpha+beta",
+    "alpha_beta",
+    "alpha.",
+    "alpha..",
+    "beta",
+    "1.0.0-alpha_beta",
+    "-alpha.",
+    "1.0.0-alpha..",
+    "1.0.0-alpha..1",
+    "1.0.0-alpha...1",
+    "1.0.0-alpha....1",
+    "1.0.0-alpha.....1",
+    "1.0.0-alpha......1",
+    "1.0.0-alpha.......1",
+    "01.1.1",
+    "1.01.1",
+    "1.1.01",
+    "1.2",
+    "1.2.3.DEV",
+    "1.2-SNAPSHOT",
+    "1.2.31.2.3----RC-SNAPSHOT.12.09.1--..12+788",
+    "1.2-RC-SNAPSHOT",
+    "-1.0.3-gamma+b7718",
+    "+justmeta",
+    "9.8.7+meta+meta",
+    "9.8.7-whatever+meta+meta",
     "99999999999999999999999.999999999999999999.99999999999999999----RC-SNAPSHOT.12.09.1--------------------------------..12"
   }};
 
@@ -439,10 +444,10 @@ TEST_CASE("from/to string") {
       REQUIRE(v == ver);
     }
 
-    //for (const auto& str : invalid_versions) {
-    //  version v;
-    //  REQUIRE_FALSE(v.from_chars(str.data(), str.data() + str.size()));
-    //}
+    for (const auto& str : invalid_versions) {
+      version v;
+      REQUIRE_FALSE(v.from_chars(str.data(), str.data() + str.size()));
+    }
   }
 
   SECTION("to chars") {
@@ -461,10 +466,10 @@ TEST_CASE("from/to string") {
       REQUIRE(v == ver);
     }
 
-    // for (const auto& str : invalid_versions) {
-    //  version v;
-    //  REQUIRE_THROWS(v.from_string(str));
-    //}
+     for (const auto& str : invalid_versions) {
+      version v;
+      REQUIRE_THROWS(v.from_string(str));
+    }
   }
 
   SECTION("from string noexcept") {
@@ -474,10 +479,10 @@ TEST_CASE("from/to string") {
       REQUIRE(v == ver);
     }
 
-    // for (const auto& str : invalid_versions) {
-    //  version v;
-    //  REQUIRE_FALSE(v.from_string_noexcept(str));
-    //}
+     for (const auto& str : invalid_versions) {
+      version v;
+      REQUIRE_FALSE(v.from_string_noexcept(str));
+    }
   }
 
   SECTION("to string") {
@@ -564,7 +569,7 @@ TEST_CASE("validation") {
       REQUIRE(detail::compare_equal(prerelease, v.get_prerelease()));
     }
 
-    constexpr std::array<std::string_view, 21> invalid_prerelease_tags = {{
+    constexpr std::array<std::string_view, 23> invalid_prerelease_tags = {{
       "%alpha%",
       "rc*123",
       "tag_with_underscores",
@@ -585,7 +590,9 @@ TEST_CASE("validation") {
       "<some.tag>",
       ">_<",
       "(((ololo)))",
-      ":prerelease:"
+      ":prerelease:",
+      ".",
+      "alpha."
     }};
 
     for (const auto& prerelease: invalid_prerelease_tags) {
@@ -643,7 +650,7 @@ TEST_CASE("validation") {
   }
 
   SECTION("build_metadata tag validation") {
-    constexpr std::array<std::string_view, 20> valid_build_metadata = {{
+    constexpr std::array<std::string_view, 19> valid_build_metadata = {{
       "build",
       "meta-valid",
       "build.1-aef.1-its-okay",
@@ -658,7 +665,6 @@ TEST_CASE("validation") {
       "-",
       "build-meta-data",
       "my.cat.is.very.cute",
-      "...",
       "000001",
       "we.cant.use.plus.sign",
       "--and-hyphen-too-",
@@ -672,7 +678,7 @@ TEST_CASE("validation") {
       REQUIRE(detail::compare_equal(bm, v.get_build_metadata()));
     }
 
-    constexpr std::array<std::string_view, 20> invalid_build_metadata = {{
+    constexpr std::array<std::string_view, 24> invalid_build_metadata = {{
       "some.build!",
       "some.build?",
       "//thebestbuild",
@@ -692,7 +698,11 @@ TEST_CASE("validation") {
       ">>>",
       "build@1937",
       "build^extrainfo",
-      "additional;info;"
+      "additional;info;",
+      "...",
+      "build.",
+      ".build",
+      "build.."
     }};
 
     for (const auto& bm: invalid_build_metadata) {
