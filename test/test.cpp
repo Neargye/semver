@@ -440,7 +440,9 @@ TEST_CASE("from/to string") {
   SECTION("from chars") {
     for (const auto& [ver, str] : valid_versions) {
       version v;
-      REQUIRE(v.from_chars(str.data(), str.data() + str.size()));
+      const auto result = v.from_chars(str.data(), str.data() + str.size());
+      REQUIRE(result);
+      REQUIRE(*result.ptr == '\0');
       REQUIRE(v == ver);
     }
 

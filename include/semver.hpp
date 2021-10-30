@@ -546,6 +546,7 @@ class version_parser {
       return false;
     }
 
+    length_ += token_.range.len;
     token_ = lexer_.get_next_token();
     return token_.type != token_type::unexpected;
   }
