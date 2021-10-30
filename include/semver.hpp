@@ -539,7 +539,7 @@ class version_parser {
  private:
   lexer lexer_;
   token token_;
-  std::size_t length_; // TODO: IMPL
+  std::size_t length_;
 
   [[nodiscard]] constexpr bool advance(token_type expected_token) {
     if (token_.type != expected_token) {
