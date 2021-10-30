@@ -442,6 +442,7 @@ TEST_CASE("from/to string") {
       version v;
       const auto result = v.from_chars(str.data(), str.data() + str.size());
       REQUIRE(result);
+      REQUIRE(result.ptr != nullptr);
       REQUIRE(*result.ptr == '\0');
       REQUIRE(v == ver);
     }
