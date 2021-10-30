@@ -108,9 +108,6 @@ using int_t = std::uint32_t;
 
 namespace detail {
 
-// Min version string length = 1(<major>) + 1(.) + 1(<minor>) + 1(.) + 1(<patch>) = 5.
-inline constexpr auto min_version_string_length = 5;
-
 constexpr bool is_digit(char c) noexcept {
   return c >= '0' && c <= '9';
 }
@@ -641,7 +638,7 @@ class version {
 
   [[nodiscard]] constexpr from_chars_result from_chars(const char* first, const char* last) noexcept {
     const auto length = (last - first);
-    if (first == nullptr || last == nullptr || length < 0 || length < detail::min_version_string_length) {
+    if (first == nullptr || last == nullptr || length < 0) {
       return {first, std::errc::invalid_argument};
     }
 
@@ -652,8 +649,7 @@ class version {
       return {first + parser.get_length(), std::errc{}};
     }
 
-    // TODO: std::errc::result_out_of_range
-    return {first, std::errc::invalid_argument};
+    return {first + parser.get_length(), std::errc::invalid_argument};
   }
 
   [[nodiscard]] constexpr to_chars_result to_chars(char* first, char* last) const noexcept {

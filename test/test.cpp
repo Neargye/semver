@@ -389,52 +389,52 @@ TEST_CASE("from/to string") {
     {version{1, 0, 0, "0A.is.legal"}, "1.0.0-0A.is.legal"}
   }};
 
-  constexpr std::array<std::string_view, 45> invalid_versions = {{
-    "1",
-    "1.2",
-    "1.2.3-0123",
-    "1.2.3-0123.0123",
-    "1.0.0-",
-    "1.0.0+",
-    "1.0.0-.",
-    "1.0.0+.",
-    "1.0.0-.+.",
-    "1.1.2+.123",
-    "+invalid",
-    "-invalid",
-    "-invalid+invalid",
-    "-invalid.01",
-    "alpha",
-    "alpha.beta",
-    "alpha.beta.1",
-    "alpha.1",
-    "alpha+beta",
-    "alpha_beta",
-    "alpha.",
-    "alpha..",
-    "beta",
-    "1.0.0-alpha_beta",
-    "-alpha.",
-    "1.0.0-alpha..",
-    "1.0.0-alpha..1",
-    "1.0.0-alpha...1",
-    "1.0.0-alpha....1",
-    "1.0.0-alpha.....1",
-    "1.0.0-alpha......1",
-    "1.0.0-alpha.......1",
-    "01.1.1",
-    "1.01.1",
-    "1.1.01",
-    "1.2",
-    "1.2.3.DEV",
-    "1.2-SNAPSHOT",
-    "1.2.31.2.3----RC-SNAPSHOT.12.09.1--..12+788",
-    "1.2-RC-SNAPSHOT",
-    "-1.0.3-gamma+b7718",
-    "+justmeta",
-    "9.8.7+meta+meta",
-    "9.8.7-whatever+meta+meta",
-    "99999999999999999999999.999999999999999999.99999999999999999----RC-SNAPSHOT.12.09.1--------------------------------..12"
+  constexpr std::array<std::pair<std::string_view, std::ptrdiff_t>, 45> invalid_versions = {{
+    {"1", 1},
+    {"1.2", 3},
+    {"1.2.3-0123", 6},
+    {"1.2.3-0123.0123", 6},
+    {"1.0.0-", 6},
+    {"1.0.0+", 6},
+    {"1.0.0-.", 6},
+    {"1.0.0+.", 6},
+    {"1.0.0-.+.", 6},
+    {"1.1.2+.123", 6},
+    {"+invalid", 0},
+    {"-invalid", 0},
+    {"-invalid+invalid", 0},
+    {"-invalid.01", 0},
+    {"alpha", 0},
+    {"alpha.beta", 0},
+    {"alpha.beta.1", 0},
+    {"alpha.1", 0},
+    {"alpha+beta", 0},
+    {"alpha_beta", 0},
+    {"alpha.", 0},
+    {"alpha..", 0},
+    {"beta", 0},
+    {"1.0.0-alpha_beta", 11},
+    {"-alpha.", 0},
+    {"1.0.0-alpha..", 12},
+    {"1.0.0-alpha..1", 12},
+    {"1.0.0-alpha...1", 12},
+    {"1.0.0-alpha....1", 12},
+    {"1.0.0-alpha.....1", 12},
+    {"1.0.0-alpha......1", 12},
+    {"1.0.0-alpha.......1", 12},
+    {"01.1.1", 0},
+    {"1.01.1", 2},
+    {"1.1.01", 4},
+    {"1.2.", 4},
+    {"1.2.3.DEV", 5},
+    {"1.2-SNAPSHOT", 3},
+    {"1.2.31.2.3----RC-SNAPSHOT.12.09.1--..12+788", 6},
+    {"1.2-RC-SNAPSHOT", 3},
+    {"-1.0.3-gamma+b7718", 0},
+    {"+justmeta", 0},
+    {"9.8.7+meta+meta", 10},
+    {"9.8.7-whatever+meta+meta", 19},
+    {"99999999999999999999999.999999999999999999.99999999999999999----RC-SNAPSHOT.12.09.1--------------------------------..12", 0}
   }};
 
   SECTION("from chars") {
@@ -443,21 +443,27 @@ TEST_CASE("from/to string") {
       const auto result = v.from_chars(str.data(), str.data() + str.size());
       REQUIRE(result);
       REQUIRE(result.ptr != nullptr);
-      REQUIRE(*result.ptr == '\0');
+      REQUIRE(result.ptr == str.data() + str.size());
       REQUIRE(v == ver);
     }
 
-    for (const auto& str : invalid_versions) {
+    for (const auto& [str, inv] : invalid_versions) {
       version v;
-      REQUIRE_FALSE(v.from_chars(str.data(), str.data() + str.size()));
+      const auto result = v.from_chars(str.data(), str.data() + str.size());
+      REQUIRE_FALSE(result);
+      REQUIRE(result.ptr != nullptr);
+      REQUIRE(result.ptr == str.data() + inv);
     }
   }
 
   SECTION("to chars") {
     for (const auto& [ver, str] : valid_versions) {
       std::array<char, 255> m = {'\0'};
-      REQUIRE(ver.to_chars(m.data(), m.data() + m.size()));
+      const auto result = ver.to_chars(m.data(), m.data() + m.size());
       const auto s = std::string_view{m.data()};
+      REQUIRE(result);
+      REQUIRE(result.ptr != nullptr);
+      REQUIRE(result.ptr == s.data() + s.size());
       REQUIRE(s == str);
     }
   }
@@ -469,7 +475,7 @@ TEST_CASE("from/to string") {
       REQUIRE(v == ver);
     }
 
-     for (const auto& str : invalid_versions) {
+     for (const auto& [str, inv] : invalid_versions) {
       version v;
       REQUIRE_THROWS(v.from_string(str));
     }
@@ -482,7 +488,7 @@ TEST_CASE("from/to string") {
       REQUIRE(v == ver);
     }
 
-     for (const auto& str : invalid_versions) {
+     for (const auto& [str, inv] : invalid_versions) {
       version v;
       REQUIRE_FALSE(v.from_string_noexcept(str));
     }
