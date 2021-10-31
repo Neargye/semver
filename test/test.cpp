@@ -351,6 +351,39 @@ TEST_CASE("operators") {
      constexpr version v = "1.2.3-rc.4"_version;
      static_assert(v == version{1, 2, 3, "rc.4"});
    }
+
+  SECTION("prerelease compare") {
+//    1.0.0-alpha < 1.0.0-alpha.1 < 1.0.0-alpha.beta < 1.0.0-beta < 1.0.0-beta.2 < 1.0.0-beta.11 < 1.0.0-rc.1 < 1.0.0.
+    constexpr auto v1 = "1.0.0-alpha"_version;
+    constexpr auto v2 = "1.0.0-alpha.1"_version;
+    constexpr auto v3 = "1.0.0-alpha.beta"_version;
+    constexpr auto v4 = "1.0.0-beta"_version;
+    constexpr auto v5 = "1.0.0-beta.2"_version;
+    constexpr auto v6 = "1.0.0-beta.11"_version;
+    constexpr auto v7 = "1.0.0-rc.1"_version;
+    constexpr auto v8 = "1.0.0"_version;
+
+    STATIC_CHECK_OP_AND_REVERSE_FALSE(v1, <, v2);
+    STATIC_CHECK_OP_AND_REVERSE_FALSE(v2, <, v3);
+    STATIC_CHECK_OP_AND_REVERSE_FALSE(v3, <, v4);
+    STATIC_CHECK_OP_AND_REVERSE_FALSE(v4, <, v5);
+    STATIC_CHECK_OP_AND_REVERSE_FALSE(v5, <, v6);
+    STATIC_CHECK_OP_AND_REVERSE_FALSE(v6, <, v7);
+    STATIC_CHECK_OP_AND_REVERSE_FALSE(v7, <, v8);
+
+    STATIC_CHECK_OP_AND_REVERSE_FALSE(v2, >, v1);
+    STATIC_CHECK_OP_AND_REVERSE_FALSE(v3, >, v2);
+    STATIC_CHECK_OP_AND_REVERSE_FALSE(v4, >, v3);
+    STATIC_CHECK_OP_AND_REVERSE_FALSE(v5, >, v4);
+    STATIC_CHECK_OP_AND_REVERSE_FALSE(v6, >, v5);
+    STATIC_CHECK_OP_AND_REVERSE_FALSE(v7, >, v6);
+    STATIC_CHECK_OP_AND_REVERSE_FALSE(v8, >, v7);
+
+    constexpr auto v9 = "1.0.0-alpha.5"_version;
+    constexpr auto v10 = "1.0.0-alpha.10"_version;
+    STATIC_CHECK_OP_AND_REVERSE_FALSE(v9, <, v10);
+    STATIC_CHECK_OP_AND_REVERSE_FALSE(v10, >, v9);
+  }
 }
 
 TEST_CASE("from/to string") {
@@ -773,83 +806,83 @@ TEST_CASE("ranges") {
   }
 }
 
-// TEST_CASE("ranges with prerelase tags") {
-//   SECTION("prerelease tags") {
-//     constexpr std::string_view r1{">1.2.3-alpha.3"};
-//     constexpr std::string_view r2{">=1.2.3 < 2.0.0"};
-//     constexpr std::string_view r3{">=1.2.3-alpha.7 <2.0.0"};
-//     constexpr std::string_view r4{">1.2.3 <2.0.0-alpha.10"};
-//     constexpr std::string_view r5{">1.2.3 <2.0.0-alpha.1 || <=2.0.0-alpha.5"};
-//     constexpr std::string_view r6{"<=2.0.0-alpha.4"};
+ TEST_CASE("ranges with prerelease tags") {
+   SECTION("prerelease tags") {
+     constexpr std::string_view r1{">1.2.3-alpha.3"};
+     constexpr std::string_view r2{">=1.2.3 < 2.0.0"};
+     constexpr std::string_view r3{">=1.2.3-alpha.7 <2.0.0"};
+     constexpr std::string_view r4{">1.2.3 <2.0.0-alpha.10"};
+     constexpr std::string_view r5{">1.2.3 <2.0.0-alpha.1 || <=2.0.0-alpha.5"};
+     constexpr std::string_view r6{"<=2.0.0-alpha.4"};
 
-//     constexpr version v1{"1.2.3-alpha.7"};
-//     constexpr version v2{"3.4.5-alpha.9"};
-//     constexpr version v3{"3.4.5"};
-//     constexpr version v4{"1.2.3-alpha.4"};
-//     constexpr version v5{"2.0.0-alpha.5"};
+     constexpr version v1{"1.2.3-alpha.7"};
+     constexpr version v2{"3.4.5-alpha.9"};
+     constexpr version v3{"3.4.5"};
+     constexpr version v4{"1.2.3-alpha.4"};
+     constexpr version v5{"2.0.0-alpha.5"};
 
-//     SECTION("exclude prerelease") {
-//       STATIC_REQUIRE(range::satisfies(v1, r1));
-//       STATIC_REQUIRE_FALSE(range::satisfies(v2, r1));
-//       STATIC_REQUIRE(range::satisfies(v3, r1));
-//       STATIC_REQUIRE(range::satisfies(v4, r1));
-//       STATIC_REQUIRE_FALSE(range::satisfies(v1, r2));
-//       STATIC_REQUIRE(range::satisfies(v1, r3));
-//       STATIC_REQUIRE(range::satisfies(v5, r4));
-//       STATIC_REQUIRE_FALSE(range::satisfies(v1, r4));
-//       STATIC_REQUIRE(range::satisfies(v5, r5));
-//       STATIC_REQUIRE_FALSE(range::satisfies(v5, r6));
-//     }
+     SECTION("exclude prerelease") {
+       STATIC_REQUIRE(range::satisfies(v1, r1));
+       STATIC_REQUIRE_FALSE(range::satisfies(v2, r1));
+       STATIC_REQUIRE(range::satisfies(v3, r1));
+       STATIC_REQUIRE(range::satisfies(v4, r1));
+       STATIC_REQUIRE_FALSE(range::satisfies(v1, r2));
+       STATIC_REQUIRE(range::satisfies(v1, r3));
+       STATIC_REQUIRE(range::satisfies(v5, r4));
+       STATIC_REQUIRE_FALSE(range::satisfies(v1, r4));
+       STATIC_REQUIRE(range::satisfies(v5, r5));
+       STATIC_REQUIRE_FALSE(range::satisfies(v5, r6));
+     }
 
-//     SECTION("include prerelease") {
-//       STATIC_REQUIRE(range::satisfies(v1, r1, range::satisfies_option::include_prerelease));
-//       STATIC_REQUIRE(range::satisfies(v2, r1, range::satisfies_option::include_prerelease));
-//       STATIC_REQUIRE(range::satisfies(v3, r1, range::satisfies_option::include_prerelease));
-//       STATIC_REQUIRE(range::satisfies(v4, r1, range::satisfies_option::include_prerelease));
-//       STATIC_REQUIRE_FALSE(range::satisfies(v1, r2, range::satisfies_option::include_prerelease));
-//       STATIC_REQUIRE(range::satisfies(v1, r3, range::satisfies_option::include_prerelease));
-//       STATIC_REQUIRE(range::satisfies(v5, r4, range::satisfies_option::include_prerelease));
-//       STATIC_REQUIRE_FALSE(range::satisfies(v1, r4, range::satisfies_option::include_prerelease));
-//       STATIC_REQUIRE(range::satisfies(v5, r5, range::satisfies_option::include_prerelease));
-//       STATIC_REQUIRE_FALSE(range::satisfies(v5, r6, range::satisfies_option::include_prerelease));
-//     }
-//   }
+     SECTION("include prerelease") {
+       STATIC_REQUIRE(range::satisfies(v1, r1, range::satisfies_option::include_prerelease));
+       STATIC_REQUIRE(range::satisfies(v2, r1, range::satisfies_option::include_prerelease));
+       STATIC_REQUIRE(range::satisfies(v3, r1, range::satisfies_option::include_prerelease));
+       STATIC_REQUIRE(range::satisfies(v4, r1, range::satisfies_option::include_prerelease));
+       STATIC_REQUIRE_FALSE(range::satisfies(v1, r2, range::satisfies_option::include_prerelease));
+       STATIC_REQUIRE(range::satisfies(v1, r3, range::satisfies_option::include_prerelease));
+       STATIC_REQUIRE(range::satisfies(v5, r4, range::satisfies_option::include_prerelease));
+       STATIC_REQUIRE_FALSE(range::satisfies(v1, r4, range::satisfies_option::include_prerelease));
+       STATIC_REQUIRE(range::satisfies(v5, r5, range::satisfies_option::include_prerelease));
+       STATIC_REQUIRE_FALSE(range::satisfies(v5, r6, range::satisfies_option::include_prerelease));
+     }
+   }
 
-//   SECTION("prelease type comparison") {
-//     constexpr version v1{"1.0.0-alpha.123"};
-//     constexpr version v2{"1.0.0-beta.123"};
-//     constexpr version v3{"1.0.0-rc.123"};
+   SECTION("prerelease type comparison") {
+     constexpr version v1{"1.0.0-alpha.123"};
+     constexpr version v2{"1.0.0-beta.123"};
+     constexpr version v3{"1.0.0-rc.123"};
 
-//     constexpr std::string_view r1{"<=1.0.0-alpha.123"};
-//     constexpr std::string_view r2{"<=1.0.0-beta.123"};
-//     constexpr std::string_view r3{"<=1.0.0-rc.123"};
+     constexpr std::string_view r1{"<=1.0.0-alpha.123"};
+     constexpr std::string_view r2{"<=1.0.0-beta.123"};
+     constexpr std::string_view r3{"<=1.0.0-rc.123"};
 
-//     SECTION("exclude prerelease") {
-//       STATIC_REQUIRE(range::satisfies(v1, r1));
-//       STATIC_REQUIRE_FALSE(range::satisfies(v2, r1));
-//       STATIC_REQUIRE_FALSE(range::satisfies(v3, r1));
+     SECTION("exclude prerelease") {
+       STATIC_REQUIRE(range::satisfies(v1, r1));
+       STATIC_REQUIRE_FALSE(range::satisfies(v2, r1));
+       STATIC_REQUIRE_FALSE(range::satisfies(v3, r1));
 
-//       STATIC_REQUIRE(range::satisfies(v1, r2));
-//       STATIC_REQUIRE(range::satisfies(v2, r2));
-//       STATIC_REQUIRE_FALSE(range::satisfies(v3, r2));
+       STATIC_REQUIRE(range::satisfies(v1, r2));
+       STATIC_REQUIRE(range::satisfies(v2, r2));
+       STATIC_REQUIRE_FALSE(range::satisfies(v3, r2));
 
-//       STATIC_REQUIRE(range::satisfies(v1, r3));
-//       STATIC_REQUIRE(range::satisfies(v2, r3));
-//       STATIC_REQUIRE(range::satisfies(v3, r3));
-//     }
+       STATIC_REQUIRE(range::satisfies(v1, r3));
+       STATIC_REQUIRE(range::satisfies(v2, r3));
+       STATIC_REQUIRE(range::satisfies(v3, r3));
+     }
 
-//     SECTION("include prerelease") {
-//       STATIC_REQUIRE(range::satisfies(v1, r1, range::satisfies_option::include_prerelease));
-//       STATIC_REQUIRE_FALSE(range::satisfies(v2, r1, range::satisfies_option::include_prerelease));
-//       STATIC_REQUIRE_FALSE(range::satisfies(v3, r1, range::satisfies_option::include_prerelease));
+     SECTION("include prerelease") {
+       STATIC_REQUIRE(range::satisfies(v1, r1, range::satisfies_option::include_prerelease));
+       STATIC_REQUIRE_FALSE(range::satisfies(v2, r1, range::satisfies_option::include_prerelease));
+       STATIC_REQUIRE_FALSE(range::satisfies(v3, r1, range::satisfies_option::include_prerelease));
 
-//       STATIC_REQUIRE(range::satisfies(v1, r2, range::satisfies_option::include_prerelease));
-//       STATIC_REQUIRE(range::satisfies(v2, r2, range::satisfies_option::include_prerelease));
-//       STATIC_REQUIRE_FALSE(range::satisfies(v3, r2, range::satisfies_option::include_prerelease));
+       STATIC_REQUIRE(range::satisfies(v1, r2, range::satisfies_option::include_prerelease));
+       STATIC_REQUIRE(range::satisfies(v2, r2, range::satisfies_option::include_prerelease));
+       STATIC_REQUIRE_FALSE(range::satisfies(v3, r2, range::satisfies_option::include_prerelease));
 
-//       STATIC_REQUIRE(range::satisfies(v1, r3, range::satisfies_option::include_prerelease));
-//       STATIC_REQUIRE(range::satisfies(v2, r3, range::satisfies_option::include_prerelease));
-//       STATIC_REQUIRE(range::satisfies(v3, r3, range::satisfies_option::include_prerelease));
-//     }
-//   }
-// }
+       STATIC_REQUIRE(range::satisfies(v1, r3, range::satisfies_option::include_prerelease));
+       STATIC_REQUIRE(range::satisfies(v2, r3, range::satisfies_option::include_prerelease));
+       STATIC_REQUIRE(range::satisfies(v3, r3, range::satisfies_option::include_prerelease));
+     }
+   }
+ }
