@@ -1030,26 +1030,36 @@ class range {
 
   constexpr bool satisfies(const version& ver, bool include_prerelease) const {
     range_parser parser{str_};
+    if (!parser.init()) {
+      SEMVER_THROW("semver::range invalid range.");
+    }
 
-    auto is_logical_or = [&parser]() constexpr noexcept -> bool { return parser.current_token.type == token_type::logical_or; };
+    auto is_logical_or = [&parser]() constexpr noexcept -> bool { return parser.token_.type == token_type::logical_or; };
 
-    auto is_operator = [&parser]() constexpr noexcept -> bool { return parser.current_token.type == token_type::range_operator; };
+    auto is_operator = [&parser]() constexpr noexcept -> bool { return parser.token_.type == token_type::range_operator; };
 
-    auto is_int = [&parser]() constexpr noexcept -> bool { return parser.current_token.type == token_type::integer; };
+    auto is_int = [&parser]() constexpr noexcept -> bool { return parser.token_.type == token_type::integer; };
 
     const bool has_prerelease = !ver.get_prerelease().empty();
 
     do {
       if (is_logical_or()) {
-        parser.advance_token(token_type::logical_or);
-        parser.skip_whitespaces();
+        if (!parser.advance(token_type::logical_or) ||
+            !parser.skip_whitespaces()) {
+          SEMVER_THROW("semver::range invalid range.");
+        }
       }
 
       bool contains = true;
       bool allow_compare = include_prerelease;
 
       while (is_operator() || is_int()) {
-        const auto range = parser.parse_range();
+        const auto range_opt = parser.parse_range();
+        if (!range_opt.has_value()) {
+          SEMVER_THROW("semver::range invalid range.");
+        }
+
+        const auto range = *range_opt;
         const bool equal_without_tags = equal_to(range.ver, ver, comparators_option::exclude_prerelease);
 
         if (has_prerelease && equal_without_tags) {
@@ -1061,7 +1071,9 @@ class range {
           break;
         }
 
-        parser.skip_whitespaces();
+        if (!parser.skip_whitespaces()) {
+          SEMVER_THROW("semver::range invalid range.");
+        }
       }
 
       if (has_prerelease) {
@@ -1072,7 +1084,9 @@ class range {
         return true;
       }
 
-      parser.skip_whitespaces();
+      if (!parser.skip_whitespaces()) {
+        SEMVER_THROW("semver::range invalid range.");
+      }
 
     } while (is_logical_or());
     
@@ -1104,59 +1118,66 @@ class range {
 
   struct range_parser {
     lexer lexer_;
-    token current_token;
+    token token_;
 
-    explicit constexpr range_parser(std::string_view str) : lexer_{str}, current_token{token_type::none, token_range{}} {
-      advance_token(token_type::none);
+    explicit constexpr range_parser(std::string_view str) : lexer_{str}, token_{token_type::none, token_range{}} {}
+
+    constexpr bool init() {
+      return advance(token_type::none);
     }
 
-    constexpr void advance_token(token_type token_type) {
-      if (current_token.type != token_type) {
-        SEMVER_THROW("semver::range unexpected token.");
+    constexpr bool advance(token_type token_type) {
+      if (token_.type != token_type) {
+        return false;
       }
-      current_token = lexer_.get_next_token();
+      token_ = lexer_.get_next_token();
+      return true;
     }
 
-    constexpr void skip_whitespaces() {
-      while (current_token.type == token_type::space) {
-        advance_token(token_type::space);
+    constexpr bool skip_whitespaces() {
+      while (token_.type == token_type::space) {
+        if (!advance(token_type::space)) {
+          return false;
+        }
       }
+      return true;
     }
 
-    constexpr range_comparator parse_range() {
-      if (current_token.type == token_type::integer) {
-        const auto version = parse_version();
-        return {range_operator::equal, version};
-      } else if (current_token.type == token_type::range_operator) {
+    constexpr std::optional<range_comparator> parse_range() {
+      if (token_.type == token_type::integer) {
+        if (const auto version = parse_version()) {
+          return range_comparator{range_operator::equal, *version};
+        }
+      } else if (token_.type == token_type::range_operator) {
         auto range_operator = range_operator::equal;
-        lexer_.get_operator(current_token.range.pos, current_token.range.len, range_operator);
-        advance_token(token_type::range_operator);
-        const auto version = parse_version();
-        return {range_operator, version};
+        if (lexer_.get_operator(token_.range.pos, token_.range.len, range_operator) &&
+            advance(token_type::range_operator)) {
+          if (const auto version = parse_version()) {
+            return range_comparator{range_operator, *version};
+          }
+        }
       }
 
-      // TODO: unexpected token
-      return {range_operator::equal, version{}};
+      return std::nullopt;
     }
 
-    // TODO: err handle
-    constexpr version parse_version() {
-      skip_whitespaces();
+    constexpr std::optional<version> parse_version() {
+      if (!skip_whitespaces()) {
+        return std::nullopt;
+      }
 
-      version_parser version_parser(lexer_, current_token);
-      version_parser.init();
+      version_parser parser(lexer_, token_);
 
-      int_t major = 0;
-      int_t minor = 0;
-      int_t patch = 0;
-      version_parser.parse_core(major, minor, patch);
-
+      int_t major = 0, minor = 0, patch = 0;
       std::string_view prerelease;
-      version_parser.parse_prerelease(prerelease);
-      std::string_view build_metadata;
-      version_parser.parse_build(build_metadata);
 
-      return {major, minor, patch, prerelease, build_metadata};
+      if (parser.init() &&
+          parser.parse_core(major, minor, patch) &&
+          parser.parse_prerelease(prerelease)) {
+        return version{major, minor, patch, prerelease};
+      }
+
+      return std::nullopt;
     }
   };
 
