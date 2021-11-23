@@ -208,15 +208,7 @@ constexpr int compare(std::string_view lhs, std::string_view rhs) {
 #endif
 
   if constexpr (workaround) {
-    if (lhs.size() < rhs.size()) {
-      return -1;
-    }
-
-    if (lhs.size() > rhs.size()) {
-      return 1;
-    }
-
-    const auto size = lhs.size();
+    const auto size = std::min(lhs.size(), rhs.size());
     for (std::size_t i = 0; i < size; ++i) {
       if (lhs[i] < rhs[i]) {
         return -1;
@@ -225,7 +217,7 @@ constexpr int compare(std::string_view lhs, std::string_view rhs) {
       }
     }
 
-    return 0;
+    return static_cast<int>(lhs.size() - rhs.size());
   } else {
     return lhs.compare(rhs);
   }
