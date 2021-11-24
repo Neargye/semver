@@ -262,4 +262,3 @@ TEST_CASE("operators") {
     STATIC_CHECK_OP_AND_REVERSE_FALSE(v10, >, v9);
   }
 }
-
