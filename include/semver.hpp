@@ -103,8 +103,11 @@ struct to_chars_result {
 };
 #endif
 
-// TODO: template str_t int_t
-using int_t = std::uint32_t;
+#if defined(SEMVER_USING_ALIAS_INTEGER)
+SEMVER_USING_ALIAS_INTEGER
+#else
+using integer_type = std::uint32_t;
+#endif
 
 namespace detail {
 
@@ -144,8 +147,7 @@ constexpr std::uint8_t to_digit(char c) noexcept {
   return static_cast<std::uint8_t>(c - '0');
 }
 
-constexpr std::size_t length(int_t x) noexcept {
-  // TODO: more fast
+constexpr std::size_t length(integer_type x) noexcept {
   std::size_t number_of_digits = 0;
   do {
     ++number_of_digits;
@@ -155,7 +157,7 @@ constexpr std::size_t length(int_t x) noexcept {
   return number_of_digits;
 }
 
-constexpr char* to_chars(char* str, int_t x) noexcept {
+constexpr char* to_chars(char* str, integer_type x) noexcept {
   do {
     *(--str) = static_cast<char>('0' + (x % 10));
     x /= 10;
@@ -172,14 +174,14 @@ constexpr char* to_chars(char* str, std::string_view s) noexcept {
   return str;
 }
 
-constexpr const char* from_chars(const char* first, const char* last, int_t& d) noexcept {
+constexpr const char* from_chars(const char* first, const char* last, integer_type& d) noexcept {
   if (first != last && is_digit(*first)) {
-    int i   = 0;
-    int_t t = 0;
+    int i = 0;
+    integer_type t = 0;
     for (; first != last && is_digit(*first); ++first, ++i) {
       t = t * 10 + to_digit(*first);
     }
-    if (i <= std::numeric_limits<int_t>::digits10) {
+    if (i <= std::numeric_limits<integer_type>::digits10) {
       d = t;
       return first;
     }
@@ -327,7 +329,7 @@ class lexer {
     return {token_type::unexpected, {}};
   }
 
-  constexpr bool get_int(std::size_t pos, std::size_t len, int_t& result) const noexcept {
+  constexpr bool get_int(std::size_t pos, std::size_t len, integer_type& result) const noexcept {
     return from_chars(text_.data() + pos, text_.data() + pos + len, result);
   }
 
@@ -490,7 +492,7 @@ private:
   }
 
   [[nodiscard]] constexpr int compare_numeric(const token& lhs_identifier, const token& rhs_identifier) const noexcept {
-    int_t lhs_i = 0, rhs_i = 0;
+    integer_type lhs_i = 0, rhs_i = 0;
     lhs.get_int(lhs_identifier.range.pos, lhs_identifier.range.len, lhs_i);
     rhs.get_int(rhs_identifier.range.pos, rhs_identifier.range.len, rhs_i);
 
@@ -518,7 +520,7 @@ class version_parser {
     return true;
   }
 
-  constexpr bool parse_core(int_t& major, int_t& minor, int_t& patch) {
+  constexpr bool parse_core(integer_type& major, integer_type& minor, integer_type& patch) {
     return parse_integer(major) &&
            advance(token_type::integer) &&
            advance(token_type::dot) &&
@@ -621,7 +623,7 @@ class version_parser {
     return lexer_.get_string(pos, len, build_metadata);
   }
 
-  constexpr bool parse_integer(int_t& value) {
+  constexpr bool parse_integer(integer_type& value) {
     // version with leading zeros in [major, minor, patch] is invalid.
     if (has_leading_zero())
       return false;
@@ -702,16 +704,13 @@ constexpr int compare_prerelease(std::string_view lhs, std::string_view rhs) noe
 } // namespace semver::detail
 
 class version {
-  int_t major                     = 0;
-  int_t minor                     = 1;
-  int_t patch                     = 0;
-  std::string_view prerelease     = {};
-  std::string_view build_metadata = {};
-
  public:
-  constexpr version(int_t mj,
-                    int_t mn,
-                    int_t pt,
+  using string_type  = std::string_view;
+  using integer_type = semver::integer_type;
+
+  constexpr version(integer_type mj,
+                    integer_type mn,
+                    integer_type pt,
                     std::string_view pr = {},
                     std::string_view bm = {})
         : major(mj),
@@ -841,25 +840,25 @@ class version {
     return detail::compare_prerelease(prerelease, other.prerelease);
   }
 
-  [[nodiscard]] constexpr int_t get_major() const noexcept { return major; }
+  [[nodiscard]] constexpr integer_type get_major() const noexcept { return major; }
 
-  constexpr version& set_major(int_t mj) noexcept {
+  constexpr version& set_major(integer_type mj) noexcept {
     major = mj;
 
     return *this;
   }
 
-  [[nodiscard]] constexpr int_t get_minor() const noexcept { return minor; }
+  [[nodiscard]] constexpr integer_type get_minor() const noexcept { return minor; }
 
-  constexpr version& set_minor(int_t mn) noexcept {
+  constexpr version& set_minor(integer_type mn) noexcept {
     minor = mn;
 
     return *this;
   }
 
-  [[nodiscard]] constexpr int_t get_patch() const noexcept { return patch; }
+  [[nodiscard]] constexpr integer_type get_patch() const noexcept { return patch; }
 
-  constexpr version& set_patch(int_t pt) noexcept {
+  constexpr version& set_patch(integer_type pt) noexcept {
     patch = pt;
 
     return *this;
@@ -902,6 +901,13 @@ class version {
 
     return valid;
   }
+
+ private:
+  integer_type major         = 0;
+  integer_type minor         = 1;
+  integer_type patch         = 0;
+  string_type prerelease     = {};
+  string_type build_metadata = {};
 };
 
 [[nodiscard]] constexpr bool operator==(const version& lhs, const version& rhs) noexcept {
@@ -1160,7 +1166,7 @@ class range {
 
       version_parser parser(lexer_, token_);
 
-      int_t major = 0, minor = 0, patch = 0;
+      integer_type major = 0, minor = 0, patch = 0;
       std::string_view prerelease;
 
       if (parser.init() &&
