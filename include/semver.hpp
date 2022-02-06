@@ -39,10 +39,6 @@
 #ifndef NEARGYE_SEMANTIC_VERSIONING_HPP
 #define NEARGYE_SEMANTIC_VERSIONING_HPP
 
-#define SEMVER_VERSION_MAJOR 0
-#define SEMVER_VERSION_MINOR 4
-#define SEMVER_VERSION_PATCH 0
-
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -509,7 +505,7 @@ private:
 
 class version_parser {
  public:
-  constexpr version_parser(lexer& lexer, token& token) : lexer_{lexer}, token_{token}, length_{0} {
+  constexpr version_parser(lexer& lexer, token& token) : lexer_{lexer}, token_{token} {
   }
 
   constexpr bool init() {
@@ -628,19 +624,15 @@ class version_parser {
     return lexer_.get_string(pos, len, build_metadata);
   }
 
-  constexpr std::size_t get_length() const noexcept { return length_; }
-
  private:
   lexer& lexer_;
   token& token_;
-  std::size_t length_;
 
   [[nodiscard]] constexpr bool advance(token_type expected_token) {
     if (token_.type != expected_token) {
       return false;
     }
 
-    length_ += token_.range.len;
     token_ = lexer_.get_next_token();
     return token_.type != token_type::unexpected;
   }
@@ -706,7 +698,7 @@ constexpr int compare_prerelease(std::string_view lhs, std::string_view rhs) noe
   return prerelease_comparator{lhs, rhs}.compare();
 }
 
-struct _version {
+struct version {
   std::string_view major;
   std::string_view minor;
   std::string_view patch;
@@ -714,7 +706,7 @@ struct _version {
   std::string_view build_metadata;
 };
 
-constexpr int compare(const _version& lhs, const _version& rhs) {
+constexpr int compare(const version& lhs, const version& rhs) {
   if (int result = compare_numerically(lhs.major, rhs.major); result != 0) {
     return result;
   }
@@ -734,7 +726,7 @@ constexpr int compare(const _version& lhs, const _version& rhs) {
   return detail::compare_prerelease(lhs.prerelease, rhs.prerelease);
 }
 
-constexpr bool parse(std::string_view str, _version& result) {
+constexpr bool parse(std::string_view str, version& result) {
   lexer lexer{str};
   detail::token token{token_type::none, token_range{}};
   version_parser parser{lexer, token};
@@ -747,13 +739,13 @@ constexpr bool parse(std::string_view str, _version& result) {
 
 constexpr int parse_and_compare(std::string_view lhs, std::string_view rhs) {
   // TODO: error handling
-  _version lhs_version, rhs_version;
+  version lhs_version, rhs_version;
   parse(lhs, lhs_version);
   parse(rhs, rhs_version);
   return compare(lhs_version, rhs_version);
 }
 
-}; // namespace semver::detail
+} // namespace semver::detail
 
 struct version_view {
   integer_type major;
@@ -806,160 +798,6 @@ constexpr bool less_equal(std::string_view lhs, std::string_view rhs) {
   return detail::parse_and_compare(lhs, rhs) <= 0;
 }
 
-class version {
- public:
-  using string_type  = std::string_view;
-  using integer_type = semver::integer_type;
-
-  constexpr version(integer_type mj,
-                    integer_type mn,
-                    integer_type pt,
-                    std::string_view pr = {},
-                    std::string_view bm = {})
-        : major(mj),
-          minor(mn),
-          patch(pt),
-          prerelease(pr),
-          build_metadata(bm) {
-    if (!prerelease.empty() && !detail::is_prerelease_valid(prerelease)) {
-      SEMVER_THROW("semver::version invalid prerelease tag.");
-    }
-
-    if (!build_metadata.empty() && !detail::is_build_metadata_valid(build_metadata)) {
-      SEMVER_THROW("semver::version invalid build metadata.");
-    }
-  }
-
-  explicit constexpr version(std::string_view str) : version(0, 0, 0) {
-    (void) str;
-  }
-
-  constexpr version() = default; // https://semver.org/#how-should-i-deal-with-revisions-in-the-0yz-initial-development-phase
-
-  constexpr version(const version&) = default;
-
-  constexpr version(version&&) = default;
-
-  ~version() = default;
-
-  version& operator=(const version&) = default;
-
-  version& operator=(version&&) = default;
-
-  [[nodiscard]] constexpr int compare(const version& other) const noexcept {
-    if (major != other.major) {
-      return static_cast<int>(major - other.major);
-    }
-
-    if (minor != other.minor) {
-      return static_cast<int>(minor - other.minor);
-    }
-
-    if (patch != other.patch) {
-      return static_cast<int>(patch - other.patch);
-    }
-
-    if (prerelease.empty() != other.prerelease.empty()) {
-      return static_cast<int>(other.prerelease.size() - prerelease.size());
-    }
-
-    return detail::compare_prerelease(prerelease, other.prerelease);
-  }
-
-  [[nodiscard]] constexpr integer_type get_major() const noexcept { return major; }
-
-  constexpr version& set_major(integer_type mj) noexcept {
-    major = mj;
-
-    return *this;
-  }
-
-  [[nodiscard]] constexpr integer_type get_minor() const noexcept { return minor; }
-
-  constexpr version& set_minor(integer_type mn) noexcept {
-    minor = mn;
-
-    return *this;
-  }
-
-  [[nodiscard]] constexpr integer_type get_patch() const noexcept { return patch; }
-
-  constexpr version& set_patch(integer_type pt) noexcept {
-    patch = pt;
-
-    return *this;
-  }
-
-  [[nodiscard]] constexpr std::string_view get_prerelease() const noexcept { return prerelease; }
-
-  constexpr version& set_prerelease(std::string_view pr) {
-    if (!set_prerelease_noexcept(pr)) {
-      SEMVER_THROW("semver::version::set_prerelease invalid prerelease tag.");
-    }
-
-    return *this;
-  }
-
-  constexpr bool set_prerelease_noexcept(std::string_view pr) noexcept {
-    const bool valid = detail::is_prerelease_valid(pr);
-    if (valid) {
-      prerelease = pr;
-    }
-
-    return valid;
-  }
-
-  [[nodiscard]] constexpr std::string_view get_build_metadata() const noexcept { return build_metadata; }
-
-  constexpr version& set_build_metadata(std::string_view bm) {
-    if (!set_build_metadata_noexcept(bm)) {
-      SEMVER_THROW("semver::version::set_build_metadata invalid build metadata.");
-    }
-
-    return *this;
-  }
-
-  constexpr bool set_build_metadata_noexcept(std::string_view bm) noexcept {
-    const bool valid = detail::is_build_metadata_valid(bm);
-    if (valid) {
-      build_metadata = bm;
-    }
-
-    return valid;
-  }
-
- private:
-  integer_type major         = 0;
-  integer_type minor         = 1;
-  integer_type patch         = 0;
-  string_type prerelease     = {};
-  string_type build_metadata = {};
-};
-
-[[nodiscard]] constexpr bool operator==(const version& lhs, const version& rhs) noexcept {
-  return lhs.compare(rhs) == 0;
-}
-
-[[nodiscard]] constexpr bool operator!=(const version& lhs, const version& rhs) noexcept {
-  return lhs.compare(rhs) != 0;
-}
-
-[[nodiscard]] constexpr bool operator>(const version& lhs, const version& rhs) noexcept {
-  return lhs.compare(rhs) > 0;
-}
-
-[[nodiscard]] constexpr bool operator>=(const version& lhs, const version& rhs) noexcept {
-  return lhs.compare(rhs) >= 0;
-}
-
-[[nodiscard]] constexpr bool operator<(const version& lhs, const version& rhs) noexcept {
-  return lhs.compare(rhs) < 0;
-}
-
-[[nodiscard]] constexpr bool operator<=(const version& lhs, const version& rhs) noexcept {
-  return lhs.compare(rhs) <= 0;
-}
-
 inline namespace comparators {
 
 enum struct comparators_option : std::uint8_t {
@@ -967,36 +805,13 @@ enum struct comparators_option : std::uint8_t {
   include_prerelease
 };
 
-[[nodiscard]] constexpr int compare(const version& lhs, const version& rhs, comparators_option option = comparators_option::include_prerelease) noexcept {
+[[nodiscard]] constexpr int compare(const detail::version& lhs, const detail::version& rhs, comparators_option option = comparators_option::include_prerelease) noexcept {
   if (option == comparators_option::exclude_prerelease) {
-    return version{lhs.get_major(), lhs.get_minor(), lhs.get_patch()}.compare(version{rhs.get_major(), rhs.get_minor(), rhs.get_patch()});
+    return detail::compare(detail::version{lhs.major, lhs.minor, lhs.patch, {}, {}},
+                           detail::version{rhs.major, rhs.minor, rhs.patch, {}, {}});
   }
 
-  return lhs.compare(rhs);
-}
-
-[[nodiscard]] constexpr bool equal_to(const version& lhs, const version& rhs, comparators_option option = comparators_option::include_prerelease) noexcept {
-  return compare(lhs, rhs, option) == 0;
-}
-
-[[nodiscard]] constexpr bool not_equal_to(const version& lhs, const version& rhs, comparators_option option = comparators_option::include_prerelease) noexcept {
-  return compare(lhs, rhs, option) != 0;
-}
-
-[[nodiscard]] constexpr bool greater(const version& lhs, const version& rhs, comparators_option option = comparators_option::include_prerelease) noexcept {
-  return compare(lhs, rhs, option) > 0;
-}
-
-[[nodiscard]] constexpr bool greater_equal(const version& lhs, const version& rhs, comparators_option option = comparators_option::include_prerelease) noexcept {
-  return compare(lhs, rhs, option) >= 0;
-}
-
-[[nodiscard]] constexpr bool less(const version& lhs, const version& rhs, comparators_option option = comparators_option::include_prerelease) noexcept {
-  return compare(lhs, rhs, option) < 0;
-}
-
-[[nodiscard]] constexpr bool less_equal(const version& lhs, const version& rhs, comparators_option option = comparators_option::include_prerelease) noexcept {
-  return compare(lhs, rhs, option) <= 0;
+  return detail::compare(lhs, rhs);
 }
 
 } // namespace semver::comparators
@@ -1011,7 +826,12 @@ class range {
  public:
   explicit constexpr range(std::string_view str) noexcept : str_{str} {}
 
-  constexpr bool satisfies(const version& ver, bool include_prerelease) const {
+  constexpr bool satisfies(std::string_view version_str, bool include_prerelease) const {
+    version version{};
+    if (!parse(version_str, version)) {
+      SEMVER_THROW("semver::range invalid version.");
+    }
+
     range_parser parser{str_};
     if (!parser.init()) {
       SEMVER_THROW("semver::range invalid range.");
@@ -1023,7 +843,7 @@ class range {
 
     auto is_int = [&parser]() constexpr noexcept -> bool { return parser.token_.type == token_type::numeric_identifier; };
 
-    const bool has_prerelease = !ver.get_prerelease().empty();
+    const bool has_prerelease = !version.prerelease.empty();
 
     do {
       if (is_logical_or()) {
@@ -1043,13 +863,13 @@ class range {
         }
 
         const auto range = *range_opt;
-        const bool equal_without_tags = equal_to(range.ver, ver, comparators_option::exclude_prerelease);
+        const bool equal_without_tags = compare(range.ver, version, comparators_option::exclude_prerelease) == 0;
 
         if (has_prerelease && equal_without_tags) {
           allow_compare = true;
         }
 
-        if (!range.satisfies(ver)) {
+        if (!range.satisfies(version)) {
           contains = false;
           break;
         }
@@ -1084,15 +904,15 @@ class range {
     constexpr bool satisfies(const version& version) const {
       switch (op) {
         case range_operator::equal:
-          return version == ver;
+          return detail::compare(version, ver) == 0;
         case range_operator::greater:
-          return version > ver;
+          return detail::compare(version, ver) > 0;
         case range_operator::greater_or_equal:
-          return version >= ver;
+          return detail::compare(version, ver) >= 0;
         case range_operator::less:
-          return version < ver;
+          return detail::compare(version, ver) < 0;
         case range_operator::less_or_equal:
-          return version <= ver;
+          return detail::compare(version, ver) <= 0;
         default:
           SEMVER_THROW("semver::range unexpected operator.");
       }
@@ -1151,12 +971,15 @@ class range {
 
       version_parser parser(lexer_, token_);
 
-      integer_type major = 0, minor = 0, patch = 0;
+      std::string_view major, minor, patch;
       std::string_view prerelease;
 
       if (parser.init() &&
+          parser.parse_major(major) &&
+          parser.parse_minor(minor) &&
+          parser.parse_patch(patch) &&
           parser.parse_prerelease(prerelease)) { // TODO: parse build?
-        return version{major, minor, patch, prerelease};
+        return version{major, minor, patch, prerelease, {}};
       }
 
       return std::nullopt;
@@ -1173,12 +996,12 @@ enum struct satisfies_option : std::uint8_t {
   include_prerelease
 };
 
-constexpr bool satisfies(const version& ver, std::string_view str, satisfies_option option = satisfies_option::exclude_prerelease) {
+constexpr bool satisfies(std::string_view version, std::string_view range, satisfies_option option = satisfies_option::exclude_prerelease) {
   switch (option) {
   case satisfies_option::exclude_prerelease:
-    return detail::range{str}.satisfies(ver, false);
+    return detail::range{range}.satisfies(version, false);
   case satisfies_option::include_prerelease:
-    return detail::range{str}.satisfies(ver, true);
+    return detail::range{range}.satisfies(version, true);
   default:
     SEMVER_THROW("semver::range unexpected satisfies_option.");
   }
@@ -1187,7 +1010,7 @@ constexpr bool satisfies(const version& ver, std::string_view str, satisfies_opt
 } // namespace semver::range
 
 // Version lib semver.
-inline constexpr auto semver_version = version{SEMVER_VERSION_MAJOR, SEMVER_VERSION_MINOR, SEMVER_VERSION_PATCH};
+inline constexpr auto semver_version = "0.4.0";
 
 } // namespace semver
 

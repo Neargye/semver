@@ -25,8 +25,4 @@
 #include <catch.hpp>
 #include <semver.hpp>
 
-using namespace semver;
-
-static_assert(semver_version.get_major() == SEMVER_VERSION_MAJOR);
-static_assert(semver_version.get_minor() == SEMVER_VERSION_MINOR);
-static_assert(semver_version.get_patch() == SEMVER_VERSION_PATCH);
+static_assert(semver::equal(semver::semver_version, "0.4.0"));
