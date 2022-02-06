@@ -229,26 +229,29 @@ constexpr bool compare_equal(std::string_view lhs, std::string_view rhs) {
   return compare(lhs, rhs) == 0;
 }
 
-template <typename T, typename = void>
-struct resize_uninitialized {
-  static auto resize(T& str, std::size_t size) -> std::void_t<decltype(str.resize(size))> {
-    str.resize(size);
-  }
-};
+constexpr int compare_numerically(std::string_view lhs, std::string_view rhs) {
+  // assume that strings don't have leading zeros (we've already checked it at parsing stage).
 
-template <typename T>
-struct resize_uninitialized<T, std::void_t<decltype(std::declval<T>().__resize_default_init(42))>> {
-   static void resize(T& str, std::size_t size) {
-      str.__resize_default_init(size);
-   }
-};
+  if (lhs.size() != rhs.size()) {
+    return static_cast<int>(lhs.size() - rhs.size());
+  }
+
+  for (std::size_t i = 0; i < lhs.size(); ++i) {
+    int a = lhs[i] - '0';
+    int b = rhs[i] - '0';
+    if (a != b) {
+      return a - b;
+    }
+  }
+
+  return 0;
+}
 
 enum class token_type : std::uint8_t {
   none,
   eol,
   space,
   dot,
-  integer,
   plus,
   hyphen,
   letter,
@@ -294,7 +297,7 @@ class lexer {
     }
 
     if (is_digit(text_[pos])) {
-      return {token_type::integer, get_int_range()};
+      return {token_type::numeric_identifier, get_int_range()};
     }
 
     if (is_dot(text_[pos])) {
@@ -327,10 +330,6 @@ class lexer {
     }
 
     return {token_type::unexpected, {}};
-  }
-
-  constexpr bool get_int(std::size_t pos, std::size_t len, integer_type& result) const noexcept {
-    return from_chars(text_.data() + pos, text_.data() + pos + len, result);
   }
 
   constexpr bool get_string(std::size_t pos, std::size_t len, std::string_view& result) const noexcept {
@@ -492,11 +491,11 @@ private:
   }
 
   [[nodiscard]] constexpr int compare_numeric(const token& lhs_identifier, const token& rhs_identifier) const noexcept {
-    integer_type lhs_i = 0, rhs_i = 0;
-    lhs.get_int(lhs_identifier.range.pos, lhs_identifier.range.len, lhs_i);
-    rhs.get_int(rhs_identifier.range.pos, rhs_identifier.range.len, rhs_i);
+    std::string_view lhs_sv, rhs_sv;
+    lhs.get_string(lhs_identifier.range.pos, lhs_identifier.range.len, lhs_sv);
+    rhs.get_string(rhs_identifier.range.pos, rhs_identifier.range.len, rhs_sv);
 
-    return static_cast<int>(lhs_i - rhs_i);
+    return detail::compare_numerically(lhs_sv, rhs_sv);
   }
 
   [[nodiscard]] constexpr int compare_non_numeric(const token& lhs_identifier, const token& rhs_identifier) const noexcept {
@@ -520,15 +519,21 @@ class version_parser {
     return true;
   }
 
-  constexpr bool parse_core(integer_type& major, integer_type& minor, integer_type& patch) {
-    return parse_integer(major) &&
-           advance(token_type::integer) &&
-           advance(token_type::dot) &&
-           parse_integer(minor) &&
-           advance(token_type::integer) &&
-           advance(token_type::dot) &&
-           parse_integer(patch) &&
-           advance(token_type::integer);
+  constexpr bool parse_major(std::string_view& major) {
+    return parse_number(major) &&
+           advance(token_type::numeric_identifier) &&
+           advance(token_type::dot);
+  }
+
+  constexpr bool parse_minor(std::string_view& minor) {
+    return parse_number(minor) &&
+           advance(token_type::numeric_identifier) &&
+           advance(token_type::dot);
+  }
+
+  constexpr bool parse_patch(std::string_view& patch) {
+    return parse_number(patch) &&
+           advance(token_type::numeric_identifier);
   }
 
   constexpr bool parse_prerelease(std::string_view& prerelease) {
@@ -623,14 +628,6 @@ class version_parser {
     return lexer_.get_string(pos, len, build_metadata);
   }
 
-  constexpr bool parse_integer(integer_type& value) {
-    // version with leading zeros in [major, minor, patch] is invalid.
-    if (has_leading_zero())
-      return false;
-
-    return lexer_.get_int(token_.range.pos, token_.range.len, value);
-  }
-
   constexpr std::size_t get_length() const noexcept { return length_; }
 
  private:
@@ -646,6 +643,14 @@ class version_parser {
     length_ += token_.range.len;
     token_ = lexer_.get_next_token();
     return token_.type != token_type::unexpected;
+  }
+
+  constexpr bool parse_number(std::string_view& value) {
+    // version with leading zeros in [major, minor, patch] is invalid.
+    if (has_leading_zero())
+      return false;
+
+    return lexer_.get_string(token_.range.pos, token_.range.len, value);
   }
 
   constexpr bool has_leading_zero() const {
@@ -677,7 +682,7 @@ class version_parser {
   }
 
   constexpr bool is_integer() const {
-    return token_.type == token_type::integer;
+    return token_.type == token_type::numeric_identifier;
   }
 };
 
@@ -701,7 +706,105 @@ constexpr int compare_prerelease(std::string_view lhs, std::string_view rhs) noe
   return prerelease_comparator{lhs, rhs}.compare();
 }
 
-} // namespace semver::detail
+struct _version {
+  std::string_view major;
+  std::string_view minor;
+  std::string_view patch;
+  std::string_view prerelease;
+  std::string_view build_metadata;
+};
+
+constexpr int compare(const _version& lhs, const _version& rhs) {
+  if (int result = compare_numerically(lhs.major, rhs.major); result != 0) {
+    return result;
+  }
+
+  if (int result = compare_numerically(lhs.minor, rhs.minor); result != 0) {
+    return result;
+  }
+
+  if (int result = compare_numerically(lhs.patch, rhs.patch); result != 0) {
+    return result;
+  }
+
+  if (lhs.prerelease.empty() != rhs.prerelease.empty()) {
+    return static_cast<int>(rhs.prerelease.size() - lhs.prerelease.size());
+  }
+
+  return detail::compare_prerelease(lhs.prerelease, rhs.prerelease);
+}
+
+constexpr bool parse(std::string_view str, _version& result) {
+  lexer lexer{str};
+  detail::token token{token_type::none, token_range{}};
+  version_parser parser{lexer, token};
+  return parser.init() && parser.parse_major(result.major) &&
+         parser.parse_minor(result.minor) &&
+         parser.parse_patch(result.patch) &&
+         parser.parse_prerelease(result.prerelease) &&
+         parser.parse_build(result.build_metadata);
+}
+
+constexpr int parse_and_compare(std::string_view lhs, std::string_view rhs) {
+  // TODO: error handling
+  _version lhs_version, rhs_version;
+  parse(lhs, lhs_version);
+  parse(rhs, rhs_version);
+  return compare(lhs_version, rhs_version);
+}
+
+}; // namespace semver::detail
+
+struct version_view {
+  integer_type major;
+  integer_type minor;
+  integer_type patch;
+  std::string_view prerelease;
+  std::string_view build_metadata;
+};
+
+// new api
+template<typename I1, typename I2, typename I3>
+constexpr bool parse(std::string_view version, I1& major, I2& minor, I3& patch,
+                     const char* prerelease = nullptr,
+                     const char* build_meta = nullptr) {
+  (void) version;
+  (void) major;
+  (void) minor;
+  (void) patch;
+  (void) prerelease;
+  (void) build_meta;
+  return false;
+}
+
+constexpr bool valid(std::string_view version) {
+  (void) version;
+  return false;
+}
+
+constexpr bool equal(std::string_view lhs, std::string_view rhs) {
+  return detail::parse_and_compare(lhs, rhs) == 0;
+}
+
+constexpr bool not_equal(std::string_view lhs, std::string_view rhs) {
+  return detail::parse_and_compare(lhs, rhs) != 0;
+}
+
+constexpr bool greater(std::string_view lhs, std::string_view rhs) {
+  return detail::parse_and_compare(lhs, rhs) > 0;
+}
+
+constexpr bool greater_equal(std::string_view lhs, std::string_view rhs) {
+  return detail::parse_and_compare(lhs, rhs) >= 0;
+}
+
+constexpr bool less(std::string_view lhs, std::string_view rhs) {
+  return detail::parse_and_compare(lhs, rhs) < 0;
+}
+
+constexpr bool less_equal(std::string_view lhs, std::string_view rhs) {
+  return detail::parse_and_compare(lhs, rhs) <= 0;
+}
 
 class version {
  public:
@@ -728,7 +831,7 @@ class version {
   }
 
   explicit constexpr version(std::string_view str) : version(0, 0, 0) {
-    from_string(str);
+    (void) str;
   }
 
   constexpr version() = default; // https://semver.org/#how-should-i-deal-with-revisions-in-the-0yz-initial-development-phase
@@ -742,83 +845,6 @@ class version {
   version& operator=(const version&) = default;
 
   version& operator=(version&&) = default;
-
-  [[nodiscard]] constexpr from_chars_result from_chars(const char* first, const char* last) noexcept {
-    const auto length = (last - first);
-    if (first == nullptr || last == nullptr || length < 0) {
-      return {first, std::errc::invalid_argument};
-    }
-
-    detail::lexer lexer(std::string_view(first, static_cast<std::size_t>(length)));
-    detail::token token{detail::token_type::none, detail::token_range{0, 0}};
-    detail::version_parser parser(lexer, token);
-
-    if (parser.init() && parser.parse_core(major, minor, patch) && parser.parse_prerelease(prerelease) && parser.parse_build(build_metadata)) {
-      return {first + parser.get_length(), std::errc{}};
-    }
-
-    return {first + parser.get_length(), std::errc::invalid_argument};
-  }
-
-  [[nodiscard]] constexpr to_chars_result to_chars(char* first, char* last) const noexcept {
-    const auto length = string_length();
-    if (first == nullptr || last == nullptr || (last - first) < 0 || static_cast<std::size_t>(last - first) < length) {
-      return {last, std::errc::value_too_large};
-    }
-
-    auto next = first + length;
-    if (build_metadata.length() > 0) {
-      next = detail::to_chars(next, build_metadata);
-      *(--next) = '+';
-    }
-    if (prerelease.length() > 0) {
-      next = detail::to_chars(next, prerelease);
-      *(--next) = '-';
-    }
-    next = detail::to_chars(next, patch);
-    *(--next) = '.';
-    next = detail::to_chars(next, minor);
-    *(--next) = '.';
-    next = detail::to_chars(next, major);
-
-    return {first + length, std::errc{}};
-  }
-
-  [[nodiscard]] constexpr bool from_string_noexcept(std::string_view str) noexcept {
-    return from_chars(str.data(), str.data() + str.length());
-  }
-
-  constexpr version& from_string(std::string_view str) {
-    if (!from_string_noexcept(str)) {
-      SEMVER_THROW("semver::version::from_string invalid version.");
-    }
-
-    return *this;
-  }
-
-  [[nodiscard]] std::string to_string() const {
-    auto str = std::string{};
-    detail::resize_uninitialized<std::string>::resize(str, string_length());
-    if (!to_chars(str.data(), str.data() + str.length())) {
-      SEMVER_THROW("semver::version::to_string invalid version.");
-    }
-
-    return str;
-  }
-
-  [[nodiscard]] constexpr std::size_t string_length() const noexcept {
-    // length(<major>) + length(.) + length(<minor>) + length(.) + length(<patch>)
-    std::size_t result = detail::length(major) + detail::length(minor) + detail::length(patch) + 2;
-    if (!prerelease.empty()) {
-      // length(-) + length(<prerelease>)
-      result += prerelease.length() + 1;
-    }
-    if (!build_metadata.empty()) {
-      // length(+) + length(<build_metadata>)
-      result += build_metadata.length() + 1;
-    }
-    return result;
-  }
 
   [[nodiscard]] constexpr int compare(const version& other) const noexcept {
     if (major != other.major) {
@@ -934,47 +960,6 @@ class version {
   return lhs.compare(rhs) <= 0;
 }
 
-[[nodiscard]] constexpr version operator""_version(const char* str, std::size_t length) {
-  return version{std::string_view{str, length}};
-}
-
-[[nodiscard]] constexpr bool valid(std::string_view str) noexcept {
-  return version{}.from_string_noexcept(str);
-}
-
-[[nodiscard]] constexpr from_chars_result from_chars(const char* first, const char* last, version& v) noexcept {
-  return v.from_chars(first, last);
-}
-
-[[nodiscard]] constexpr to_chars_result to_chars(char* first, char* last, const version& v) noexcept {
-  return v.to_chars(first, last);
-}
-
-[[nodiscard]] constexpr std::optional<version> from_string_noexcept(std::string_view str) noexcept {
-  if (version v; v.from_string_noexcept(str)) {
-    return v;
-  }
-
-  return std::nullopt;
-}
-
-[[nodiscard]] constexpr version from_string(std::string_view str) {
-  return version{str};
-}
-
-[[nodiscard]] inline std::string to_string(const version& v) {
-  return v.to_string();
-}
-
-template <typename Char, typename Traits>
-inline std::basic_ostream<Char, Traits>& operator<<(std::basic_ostream<Char, Traits>& os, const version& v) {
-  for (const auto c : v.to_string()) {
-    os.put(c);
-  }
-
-  return os;
-}
-
 inline namespace comparators {
 
 enum struct comparators_option : std::uint8_t {
@@ -1036,7 +1021,7 @@ class range {
 
     auto is_operator = [&parser]() constexpr noexcept -> bool { return parser.token_.type == token_type::range_operator; };
 
-    auto is_int = [&parser]() constexpr noexcept -> bool { return parser.token_.type == token_type::integer; };
+    auto is_int = [&parser]() constexpr noexcept -> bool { return parser.token_.type == token_type::numeric_identifier; };
 
     const bool has_prerelease = !ver.get_prerelease().empty();
 
@@ -1142,7 +1127,7 @@ class range {
     }
 
     constexpr std::optional<range_comparator> parse_range() {
-      if (token_.type == token_type::integer) {
+      if (token_.type == token_type::numeric_identifier) {
         if (const auto version = parse_version()) {
           return range_comparator{range_operator::equal, *version};
         }
@@ -1170,8 +1155,7 @@ class range {
       std::string_view prerelease;
 
       if (parser.init() &&
-          parser.parse_core(major, minor, patch) &&
-          parser.parse_prerelease(prerelease)) {
+          parser.parse_prerelease(prerelease)) { // TODO: parse build?
         return version{major, minor, patch, prerelease};
       }
 

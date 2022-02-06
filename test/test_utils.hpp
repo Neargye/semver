@@ -3,21 +3,21 @@
 #include <catch.hpp>
 
 #define STATIC_CHECK_OP_AND_REVERSE(v1, op, v2) \
-  static_assert(v1 op v2);                      \
-  static_assert(v2 op v1);
+  static_assert(op(v1, v2));                      \
+  static_assert(op(v2, v1));
 
 #define STATIC_CHECK_OP_AND_REVERSE_FALSE(v1, op, v2) \
-  static_assert(v1 op v2);                            \
-  static_assert(!(v2 op v1));
+  static_assert(op(v1, v2));                            \
+  static_assert(!op(v2, v1));
 
 #define CHECK_OP_AND_REVERSE(v1, op, v2) \
-  REQUIRE(v1 op v2);                     \
-  REQUIRE(v2 op v1);
+  REQUIRE(op(v1, v2));                     \
+  REQUIRE(op(v2, v1));
 
 #define CHECK_OP_AND_REVERSE_FALSE(v1, op, v2) \
-  REQUIRE(v1 op v2);                           \
-  REQUIRE_FALSE(v2 op v1);
+  REQUIRE(op(v1, v2));                           \
+  REQUIRE_FALSE(op(v2, v1));
 
 #define CHECK_FALSE_OP_AND_REVERSE(v1, op, v2) \
-  REQUIRE_FALSE(v1 op v2);                     \
-  REQUIRE_FALSE(v2 op v1);
+  REQUIRE_FALSE(op(v1, v2));                     \
+  REQUIRE_FALSE(op(v2, v1));
