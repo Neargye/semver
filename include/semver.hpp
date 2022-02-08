@@ -747,14 +747,6 @@ constexpr int parse_and_compare(std::string_view lhs, std::string_view rhs) {
 
 } // namespace semver::detail
 
-struct version_view {
-  integer_type major;
-  integer_type minor;
-  integer_type patch;
-  std::string_view prerelease;
-  std::string_view build_metadata;
-};
-
 // new api
 template<typename I1, typename I2, typename I3>
 constexpr bool parse(std::string_view version, I1& major, I2& minor, I3& patch,
@@ -770,8 +762,8 @@ constexpr bool parse(std::string_view version, I1& major, I2& minor, I3& patch,
 }
 
 constexpr bool valid(std::string_view version) {
-  (void) version;
-  return false;
+  detail::version v;
+  return detail::parse(version, v);
 }
 
 constexpr bool equal(std::string_view lhs, std::string_view rhs) {
