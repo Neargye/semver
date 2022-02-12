@@ -816,29 +816,22 @@ using namespace semver::detail;
 
 class range {
  public:
-  explicit constexpr range(std::string_view str) noexcept : str_{str} {}
+  explicit constexpr range(std::string_view str) noexcept : parser{str} {}
 
-  constexpr bool satisfies(std::string_view version_str, bool include_prerelease) const {
+  constexpr bool satisfies(std::string_view version_str, bool include_prerelease) {
     version version{};
     if (!parse(version_str, version)) {
       SEMVER_THROW("semver::range invalid version.");
     }
 
-    range_parser parser{str_};
     if (!parser.init()) {
       SEMVER_THROW("semver::range invalid range.");
     }
 
-    auto is_logical_or = [&parser]() constexpr noexcept -> bool { return parser.token_.type == token_type::logical_or; };
-
-    auto is_operator = [&parser]() constexpr noexcept -> bool { return parser.token_.type == token_type::range_operator; };
-
-    auto is_int = [&parser]() constexpr noexcept -> bool { return parser.token_.type == token_type::numeric_identifier; };
-
     const bool has_prerelease = !version.prerelease.empty();
 
     do {
-      if (is_logical_or()) {
+      if (is_logical_or_token()) {
         if (!parser.advance(token_type::logical_or) ||
             !parser.skip_whitespaces()) {
           SEMVER_THROW("semver::range invalid range.");
@@ -848,7 +841,7 @@ class range {
       bool contains = true;
       bool allow_compare = include_prerelease;
 
-      while (is_operator() || is_int()) {
+      while (is_operator_token() || is_number_token()) {
         const auto range_opt = parser.parse_range();
         if (!range_opt.has_value()) {
           SEMVER_THROW("semver::range invalid range.");
@@ -882,8 +875,7 @@ class range {
       if (!parser.skip_whitespaces()) {
         SEMVER_THROW("semver::range invalid range.");
       }
-
-    } while (is_logical_or());
+    } while (is_logical_or_token());
     
     return false;
   }
@@ -978,7 +970,18 @@ class range {
     }
   };
 
-  std::string_view str_;
+  [[nodiscard]] constexpr bool is_logical_or_token() const noexcept {
+    return parser.token_.type == token_type::logical_or;
+  }
+  [[nodiscard]] constexpr bool is_operator_token() const noexcept {
+    return parser.token_.type == token_type::range_operator;
+  }
+
+  [[nodiscard]] constexpr bool is_number_token() const noexcept {
+    return parser.token_.type == token_type::numeric_identifier;
+  }
+
+  range_parser parser;
 };
 
 } // namespace semver::range::detail
