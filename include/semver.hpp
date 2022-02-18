@@ -170,20 +170,20 @@ constexpr char* to_chars(char* str, std::string_view s) noexcept {
   return str;
 }
 
-constexpr const char* from_chars(const char* first, const char* last, integer_type& d) noexcept {
-  if (first != last && is_digit(*first)) {
-    int i = 0;
-    integer_type t = 0;
-    for (; first != last && is_digit(*first); ++first, ++i) {
-      t = t * 10 + to_digit(*first);
-    }
-    if (i <= std::numeric_limits<integer_type>::digits10) {
-      d = t;
-      return first;
-    }
+template<typename Int>
+constexpr bool parse_int(std::string_view s, Int& d) noexcept {
+  int i = 0;
+  Int t = 0;
+  for (char c : s) {
+    t = t * 10 + to_digit(c);
+    ++i;
+  }
+  if (i <= std::numeric_limits<integer_type>::digits10) {
+    d = t;
+    return true;
   }
 
-  return nullptr;
+  return false;
 }
 
 // std implementation can throw
@@ -747,18 +747,52 @@ constexpr int parse_and_compare(std::string_view lhs, std::string_view rhs) {
 
 } // namespace semver::detail
 
-// new api
 template<typename I1, typename I2, typename I3>
 constexpr bool parse(std::string_view version, I1& major, I2& minor, I3& patch,
-                     const char* prerelease = nullptr,
-                     const char* build_meta = nullptr) {
-  (void) version;
-  (void) major;
-  (void) minor;
-  (void) patch;
-  (void) prerelease;
-  (void) build_meta;
-  return false;
+                     char* prerelease_begin = nullptr,
+                     char* prerelease_end = nullptr,
+                     char* build_begin = nullptr,
+                     char* build_end = nullptr) {
+  detail::version result;
+  if (!detail::parse(version, result)) {
+    return false;
+  }
+
+  if (!detail::parse_int(result.major, major)) {
+    return false;
+  }
+
+  if (!detail::parse_int(result.minor, minor)) {
+    return false;
+  }
+
+  if (!detail::parse_int(result.patch, patch)) {
+    return false;
+  }
+
+  if (!result.prerelease.empty()) {
+    if (prerelease_begin && prerelease_end) {
+      auto length = static_cast<long>(result.prerelease.size());
+      if (prerelease_end - prerelease_begin < length) {
+        return false;
+      }
+      std::copy(result.prerelease.begin(), result.prerelease.end(),
+                prerelease_begin);
+    }
+  }
+
+  if (!result.build_metadata.empty()) {
+    if (build_begin && build_end) {
+      auto length = static_cast<long>(result.build_metadata.size());
+      if (build_end - build_begin < length) {
+        return false;
+      }
+      std::copy(result.build_metadata.begin(), result.build_metadata.end(),
+                build_begin);
+    }
+  }
+
+  return true;
 }
 
 constexpr bool valid(std::string_view version) {
