@@ -75,9 +75,25 @@ TEST_CASE("parse") {
   }
 
   SECTION("overflow") {
-    constexpr std::string_view v = "128.0.0";
-    std::int8_t major = 0, minor = 0, patch = 0;
-    REQUIRE_FALSE(parse(v, major, minor, patch));
+    constexpr std::string_view v = "0.0.128";
+    std::int8_t m = 0, mr = 0, p = 0;
+    REQUIRE_FALSE(parse(v, m, mr, p));
+
+    std::int16_t m2 = 0, mr2 = 0, p2 = 0;
+    REQUIRE(parse(v, m2, mr2, p2));
+    REQUIRE(m2 == 0);
+    REQUIRE(mr2 == 0);
+    REQUIRE(p2 == 128);
+
+    constexpr std::string_view v2 = "0.4294967296.0";
+    std::int32_t m3 = 0, mr3 = 0, p3 = 0;
+    REQUIRE_FALSE(parse(v2, m3, mr3, p3));
+
+    std::int64_t m4 = 0, mr4 = 0, p4 = 0;
+    REQUIRE(parse(v2, m4, mr4, p4));
+    REQUIRE(m4 == 0);
+    REQUIRE(mr4 == 4294967296);
+    REQUIRE(p4 == 0);
   }
 
   SECTION("prerelease") {
