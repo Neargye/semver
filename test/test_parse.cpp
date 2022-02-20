@@ -173,3 +173,31 @@ TEST_CASE("parse") {
     }
   }
 }
+
+TEST_CASE("major") {
+  auto m = major<int>("5.0.0");
+  REQUIRE(m);
+  REQUIRE(*m == 5);
+}
+
+TEST_CASE("minor") {
+  auto mr = minor<int>("0.8.0");
+  REQUIRE(mr);
+  REQUIRE(*mr == 8);
+}
+
+TEST_CASE("patch") {
+  auto p = patch<int>("0.0.13");
+  REQUIRE(p);
+  REQUIRE(*p == 13);
+}
+
+TEST_CASE("prerelease") {
+  std::string_view pre = prerelease("0.0.1-beta.21.34");
+  REQUIRE(pre == "beta.21.34");
+}
+
+TEST_CASE("build_metadata") {
+  std::string_view build = build_metadata("0.0.1-beta.21.34+meta-info-55");
+  REQUIRE(build == "meta-info-55");
+}

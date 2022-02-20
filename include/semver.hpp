@@ -795,6 +795,69 @@ constexpr bool parse(std::string_view version, I1& major, I2& minor, I3& patch,
   return true;
 }
 
+template <typename I>
+constexpr std::optional<I> major(std::string_view version) {
+  detail::version parsed_version;
+  if (!detail::parse(version, parsed_version)) {
+    return std::nullopt;
+  }
+
+  I result;
+  if (!detail::parse_int(parsed_version.major, result)) {
+    return false;
+  }
+
+  return result;
+}
+
+template <typename I>
+constexpr std::optional<I> minor(std::string_view version) {
+  detail::version parsed_version;
+  if (!detail::parse(version, parsed_version)) {
+    return std::nullopt;
+  }
+
+  I result;
+  if (!detail::parse_int(parsed_version.minor, result)) {
+    return false;
+  }
+
+  return result;
+}
+
+template <typename I>
+constexpr std::optional<I> patch(std::string_view version) {
+  detail::version parsed_version;
+  if (!detail::parse(version, parsed_version)) {
+    return std::nullopt;
+  }
+
+  I result;
+  if (!detail::parse_int(parsed_version.patch, result)) {
+    return false;
+  }
+
+  return result;
+}
+
+constexpr std::string_view prerelease(std::string_view version) {
+  detail::version parsed_version;
+  if (!detail::parse(version, parsed_version)) {
+    return {};
+  }
+
+  return parsed_version.prerelease;
+}
+
+constexpr std::string_view build_metadata(std::string_view version) {
+  detail::version parsed_version;
+  if (!detail::parse(version, parsed_version)) {
+    return {};
+  }
+
+  return parsed_version.build_metadata;
+}
+
 constexpr bool valid(std::string_view version) {
   detail::version v;
   return detail::parse(version, v);
