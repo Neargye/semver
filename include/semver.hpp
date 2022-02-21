@@ -1046,16 +1046,16 @@ class range {
         return std::nullopt;
       }
 
-      version_parser parser(lexer_, token_);
+      version_parser v_parser(lexer_, token_);
 
       std::string_view major, minor, patch;
       std::string_view prerelease;
 
-      if (parser.init() &&
-          parser.parse_major(major) &&
-          parser.parse_minor(minor) &&
-          parser.parse_patch(patch) &&
-          parser.parse_prerelease(prerelease)) { // TODO: parse build?
+      if (v_parser.init() &&
+          v_parser.parse_major(major) &&
+          v_parser.parse_minor(minor) &&
+          v_parser.parse_patch(patch) &&
+          v_parser.parse_prerelease(prerelease)) { // TODO: parse build?
         return version{major, minor, patch, prerelease, {}};
       }
 
