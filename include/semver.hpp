@@ -99,12 +99,6 @@ struct to_chars_result {
 };
 #endif
 
-#if defined(SEMVER_USING_ALIAS_INTEGER)
-SEMVER_USING_ALIAS_INTEGER
-#else
-using integer_type = std::uint32_t;
-#endif
-
 namespace detail {
 
 constexpr bool is_digit(char c) noexcept {
@@ -143,7 +137,8 @@ constexpr std::uint8_t to_digit(char c) noexcept {
   return static_cast<std::uint8_t>(c - '0');
 }
 
-constexpr std::size_t length(integer_type x) noexcept {
+template<typename Int>
+constexpr std::size_t length(Int x) noexcept {
   std::size_t number_of_digits = 0;
   do {
     ++number_of_digits;
@@ -153,7 +148,8 @@ constexpr std::size_t length(integer_type x) noexcept {
   return number_of_digits;
 }
 
-constexpr char* to_chars(char* str, integer_type x) noexcept {
+template<typename Int>
+constexpr char* to_chars(char* str, Int x) noexcept {
   do {
     *(--str) = static_cast<char>('0' + (x % 10));
     x /= 10;
@@ -178,7 +174,7 @@ constexpr bool parse_int(std::string_view s, Int& d) noexcept {
     t = t * 10 + to_digit(c);
     ++i;
   }
-  if (i <= std::numeric_limits<integer_type>::digits10) {
+  if (i <= std::numeric_limits<Int>::digits10) {
     d = t;
     return true;
   }
