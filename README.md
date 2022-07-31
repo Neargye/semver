@@ -97,9 +97,9 @@ C++ library compare and manipulate versions are available as extensions to the `
   std::optional<version> v6 = semver::from_string_noexcept(s); // constexpr and no throw.
 
   // From string.
-  semver::version v6;
+  semver::version v7;
   v7.from_string(s); // constexpr and may throw.
-  bool success = v8.from_string_noexcept(s); // constexpr and no throw.
+  bool success = v7.from_string_noexcept(s); // constexpr and no throw.
   ```
   
 * Range matching
