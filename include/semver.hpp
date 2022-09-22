@@ -274,21 +274,25 @@ struct version {
   std::uint8_t minor             = 1;
   std::uint8_t patch             = 0;
   prerelease prerelease_type     = prerelease::none;
+  bool has_prerelease_number     = false;
   std::uint8_t prerelease_number = 0;
 
   constexpr version(std::uint8_t mj,
                     std::uint8_t mn,
                     std::uint8_t pt,
                     prerelease prt = prerelease::none,
-                    std::uint8_t prn = 0) noexcept
+                    std::uint8_t prn = 0,
+                    bool has_prn = false) noexcept
       : major{mj},
         minor{mn},
         patch{pt},
         prerelease_type{prt},
+        has_prerelease_number{prt != prerelease::none && (prn > 0 || has_prn)},
         prerelease_number{prt == prerelease::none ? static_cast<std::uint8_t>(0) : prn} {
   }
 
-  explicit constexpr version(std::string_view str) : version(0, 0, 0, prerelease::none, 0) {
+
+  explicit constexpr version(std::string_view str) : version(0, 0, 0, prerelease::none, 0, false) {
     from_string(str);
   }
 
@@ -314,6 +318,7 @@ struct version {
       if (next = detail::from_chars(++next, last, minor); detail::check_delimiter(next, last, '.')) {
         if (next = detail::from_chars(++next, last, patch); next == last) {
           prerelease_type = prerelease::none;
+          has_prerelease_number = false;
           prerelease_number = 0;
           return {next, std::errc{}};
         } else if (detail::check_delimiter(next, last, '-')) {
@@ -321,6 +326,7 @@ struct version {
             prerelease_number = 0;
             return {next, std::errc{}};
           } else if (detail::check_delimiter(next, last, '.')) {
+            has_prerelease_number = true;
             if (next = detail::from_chars(++next, last, prerelease_number); next == last) {
               return {next, std::errc{}};
             }
@@ -340,7 +346,7 @@ struct version {
 
     auto next = first + length;
     if (prerelease_type != prerelease::none) {
-      if (prerelease_number != 0) {
+      if (has_prerelease_number) {
         next = detail::to_chars(next, prerelease_number);
       }
       next = detail::to_chars(next, prerelease_type);
@@ -380,7 +386,7 @@ struct version {
     if (prerelease_type != prerelease::none) {
       // + 1(-) + (<prerelease>)
       length += detail::length(prerelease_type) + 1;
-      if (prerelease_number != 0) {
+      if (has_prerelease_number) {
         // + 1(.) + (<prereleaseversion>)
         length += detail::length(prerelease_number) + 1;
       }
@@ -406,8 +412,13 @@ struct version {
       return static_cast<std::uint8_t>(prerelease_type) - static_cast<std::uint8_t>(other.prerelease_type);
     }
 
-    if (prerelease_number != other.prerelease_number) {
-      return prerelease_number - other.prerelease_number;
+    if (has_prerelease_number) {
+      if (other.has_prerelease_number) {
+        return prerelease_number - other.prerelease_number;
+      }
+      return 1;
+    } else if (other.has_prerelease_number) {
+      return -1;
     }
 
     return 0;
@@ -762,16 +773,20 @@ private:
       const auto patch = parse_number();
 
       prerelease prerelease = prerelease::none;
+      bool has_prerelease_number = false;
       std::uint8_t prerelease_number = 0;
 
       if (current_token.type == range_token_type::hyphen) {
         advance_token(range_token_type::hyphen);
         prerelease = parse_prerelease();
-        advance_token(range_token_type::dot);
-        prerelease_number = parse_number();
+        if (current_token.type == range_token_type::dot) {
+          has_prerelease_number = true;
+          advance_token(range_token_type::dot);
+          prerelease_number = parse_number();
+        }
       }
 
-      return {major, minor, patch, prerelease, prerelease_number};
+      return {major, minor, patch, prerelease, prerelease_number, has_prerelease_number};
     }
 
     constexpr std::uint8_t parse_number() {
