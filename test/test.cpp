@@ -28,6 +28,7 @@
 
 #include <cstddef>
 #include <array>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <sstream>
@@ -74,8 +75,7 @@ TEST_CASE("constructors") {
                       v0.minor == 1 &&
                       v0.patch == 0 &&
                       v0.prerelease_type == prerelease::none &&
-                      !v0.has_prerelease_number &&
-                      v0.prerelease_number == 0);
+                      !v0.prerelease_number.has_value());
   }
 
   SECTION("constructor") {
@@ -84,15 +84,14 @@ TEST_CASE("constructors") {
                       v1.minor == 2 &&
                       v1.patch == 3 &&
                       v1.prerelease_type == prerelease::rc &&
-                      !v1.has_prerelease_number &&
-                      v1.prerelease_number == 0);
+                      !v1.prerelease_number.has_value());
 
     constexpr version v2{1, 2, 3, prerelease::rc, 4};
     static_assert(v2.major == 1 &&
                       v2.minor == 2 &&
                       v2.patch == 3 &&
                       v2.prerelease_type == prerelease::rc &&
-                      v2.has_prerelease_number &&
+                      v2.prerelease_number.has_value() &&
                       v2.prerelease_number == 4);
 
     constexpr version v3{1, 2, 3};
@@ -100,55 +99,49 @@ TEST_CASE("constructors") {
                       v3.minor == 2 &&
                       v3.patch == 3 &&
                       v3.prerelease_type == prerelease::none &&
-                      !v3.has_prerelease_number &&
-                      v3.prerelease_number == 0);
+                      !v3.prerelease_number.has_value());
 
     constexpr version v4{1, 2, 3, prerelease::none};
     static_assert(v4.major == 1 &&
                       v4.minor == 2 &&
                       v4.patch == 3 &&
                       v4.prerelease_type == prerelease::none &&
-                      !v4.has_prerelease_number &&
-                      v4.prerelease_number == 0);
+                      !v4.prerelease_number.has_value());
 
     constexpr version v5{1, 2, 3, prerelease::none, 0};
     static_assert(v5.major == 1 &&
                       v5.minor == 2 &&
                       v5.patch == 3 &&
                       v5.prerelease_type == prerelease::none &&
-                      !v5.has_prerelease_number &&
-                      v5.prerelease_number == 0);
+                      !v5.prerelease_number.has_value());
 
     constexpr version v6{1, 2, 3, prerelease::none, 4};
     static_assert(v6.major == 1 &&
                       v6.minor == 2 &&
                       v6.patch == 3 &&
                       v6.prerelease_type == prerelease::none &&
-                      !v6.has_prerelease_number &&
-                      v6.prerelease_number == 0);
+                      !v6.prerelease_number.has_value());
 
     constexpr version v7{v6};
     static_assert(v7.major == 1 &&
                       v7.minor == 2 &&
                       v7.patch == 3 &&
                       v7.prerelease_type == prerelease::none &&
-                      !v7.has_prerelease_number &&
-                      v7.prerelease_number == 0);
+                      !v7.prerelease_number.has_value());
 
     constexpr version v8{v6};
     static_assert(v8.major == 1 &&
                       v8.minor == 2 &&
                       v8.patch == 3 &&
                       v8.prerelease_type == prerelease::none &&
-                      !v8.has_prerelease_number &&
-                      v8.prerelease_number == 0);
+                      !v8.prerelease_number.has_value());
 
     constexpr version v9{"1.2.3-alpha.4"};
     static_assert(v9.major == 1 &&
                       v9.minor == 2 &&
                       v9.patch == 3 &&
                       v9.prerelease_type == prerelease::alpha &&
-                      v9.has_prerelease_number &&
+                      v9.prerelease_number.has_value() &&
                       v9.prerelease_number == 4);
   
     constexpr version v10{"1.2.3-alpha.0"};
@@ -156,7 +149,7 @@ TEST_CASE("constructors") {
                       v10.minor == 2 &&
                       v10.patch == 3 &&
                       v10.prerelease_type == prerelease::alpha &&
-                      v10.has_prerelease_number &&
+                      v10.prerelease_number.has_value() &&
                       v10.prerelease_number == 0);
 
     std::string s = "1.1.1";
@@ -165,98 +158,97 @@ TEST_CASE("constructors") {
     REQUIRE(v11.minor == 1);
     REQUIRE(v11.patch == 1);
     REQUIRE(v11.prerelease_type == prerelease::none);
-    REQUIRE(!v11.has_prerelease_number);
-    REQUIRE(v11.prerelease_number == 0);
+    REQUIRE(!v11.prerelease_number.has_value());
   }
 }
 
 TEST_CASE("operators") {
   constexpr std::array<version, 80> versions = {{
+      version{0, 0, 0, prerelease::alpha, std::nullopt},
       version{0, 0, 0, prerelease::alpha, 0},
-      version{0, 0, 0, prerelease::alpha, 0, true},
       version{0, 0, 0, prerelease::alpha, 1},
+      version{0, 0, 0, prerelease::beta, std::nullopt},
       version{0, 0, 0, prerelease::beta, 0},
-      version{0, 0, 0, prerelease::beta, 0, true},
       version{0, 0, 0, prerelease::beta, 1},
       version{0, 0, 0, prerelease::rc, 0},
-      version{0, 0, 0, prerelease::rc, 0, true},
+      version{0, 0, 0, prerelease::rc, std::nullopt},
       version{0, 0, 0, prerelease::rc, 1},
       version{0, 0, 0},
 
+      version{0, 0, 1, prerelease::alpha, std::nullopt},
       version{0, 0, 1, prerelease::alpha, 0},
-      version{0, 0, 1, prerelease::alpha, 0, true},
       version{0, 0, 1, prerelease::alpha, 1},
+      version{0, 0, 1, prerelease::beta, std::nullopt},
       version{0, 0, 1, prerelease::beta, 0},
-      version{0, 0, 1, prerelease::beta, 0, true},
       version{0, 0, 1, prerelease::beta, 1},
+      version{0, 0, 1, prerelease::rc, std::nullopt},
       version{0, 0, 1, prerelease::rc, 0},
-      version{0, 0, 1, prerelease::rc, 0, true},
       version{0, 0, 1, prerelease::rc, 1},
       version{0, 0, 1},
 
+      version{0, 1, 0, prerelease::alpha, std::nullopt},
       version{0, 1, 0, prerelease::alpha, 0},
-      version{0, 1, 0, prerelease::alpha, 0, true},
       version{0, 1, 0, prerelease::alpha, 1},
+      version{0, 1, 0, prerelease::beta, std::nullopt},
       version{0, 1, 0, prerelease::beta, 0},
-      version{0, 1, 0, prerelease::beta, 0, true},
       version{0, 1, 0, prerelease::beta, 1},
+      version{0, 1, 0, prerelease::rc, std::nullopt},
       version{0, 1, 0, prerelease::rc, 0},
-      version{0, 1, 0, prerelease::rc, 0, true},
       version{0, 1, 0, prerelease::rc, 1},
       version{0, 1, 0},
 
+      version{0, 1, 1, prerelease::alpha, std::nullopt},
       version{0, 1, 1, prerelease::alpha, 0},
-      version{0, 1, 1, prerelease::alpha, 0, true},
       version{0, 1, 1, prerelease::alpha, 1},
+      version{0, 1, 1, prerelease::beta, std::nullopt},
       version{0, 1, 1, prerelease::beta, 0},
-      version{0, 1, 1, prerelease::beta, 0, true},
       version{0, 1, 1, prerelease::beta, 1},
+      version{0, 1, 1, prerelease::rc, std::nullopt},
       version{0, 1, 1, prerelease::rc, 0},
-      version{0, 1, 1, prerelease::rc, 0, true},
       version{0, 1, 1, prerelease::rc, 1},
       version{0, 1, 1},
 
+      version{1, 0, 0, prerelease::alpha, std::nullopt},
       version{1, 0, 0, prerelease::alpha, 0},
-      version{1, 0, 0, prerelease::alpha, 0, true},
       version{1, 0, 0, prerelease::alpha, 1},
+      version{1, 0, 0, prerelease::beta, std::nullopt},
       version{1, 0, 0, prerelease::beta, 0},
-      version{1, 0, 0, prerelease::beta, 0, true},
       version{1, 0, 0, prerelease::beta, 1},
+      version{1, 0, 0, prerelease::rc, std::nullopt},
       version{1, 0, 0, prerelease::rc, 0},
-      version{1, 0, 0, prerelease::rc, 0, true},
       version{1, 0, 0, prerelease::rc, 1},
       version{1, 0, 0},
 
+      version{1, 0, 1, prerelease::alpha, std::nullopt},
       version{1, 0, 1, prerelease::alpha, 0},
-      version{1, 0, 1, prerelease::alpha, 0, true},
       version{1, 0, 1, prerelease::alpha, 1},
+      version{1, 0, 1, prerelease::beta, std::nullopt},
       version{1, 0, 1, prerelease::beta, 0},
-      version{1, 0, 1, prerelease::beta, 0, true},
       version{1, 0, 1, prerelease::beta, 1},
+      version{1, 0, 1, prerelease::rc, std::nullopt},
       version{1, 0, 1, prerelease::rc, 0},
-      version{1, 0, 1, prerelease::rc, 0, true},
       version{1, 0, 1, prerelease::rc, 1},
       version{1, 0, 1},
 
+      version{1, 1, 0, prerelease::alpha, std::nullopt},
       version{1, 1, 0, prerelease::alpha, 0},
-      version{1, 1, 0, prerelease::alpha, 0, true},
       version{1, 1, 0, prerelease::alpha, 1},
+      version{1, 1, 0, prerelease::beta, std::nullopt},
       version{1, 1, 0, prerelease::beta, 0},
-      version{1, 1, 0, prerelease::beta, 0, true},
       version{1, 1, 0, prerelease::beta, 1},
+      version{1, 1, 0, prerelease::rc, std::nullopt},
       version{1, 1, 0, prerelease::rc, 0},
-      version{1, 1, 0, prerelease::rc, 0, true},
       version{1, 1, 0, prerelease::rc, 1},
       version{1, 1, 0},
 
+      version{1, 1, 1, prerelease::alpha, std::nullopt},
       version{1, 1, 1, prerelease::alpha, 0},
-      version{1, 1, 1, prerelease::alpha, 0, true},
       version{1, 1, 1, prerelease::alpha, 1},
+      version{1, 1, 1, prerelease::beta, std::nullopt},
       version{1, 1, 1, prerelease::beta, 0},
-      version{1, 1, 1, prerelease::beta, 0, true},
       version{1, 1, 1, prerelease::beta, 1},
+      version{1, 1, 1, prerelease::rc, std::nullopt},
       version{1, 1, 1, prerelease::rc, 0},
-      version{1, 1, 1, prerelease::rc, 0, true},
       version{1, 1, 1, prerelease::rc, 1},
       version{1, 1, 1},
   }};
@@ -426,28 +418,28 @@ TEST_CASE("from/to string") {
       version{255, 255, 255},
       version{0, 0, 0},
       //
-      version{1, 2, 3, prerelease::none, 0},
+      version{1, 2, 3, prerelease::none, std::nullopt},
       version{1, 2, 3, prerelease::none, 4},
       version{255, 255, 255, prerelease::none, 255},
-      version{0, 0, 0, prerelease::none, 0},
+      version{0, 0, 0, prerelease::none, std::nullopt},
       //
+      version{1, 2, 3, prerelease::alpha, std::nullopt},
       version{1, 2, 3, prerelease::alpha, 0},
-      version{1, 2, 3, prerelease::alpha, 0, true},
       version{1, 2, 3, prerelease::alpha, 4},
       version{255, 255, 255, prerelease::alpha, 255},
-      version{0, 0, 0, prerelease::alpha, 0},
+      version{0, 0, 0, prerelease::alpha, std::nullopt},
       //
+      version{1, 2, 3, prerelease::beta, std::nullopt},
       version{1, 2, 3, prerelease::beta, 0},
-      version{1, 2, 3, prerelease::beta, 0, true},
       version{1, 2, 3, prerelease::beta, 4},
       version{255, 255, 255, prerelease::beta, 255},
-      version{0, 0, 0, prerelease::beta, 0},
+      version{0, 0, 0, prerelease::beta, std::nullopt},
       //
+      version{1, 2, 3, prerelease::rc, std::nullopt},
       version{1, 2, 3, prerelease::rc, 0},
-      version{1, 2, 3, prerelease::rc, 0, true},
       version{1, 2, 3, prerelease::rc, 4},
       version{255, 255, 255, prerelease::rc, 255},
-      version{0, 0, 0, prerelease::rc, 0},
+      version{0, 0, 0, prerelease::rc, std::nullopt},
   }};
 
   constexpr std::array<std::string_view, 22> versions_strings = {{
