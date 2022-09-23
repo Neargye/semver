@@ -245,36 +245,6 @@ constexpr const char* from_chars(const char* first, const char* last, std::optio
   return nullptr;
 }
 
-// constexpr const std::optional<std::uint8_t> from_chars_digit(const char* first, const char* last) noexcept {
-//   if (first != last && is_digit(*first)) {
-//     std::int32_t t = 0;
-//     for (; first != last && is_digit(*first); ++first) {
-//       t = t * 10 + to_digit(*first);
-//     }
-//     if (t <= (std::numeric_limits<std::uint8_t>::max)()) {
-//       return static_cast<std::uint8_t>(t);
-//     }
-//   }
-
-//   return std::nullopt;
-// }
-
-// constexpr const char* from_chars(const char* first, const char* last, std::uint8_t& d) noexcept {
-//   if (auto digit = from_chars_digit(first, last); digit.has_value()) {
-//     d = digit.value();
-//     return first;
-//   }
-//   return nullptr;
-// }
-
-// constexpr const char* from_chars(const char* first, const char* last, std::optional<std::uint8_t>& d) noexcept {
-//   if (auto digit = from_chars_digit(first, last); digit.has_value()) {
-//     d = digit.value();
-//     return first;
-//   }
-//   return nullptr;
-// }
-
 constexpr const char* from_chars(const char* first, const char* last, prerelease& p) noexcept {
   if (is_hyphen(*first)) {
     ++first;
