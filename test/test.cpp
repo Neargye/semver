@@ -28,6 +28,7 @@
 
 #include <cstddef>
 #include <array>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <sstream>
@@ -40,7 +41,7 @@ static_assert(semver_version.patch == SEMVER_VERSION_PATCH);
 
 static_assert(alignof(version) == 1);
 static_assert(alignof(prerelease) == 1);
-static_assert(sizeof(version) == 5);
+static_assert(sizeof(version) == 6);
 static_assert(sizeof(prerelease) == 1);
 
 #define STATIC_CHECK_OP_AND_REVERSE(v1, op, v2) \
@@ -74,7 +75,7 @@ TEST_CASE("constructors") {
                       v0.minor == 1 &&
                       v0.patch == 0 &&
                       v0.prerelease_type == prerelease::none &&
-                      v0.prerelease_number == 0);
+                      !v0.prerelease_number.has_value());
   }
 
   SECTION("constructor") {
@@ -83,13 +84,14 @@ TEST_CASE("constructors") {
                       v1.minor == 2 &&
                       v1.patch == 3 &&
                       v1.prerelease_type == prerelease::rc &&
-                      v1.prerelease_number == 0);
+                      !v1.prerelease_number.has_value());
 
     constexpr version v2{1, 2, 3, prerelease::rc, 4};
     static_assert(v2.major == 1 &&
                       v2.minor == 2 &&
                       v2.patch == 3 &&
                       v2.prerelease_type == prerelease::rc &&
+                      v2.prerelease_number.has_value() &&
                       v2.prerelease_number == 4);
 
     constexpr version v3{1, 2, 3};
@@ -97,122 +99,155 @@ TEST_CASE("constructors") {
                       v3.minor == 2 &&
                       v3.patch == 3 &&
                       v3.prerelease_type == prerelease::none &&
-                      v3.prerelease_number == 0);
+                      !v3.prerelease_number.has_value());
 
     constexpr version v4{1, 2, 3, prerelease::none};
     static_assert(v4.major == 1 &&
                       v4.minor == 2 &&
                       v4.patch == 3 &&
                       v4.prerelease_type == prerelease::none &&
-                      v4.prerelease_number == 0);
+                      !v4.prerelease_number.has_value());
 
     constexpr version v5{1, 2, 3, prerelease::none, 0};
     static_assert(v5.major == 1 &&
                       v5.minor == 2 &&
                       v5.patch == 3 &&
                       v5.prerelease_type == prerelease::none &&
-                      v5.prerelease_number == 0);
+                      !v5.prerelease_number.has_value());
 
     constexpr version v6{1, 2, 3, prerelease::none, 4};
     static_assert(v6.major == 1 &&
                       v6.minor == 2 &&
                       v6.patch == 3 &&
                       v6.prerelease_type == prerelease::none &&
-                      v6.prerelease_number == 0);
+                      !v6.prerelease_number.has_value());
 
     constexpr version v7{v6};
     static_assert(v7.major == 1 &&
                       v7.minor == 2 &&
                       v7.patch == 3 &&
                       v7.prerelease_type == prerelease::none &&
-                      v7.prerelease_number == 0);
+                      !v7.prerelease_number.has_value());
 
     constexpr version v8{v6};
     static_assert(v8.major == 1 &&
                       v8.minor == 2 &&
                       v8.patch == 3 &&
                       v8.prerelease_type == prerelease::none &&
-                      v8.prerelease_number == 0);
+                      !v8.prerelease_number.has_value());
 
     constexpr version v9{"1.2.3-alpha.4"};
     static_assert(v9.major == 1 &&
                       v9.minor == 2 &&
                       v9.patch == 3 &&
                       v9.prerelease_type == prerelease::alpha &&
+                      v9.prerelease_number.has_value() &&
                       v9.prerelease_number == 4);
+  
+    constexpr version v10{"1.2.3-alpha.0"};
+    static_assert(v10.major == 1 &&
+                      v10.minor == 2 &&
+                      v10.patch == 3 &&
+                      v10.prerelease_type == prerelease::alpha &&
+                      v10.prerelease_number.has_value() &&
+                      v10.prerelease_number == 0);
 
     std::string s = "1.1.1";
-    version v10{s};
-    REQUIRE(v10.major == 1);
-    REQUIRE(v10.minor == 1);
-    REQUIRE(v10.patch == 1);
-    REQUIRE(v10.prerelease_type == prerelease::none);
-    REQUIRE(v10.prerelease_number == 0);
+    version v11{s};
+    REQUIRE(v11.major == 1);
+    REQUIRE(v11.minor == 1);
+    REQUIRE(v11.patch == 1);
+    REQUIRE(v11.prerelease_type == prerelease::none);
+    REQUIRE(!v11.prerelease_number.has_value());
   }
 }
 
 TEST_CASE("operators") {
-  constexpr std::array<version, 56> versions = {{
+  constexpr std::array<version, 80> versions = {{
+      version{0, 0, 0, prerelease::alpha, std::nullopt},
       version{0, 0, 0, prerelease::alpha, 0},
       version{0, 0, 0, prerelease::alpha, 1},
+      version{0, 0, 0, prerelease::beta, std::nullopt},
       version{0, 0, 0, prerelease::beta, 0},
       version{0, 0, 0, prerelease::beta, 1},
+      version{0, 0, 0, prerelease::rc, std::nullopt},
       version{0, 0, 0, prerelease::rc, 0},
       version{0, 0, 0, prerelease::rc, 1},
       version{0, 0, 0},
 
+      version{0, 0, 1, prerelease::alpha, std::nullopt},
       version{0, 0, 1, prerelease::alpha, 0},
       version{0, 0, 1, prerelease::alpha, 1},
+      version{0, 0, 1, prerelease::beta, std::nullopt},
       version{0, 0, 1, prerelease::beta, 0},
       version{0, 0, 1, prerelease::beta, 1},
+      version{0, 0, 1, prerelease::rc, std::nullopt},
       version{0, 0, 1, prerelease::rc, 0},
       version{0, 0, 1, prerelease::rc, 1},
       version{0, 0, 1},
 
+      version{0, 1, 0, prerelease::alpha, std::nullopt},
       version{0, 1, 0, prerelease::alpha, 0},
       version{0, 1, 0, prerelease::alpha, 1},
+      version{0, 1, 0, prerelease::beta, std::nullopt},
       version{0, 1, 0, prerelease::beta, 0},
       version{0, 1, 0, prerelease::beta, 1},
+      version{0, 1, 0, prerelease::rc, std::nullopt},
       version{0, 1, 0, prerelease::rc, 0},
       version{0, 1, 0, prerelease::rc, 1},
       version{0, 1, 0},
 
+      version{0, 1, 1, prerelease::alpha, std::nullopt},
       version{0, 1, 1, prerelease::alpha, 0},
       version{0, 1, 1, prerelease::alpha, 1},
+      version{0, 1, 1, prerelease::beta, std::nullopt},
       version{0, 1, 1, prerelease::beta, 0},
       version{0, 1, 1, prerelease::beta, 1},
+      version{0, 1, 1, prerelease::rc, std::nullopt},
       version{0, 1, 1, prerelease::rc, 0},
       version{0, 1, 1, prerelease::rc, 1},
       version{0, 1, 1},
 
+      version{1, 0, 0, prerelease::alpha, std::nullopt},
       version{1, 0, 0, prerelease::alpha, 0},
       version{1, 0, 0, prerelease::alpha, 1},
+      version{1, 0, 0, prerelease::beta, std::nullopt},
       version{1, 0, 0, prerelease::beta, 0},
       version{1, 0, 0, prerelease::beta, 1},
+      version{1, 0, 0, prerelease::rc, std::nullopt},
       version{1, 0, 0, prerelease::rc, 0},
       version{1, 0, 0, prerelease::rc, 1},
       version{1, 0, 0},
 
+      version{1, 0, 1, prerelease::alpha, std::nullopt},
       version{1, 0, 1, prerelease::alpha, 0},
       version{1, 0, 1, prerelease::alpha, 1},
+      version{1, 0, 1, prerelease::beta, std::nullopt},
       version{1, 0, 1, prerelease::beta, 0},
       version{1, 0, 1, prerelease::beta, 1},
+      version{1, 0, 1, prerelease::rc, std::nullopt},
       version{1, 0, 1, prerelease::rc, 0},
       version{1, 0, 1, prerelease::rc, 1},
       version{1, 0, 1},
 
+      version{1, 1, 0, prerelease::alpha, std::nullopt},
       version{1, 1, 0, prerelease::alpha, 0},
       version{1, 1, 0, prerelease::alpha, 1},
+      version{1, 1, 0, prerelease::beta, std::nullopt},
       version{1, 1, 0, prerelease::beta, 0},
       version{1, 1, 0, prerelease::beta, 1},
+      version{1, 1, 0, prerelease::rc, std::nullopt},
       version{1, 1, 0, prerelease::rc, 0},
       version{1, 1, 0, prerelease::rc, 1},
       version{1, 1, 0},
 
+      version{1, 1, 1, prerelease::alpha, std::nullopt},
       version{1, 1, 1, prerelease::alpha, 0},
       version{1, 1, 1, prerelease::alpha, 1},
+      version{1, 1, 1, prerelease::beta, std::nullopt},
       version{1, 1, 1, prerelease::beta, 0},
       version{1, 1, 1, prerelease::beta, 1},
+      version{1, 1, 1, prerelease::rc, std::nullopt},
       version{1, 1, 1, prerelease::rc, 0},
       version{1, 1, 1, prerelease::rc, 1},
       version{1, 1, 1},
@@ -258,7 +293,7 @@ TEST_CASE("operators") {
 
         REQUIRE(compare(versions[i], versions[i - j], comparators_option::include_prerelease) != 0);
         REQUIRE(compare(versions[i - j], versions[i], comparators_option::include_prerelease) != 0);
-        if ((i - j) / 7 == i / 7) {
+        if ((i - j) / 10 == i / 10) {
           REQUIRE(compare(versions[i], versions[i - j], comparators_option::exclude_prerelease) == 0);
           REQUIRE(compare(versions[i - j], versions[i], comparators_option::exclude_prerelease) == 0);
         } else {
@@ -280,7 +315,7 @@ TEST_CASE("operators") {
 
         REQUIRE(greater(versions[i], versions[i - j], comparators_option::include_prerelease));
         REQUIRE_FALSE(greater(versions[i - j], versions[i], comparators_option::include_prerelease));
-        if ((i - j) / 7 == i / 7) {
+        if ((i - j) / 10 == i / 10) {
           REQUIRE_FALSE(greater(versions[i], versions[i - j], comparators_option::exclude_prerelease));
           REQUIRE_FALSE(greater(versions[i - j], versions[i], comparators_option::exclude_prerelease));
         } else {
@@ -308,7 +343,7 @@ TEST_CASE("operators") {
         REQUIRE_FALSE(greater_equal(versions[i - j], versions[i], comparators_option::include_prerelease));
         REQUIRE(greater_equal(versions[i], v, comparators_option::include_prerelease));
         REQUIRE(greater_equal(v, versions[i], comparators_option::include_prerelease));
-        if ((i - j) / 7 == i / 7) {
+        if ((i - j) / 10 == i / 10) {
           REQUIRE(greater_equal(versions[i], versions[i - j], comparators_option::exclude_prerelease));
           REQUIRE(greater_equal(versions[i - j], versions[i], comparators_option::exclude_prerelease));
           REQUIRE(greater_equal(versions[i], v, comparators_option::exclude_prerelease));
@@ -332,7 +367,7 @@ TEST_CASE("operators") {
 
         REQUIRE(less(versions[i - j], versions[i], comparators_option::include_prerelease));
         REQUIRE_FALSE(less(versions[i], versions[i - j], comparators_option::include_prerelease));
-        if ((i - j) / 7 == i / 7) {
+        if ((i - j) / 10 == i / 10) {
           REQUIRE_FALSE(less(versions[i - j], versions[i], comparators_option::exclude_prerelease));
           REQUIRE_FALSE(less(versions[i], versions[i - j], comparators_option::exclude_prerelease));
         } else {
@@ -360,7 +395,7 @@ TEST_CASE("operators") {
         REQUIRE_FALSE(less_equal(versions[i], versions[i - j], comparators_option::include_prerelease));
         REQUIRE(less_equal(v, versions[i - j], comparators_option::include_prerelease));
         REQUIRE(less_equal(versions[i - j], v, comparators_option::include_prerelease));
-        if ((i - j) / 7 == i / 7) {
+        if ((i - j) / 10 == i / 10) {
           REQUIRE(less_equal(versions[i - j], versions[i], comparators_option::exclude_prerelease));
           REQUIRE(less_equal(versions[i], versions[i - j], comparators_option::exclude_prerelease));
         } else {
@@ -378,33 +413,36 @@ TEST_CASE("operators") {
 }
 
 TEST_CASE("from/to string") {
-  constexpr std::array<version, 19> versions = {{
+  constexpr std::array<version, 22> versions = {{
       version{1, 2, 3},
       version{255, 255, 255},
       version{0, 0, 0},
       //
-      version{1, 2, 3, prerelease::none, 0},
+      version{1, 2, 3, prerelease::none, std::nullopt},
       version{1, 2, 3, prerelease::none, 4},
       version{255, 255, 255, prerelease::none, 255},
-      version{0, 0, 0, prerelease::none, 0},
+      version{0, 0, 0, prerelease::none, std::nullopt},
       //
+      version{1, 2, 3, prerelease::alpha, std::nullopt},
       version{1, 2, 3, prerelease::alpha, 0},
       version{1, 2, 3, prerelease::alpha, 4},
       version{255, 255, 255, prerelease::alpha, 255},
-      version{0, 0, 0, prerelease::alpha, 0},
+      version{0, 0, 0, prerelease::alpha, std::nullopt},
       //
+      version{1, 2, 3, prerelease::beta, std::nullopt},
       version{1, 2, 3, prerelease::beta, 0},
       version{1, 2, 3, prerelease::beta, 4},
       version{255, 255, 255, prerelease::beta, 255},
-      version{0, 0, 0, prerelease::beta, 0},
+      version{0, 0, 0, prerelease::beta, std::nullopt},
       //
+      version{1, 2, 3, prerelease::rc, std::nullopt},
       version{1, 2, 3, prerelease::rc, 0},
       version{1, 2, 3, prerelease::rc, 4},
       version{255, 255, 255, prerelease::rc, 255},
-      version{0, 0, 0, prerelease::rc, 0},
+      version{0, 0, 0, prerelease::rc, std::nullopt},
   }};
 
-  constexpr std::array<std::string_view, 19> versions_strings = {{
+  constexpr std::array<std::string_view, 22> versions_strings = {{
       "1.2.3",
       "255.255.255",
       "0.0.0",
@@ -415,16 +453,19 @@ TEST_CASE("from/to string") {
       "0.0.0",
       //
       "1.2.3-alpha",
+      "1.2.3-alpha.0",
       "1.2.3-alpha.4",
       "255.255.255-alpha.255",
       "0.0.0-alpha",
       //
       "1.2.3-beta",
+      "1.2.3-beta.0",
       "1.2.3-beta.4",
       "255.255.255-beta.255",
       "0.0.0-beta",
       //
       "1.2.3-rc",
+      "1.2.3-rc.0",
       "1.2.3-rc.4",
       "255.255.255-rc.255",
       "0.0.0-rc",
@@ -533,12 +574,15 @@ TEST_CASE("ranges with prerelase tags") {
     constexpr std::string_view r4{">1.2.3 <2.0.0-alpha.10"};
     constexpr std::string_view r5{">1.2.3 <2.0.0-alpha.1 || <=2.0.0-alpha.5"};
     constexpr std::string_view r6{"<=2.0.0-alpha.4"};
+    constexpr std::string_view r7{">=2.0.0-alpha"};
+    constexpr std::string_view r8{"<2.0.0-alpha"};
 
     constexpr version v1{"1.2.3-alpha.7"};
     constexpr version v2{"3.4.5-alpha.9"};
     constexpr version v3{"3.4.5"};
     constexpr version v4{"1.2.3-alpha.4"};
     constexpr version v5{"2.0.0-alpha.5"};
+    constexpr version v6{"2.0.0-alpha.0"};
 
     SECTION("exclude prerelease") {
       STATIC_REQUIRE(range::satisfies(v1, r1));
@@ -551,6 +595,10 @@ TEST_CASE("ranges with prerelase tags") {
       STATIC_REQUIRE_FALSE(range::satisfies(v1, r4));
       STATIC_REQUIRE(range::satisfies(v5, r5));
       STATIC_REQUIRE_FALSE(range::satisfies(v5, r6));
+      STATIC_REQUIRE(range::satisfies(v5, r7));
+      STATIC_REQUIRE(range::satisfies(v6, r7));
+      STATIC_REQUIRE_FALSE(range::satisfies(v5, r8));
+      STATIC_REQUIRE_FALSE(range::satisfies(v6, r8));
     }
 
     SECTION("include prerelease") {
@@ -564,6 +612,10 @@ TEST_CASE("ranges with prerelase tags") {
       STATIC_REQUIRE_FALSE(range::satisfies(v1, r4, range::satisfies_option::include_prerelease));
       STATIC_REQUIRE(range::satisfies(v5, r5, range::satisfies_option::include_prerelease));
       STATIC_REQUIRE_FALSE(range::satisfies(v5, r6, range::satisfies_option::include_prerelease));
+      STATIC_REQUIRE(range::satisfies(v5, r7, range::satisfies_option::include_prerelease));
+      STATIC_REQUIRE(range::satisfies(v6, r7, range::satisfies_option::include_prerelease));
+      STATIC_REQUIRE_FALSE(range::satisfies(v5, r8, range::satisfies_option::include_prerelease));
+      STATIC_REQUIRE_FALSE(range::satisfies(v6, r8, range::satisfies_option::include_prerelease));
     }
   }
 

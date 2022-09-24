@@ -230,6 +230,21 @@ constexpr const char* from_chars(const char* first, const char* last, std::uint8
   return nullptr;
 }
 
+constexpr const char* from_chars(const char* first, const char* last, std::optional<std::uint8_t>& d) noexcept {
+  if (first != last && is_digit(*first)) {
+    std::int32_t t = 0;
+    for (; first != last && is_digit(*first); ++first) {
+      t = t * 10 + to_digit(*first);
+    }
+    if (t <= (std::numeric_limits<std::uint8_t>::max)()) {
+      d = static_cast<std::uint8_t>(t);
+      return first;
+    }
+  }
+
+  return nullptr;
+}
+
 constexpr const char* from_chars(const char* first, const char* last, prerelease& p) noexcept {
   if (is_hyphen(*first)) {
     ++first;
@@ -274,19 +289,20 @@ struct version {
   std::uint8_t minor             = 1;
   std::uint8_t patch             = 0;
   prerelease prerelease_type     = prerelease::none;
-  std::uint8_t prerelease_number = 0;
+  std::optional<std::uint8_t> prerelease_number = std::nullopt;
 
   constexpr version(std::uint8_t mj,
                     std::uint8_t mn,
                     std::uint8_t pt,
                     prerelease prt = prerelease::none,
-                    std::uint8_t prn = 0) noexcept
+                    std::optional<std::uint8_t> prn = std::nullopt) noexcept
       : major{mj},
         minor{mn},
         patch{pt},
         prerelease_type{prt},
-        prerelease_number{prt == prerelease::none ? static_cast<std::uint8_t>(0) : prn} {
+        prerelease_number{prt == prerelease::none ? std::nullopt : prn} {
   }
+
 
   explicit constexpr version(std::string_view str) : version(0, 0, 0, prerelease::none, 0) {
     from_string(str);
@@ -314,11 +330,11 @@ struct version {
       if (next = detail::from_chars(++next, last, minor); detail::check_delimiter(next, last, '.')) {
         if (next = detail::from_chars(++next, last, patch); next == last) {
           prerelease_type = prerelease::none;
-          prerelease_number = 0;
+          prerelease_number = {};
           return {next, std::errc{}};
         } else if (detail::check_delimiter(next, last, '-')) {
           if (next = detail::from_chars(next, last, prerelease_type); next == last) {
-            prerelease_number = 0;
+            prerelease_number = {};
             return {next, std::errc{}};
           } else if (detail::check_delimiter(next, last, '.')) {
             if (next = detail::from_chars(++next, last, prerelease_number); next == last) {
@@ -340,8 +356,8 @@ struct version {
 
     auto next = first + length;
     if (prerelease_type != prerelease::none) {
-      if (prerelease_number != 0) {
-        next = detail::to_chars(next, prerelease_number);
+      if (prerelease_number.has_value()) {
+        next = detail::to_chars(next, prerelease_number.value());
       }
       next = detail::to_chars(next, prerelease_type);
     }
@@ -380,9 +396,9 @@ struct version {
     if (prerelease_type != prerelease::none) {
       // + 1(-) + (<prerelease>)
       length += detail::length(prerelease_type) + 1;
-      if (prerelease_number != 0) {
+      if (prerelease_number.has_value()) {
         // + 1(.) + (<prereleaseversion>)
-        length += detail::length(prerelease_number) + 1;
+        length += detail::length(prerelease_number.value()) + 1;
       }
     }
 
@@ -406,8 +422,13 @@ struct version {
       return static_cast<std::uint8_t>(prerelease_type) - static_cast<std::uint8_t>(other.prerelease_type);
     }
 
-    if (prerelease_number != other.prerelease_number) {
-      return prerelease_number - other.prerelease_number;
+    if (prerelease_number.has_value()) {
+      if (other.prerelease_number.has_value()) {
+        return prerelease_number.value() - other.prerelease_number.value();
+      }
+      return 1;
+    } else if (other.prerelease_number.has_value()) {
+      return -1;
     }
 
     return 0;
@@ -762,13 +783,15 @@ private:
       const auto patch = parse_number();
 
       prerelease prerelease = prerelease::none;
-      std::uint8_t prerelease_number = 0;
+      std::optional<std::uint8_t> prerelease_number = std::nullopt;
 
       if (current_token.type == range_token_type::hyphen) {
         advance_token(range_token_type::hyphen);
         prerelease = parse_prerelease();
-        advance_token(range_token_type::dot);
-        prerelease_number = parse_number();
+        if (current_token.type == range_token_type::dot) {
+          advance_token(range_token_type::dot);
+          prerelease_number = parse_number();
+        }
       }
 
       return {major, minor, patch, prerelease, prerelease_number};
