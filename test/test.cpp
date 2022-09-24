@@ -170,8 +170,8 @@ TEST_CASE("operators") {
       version{0, 0, 0, prerelease::beta, std::nullopt},
       version{0, 0, 0, prerelease::beta, 0},
       version{0, 0, 0, prerelease::beta, 1},
-      version{0, 0, 0, prerelease::rc, 0},
       version{0, 0, 0, prerelease::rc, std::nullopt},
+      version{0, 0, 0, prerelease::rc, 0},
       version{0, 0, 0, prerelease::rc, 1},
       version{0, 0, 0},
 
