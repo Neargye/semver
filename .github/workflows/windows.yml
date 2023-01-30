@@ -16,7 +16,7 @@ jobs:
 
     name: "${{matrix.config.vs}}:${{matrix.platform}}:${{matrix.build}}"
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
 
     - name: Configure CMake
       run: cmake -A ${{matrix.platform}}
