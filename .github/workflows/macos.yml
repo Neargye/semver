@@ -15,7 +15,7 @@ jobs:
 
     name: "${{matrix.config.os}}:${{matrix.build}}"
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
 
     - name: Configure CMake
       run: cmake -DCMAKE_BUILD_TYPE=${{matrix.build}}
