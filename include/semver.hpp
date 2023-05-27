@@ -315,6 +315,17 @@ struct version {
         prerelease_number{prt == prerelease::none ? std::nullopt : prn} {
   }
 
+    constexpr version(std::uint16_t mj,
+                    std::uint16_t mn,
+                    std::uint16_t pt,
+                    prerelease prt,
+                    std::uint16_t prn) noexcept
+      : major{mj},
+        minor{mn},
+        patch{pt},
+        prerelease_type{prt},
+        prerelease_number{prt == prerelease::none ? std::nullopt : std::make_optional<std::uint16_t>(prn)} {
+  }
 
   explicit constexpr version(std::string_view str) : version(0, 0, 0, prerelease::none, std::nullopt) {
     from_string(str);
