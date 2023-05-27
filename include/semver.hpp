@@ -153,7 +153,6 @@ constexpr bool is_letter(char c) noexcept {
   return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
 }
 
-// TODO: TYLER AUDIT
 constexpr std::uint16_t to_digit(char c) noexcept {
   return static_cast<std::uint16_t>(c - '0');
 }
