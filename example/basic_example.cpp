@@ -23,6 +23,7 @@
 
 #include <semver.hpp>
 
+#include <cstdint>
 #include <iostream>
 
 using namespace semver;
