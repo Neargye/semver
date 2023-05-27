@@ -23,14 +23,13 @@
 
 #include <semver.hpp>
 
-#include <cstdint>
 #include <iostream>
 
 using namespace semver;
 
 int main() {
   constexpr version v_default;
-  static_assert(v_default == version(0, 1, 0, prerelease::none, 0));
+  static_assert(v_default == version(0, 1, 0, prerelease::none, std::nullopt));
   std::cout << v_default << std::endl; // 0.1.0
 
   constexpr version v1{1, 4, 3};

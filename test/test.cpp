@@ -27,7 +27,6 @@
 #include <semver.hpp>
 
 #include <cstddef>
-#include <cstdint>
 #include <array>
 #include <optional>
 #include <string>
