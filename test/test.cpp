@@ -86,7 +86,7 @@ TEST_CASE("constructors") {
                       v1.prerelease_type == prerelease::rc &&
                       !v1.prerelease_number.has_value());
 
-    constexpr version v2{1, 2, 3, prerelease::rc, 4};
+    constexpr version v2{1, 2, 3, prerelease::rc, static_cast<std::uint16_t>(4)};
     static_assert(v2.major == 1 &&
                       v2.minor == 2 &&
                       v2.patch == 3 &&
