@@ -109,8 +109,8 @@ struct to_chars_result {
 };
 #endif
 
-// Max version string length = 3(<major>) + 1(.) + 3(<minor>) + 1(.) + 3(<patch>) + 1(-) + 5(<prerelease>) + 1(.) + 3(<prereleaseversion>) = 21.
-inline constexpr auto max_version_string_length = std::size_t{21};
+// Max version string length = 5(<major>) + 1(.) + 5(<minor>) + 1(.) + 5(<patch>) + 1(-) + 5(<prerelease>) + 1(.) + 5(<prereleaseversion>) = 29.
+inline constexpr auto max_version_string_length = std::size_t{29};
 
 namespace detail {
 
@@ -153,12 +153,24 @@ constexpr bool is_letter(char c) noexcept {
   return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
 }
 
-constexpr std::uint8_t to_digit(char c) noexcept {
-  return static_cast<std::uint8_t>(c - '0');
+constexpr std::uint16_t to_digit(char c) noexcept {
+  return static_cast<std::uint16_t>(c - '0');
 }
 
-constexpr std::uint8_t length(std::uint8_t x) noexcept {
-  return x < 10 ? 1 : (x < 100 ? 2 : 3);
+constexpr std::uint8_t length(std::uint16_t x) noexcept {
+  if (x < 10) {
+    return 1;
+  }
+  if (x < 100) {
+    return 2;
+  }
+  if (x < 1000) {
+    return 3;
+  }
+  if (x < 10000) {
+    return 4;
+  }
+  return 5;
 }
 
 constexpr std::uint8_t length(prerelease t) noexcept {
@@ -183,7 +195,7 @@ constexpr bool equals(const char* first, const char* last, std::string_view str)
   return true;
 }
 
-constexpr char* to_chars(char* str, std::uint8_t x, bool dot = true) noexcept {
+constexpr char* to_chars(char* str, std::uint16_t x, bool dot = true) noexcept {
   do {
     *(--str) = static_cast<char>('0' + (x % 10));
     x /= 10;
@@ -215,14 +227,14 @@ constexpr char* to_chars(char* str, prerelease t) noexcept {
   return str;
 }
 
-constexpr const char* from_chars(const char* first, const char* last, std::uint8_t& d) noexcept {
+constexpr const char* from_chars(const char* first, const char* last, std::uint16_t& d) noexcept {
   if (first != last && is_digit(*first)) {
     std::int32_t t = 0;
     for (; first != last && is_digit(*first); ++first) {
       t = t * 10 + to_digit(*first);
     }
-    if (t <= (std::numeric_limits<std::uint8_t>::max)()) {
-      d = static_cast<std::uint8_t>(t);
+    if (t <= (std::numeric_limits<std::uint16_t>::max)()) {
+      d = static_cast<std::uint16_t>(t);
       return first;
     }
   }
@@ -230,14 +242,14 @@ constexpr const char* from_chars(const char* first, const char* last, std::uint8
   return nullptr;
 }
 
-constexpr const char* from_chars(const char* first, const char* last, std::optional<std::uint8_t>& d) noexcept {
+constexpr const char* from_chars(const char* first, const char* last, std::optional<std::uint16_t>& d) noexcept {
   if (first != last && is_digit(*first)) {
     std::int32_t t = 0;
     for (; first != last && is_digit(*first); ++first) {
       t = t * 10 + to_digit(*first);
     }
-    if (t <= (std::numeric_limits<std::uint8_t>::max)()) {
-      d = static_cast<std::uint8_t>(t);
+    if (t <= (std::numeric_limits<std::uint16_t>::max)()) {
+      d = static_cast<std::uint16_t>(t);
       return first;
     }
   }
@@ -285,17 +297,17 @@ struct resize_uninitialized<T, std::void_t<decltype(std::declval<T>().__resize_d
 } // namespace semver::detail
 
 struct version {
-  std::uint8_t major             = 0;
-  std::uint8_t minor             = 1;
-  std::uint8_t patch             = 0;
-  prerelease prerelease_type     = prerelease::none;
-  std::optional<std::uint8_t> prerelease_number = std::nullopt;
+  std::uint16_t major             = 0;
+  std::uint16_t minor             = 1;
+  std::uint16_t patch             = 0;
+  prerelease prerelease_type      = prerelease::none;
+  std::optional<std::uint16_t> prerelease_number = std::nullopt;
 
-  constexpr version(std::uint8_t mj,
-                    std::uint8_t mn,
-                    std::uint8_t pt,
+  constexpr version(std::uint16_t mj,
+                    std::uint16_t mn,
+                    std::uint16_t pt,
                     prerelease prt = prerelease::none,
-                    std::optional<std::uint8_t> prn = std::nullopt) noexcept
+                    std::optional<std::uint16_t> prn = std::nullopt) noexcept
       : major{mj},
         minor{mn},
         patch{pt},
@@ -303,8 +315,19 @@ struct version {
         prerelease_number{prt == prerelease::none ? std::nullopt : prn} {
   }
 
+    constexpr version(std::uint16_t mj,
+                    std::uint16_t mn,
+                    std::uint16_t pt,
+                    prerelease prt,
+                    std::uint16_t prn) noexcept
+      : major{mj},
+        minor{mn},
+        patch{pt},
+        prerelease_type{prt},
+        prerelease_number{prt == prerelease::none ? std::nullopt : std::make_optional<std::uint16_t>(prn)} {
+  }
 
-  explicit constexpr version(std::string_view str) : version(0, 0, 0, prerelease::none, 0) {
+  explicit constexpr version(std::string_view str) : version(0, 0, 0, prerelease::none, std::nullopt) {
     from_string(str);
   }
 
@@ -632,7 +655,7 @@ private:
 
   struct range_token {
     range_token_type type      = range_token_type::none;
-    std::uint8_t number        = 0;
+    std::uint16_t number       = 0;
     range_operator op          = range_operator::equal;
     prerelease prerelease_type = prerelease::none;
   };
@@ -714,10 +737,10 @@ private:
       return range_operator::equal;
     }
 
-    constexpr std::uint8_t get_number() noexcept {
+    constexpr std::uint16_t get_number() noexcept {
       const auto first = text.data() + pos;
       const auto last = text.data() + text.length();
-      if (std::uint8_t n{}; from_chars(first, last, n) != nullptr) {
+      if (std::uint16_t n{}; from_chars(first, last, n) != nullptr) {
         advance(length(n));
         return n;
       }
@@ -783,7 +806,7 @@ private:
       const auto patch = parse_number();
 
       prerelease prerelease = prerelease::none;
-      std::optional<std::uint8_t> prerelease_number = std::nullopt;
+      std::optional<std::uint16_t> prerelease_number = std::nullopt;
 
       if (current_token.type == range_token_type::hyphen) {
         advance_token(range_token_type::hyphen);
@@ -797,7 +820,7 @@ private:
       return {major, minor, patch, prerelease, prerelease_number};
     }
 
-    constexpr std::uint8_t parse_number() {
+    constexpr std::uint16_t parse_number() {
       const auto token = current_token;
       advance_token(range_token_type::number);
 

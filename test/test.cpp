@@ -39,9 +39,9 @@ static_assert(semver_version.major == SEMVER_VERSION_MAJOR);
 static_assert(semver_version.minor == SEMVER_VERSION_MINOR);
 static_assert(semver_version.patch == SEMVER_VERSION_PATCH);
 
-static_assert(alignof(version) == 1);
+static_assert(alignof(version) == 2);
 static_assert(alignof(prerelease) == 1);
-static_assert(sizeof(version) == 6);
+static_assert(sizeof(version) == 12);
 static_assert(sizeof(prerelease) == 1);
 
 #define STATIC_CHECK_OP_AND_REVERSE(v1, op, v2) \
@@ -415,59 +415,59 @@ TEST_CASE("operators") {
 TEST_CASE("from/to string") {
   constexpr std::array<version, 22> versions = {{
       version{1, 2, 3},
-      version{255, 255, 255},
+      version{65535, 65535, 65535},
       version{0, 0, 0},
       //
       version{1, 2, 3, prerelease::none, std::nullopt},
       version{1, 2, 3, prerelease::none, 4},
-      version{255, 255, 255, prerelease::none, 255},
+      version{65535, 65535, 65535, prerelease::none, 65535},
       version{0, 0, 0, prerelease::none, std::nullopt},
       //
       version{1, 2, 3, prerelease::alpha, std::nullopt},
       version{1, 2, 3, prerelease::alpha, 0},
       version{1, 2, 3, prerelease::alpha, 4},
-      version{255, 255, 255, prerelease::alpha, 255},
+      version{65535, 65535, 65535, prerelease::alpha, 65535},
       version{0, 0, 0, prerelease::alpha, std::nullopt},
       //
       version{1, 2, 3, prerelease::beta, std::nullopt},
       version{1, 2, 3, prerelease::beta, 0},
       version{1, 2, 3, prerelease::beta, 4},
-      version{255, 255, 255, prerelease::beta, 255},
+      version{65535, 65535, 65535, prerelease::beta, 65535},
       version{0, 0, 0, prerelease::beta, std::nullopt},
       //
       version{1, 2, 3, prerelease::rc, std::nullopt},
       version{1, 2, 3, prerelease::rc, 0},
       version{1, 2, 3, prerelease::rc, 4},
-      version{255, 255, 255, prerelease::rc, 255},
+      version{65535, 65535, 65535, prerelease::rc, 65535},
       version{0, 0, 0, prerelease::rc, std::nullopt},
   }};
 
   constexpr std::array<std::string_view, 22> versions_strings = {{
       "1.2.3",
-      "255.255.255",
+      "65535.65535.65535",
       "0.0.0",
       //
       "1.2.3",
       "1.2.3",
-      "255.255.255",
+      "65535.65535.65535",
       "0.0.0",
       //
       "1.2.3-alpha",
       "1.2.3-alpha.0",
       "1.2.3-alpha.4",
-      "255.255.255-alpha.255",
+      "65535.65535.65535-alpha.65535",
       "0.0.0-alpha",
       //
       "1.2.3-beta",
       "1.2.3-beta.0",
       "1.2.3-beta.4",
-      "255.255.255-beta.255",
+      "65535.65535.65535-beta.65535",
       "0.0.0-beta",
       //
       "1.2.3-rc",
       "1.2.3-rc.0",
       "1.2.3-rc.4",
-      "255.255.255-rc.255",
+      "65535.65535.65535-rc.65535",
       "0.0.0-rc",
   }};
 
