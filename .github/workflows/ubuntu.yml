@@ -23,7 +23,7 @@ jobs:
         - { cc: "clang-15", cxx: "clang++-15" }
         - { cc: "clang-16", cxx: "clang++-16" }
 
-    name: "${{ matrix.compiler.cc} }"
+    name: "${{ matrix.compiler.cc }}"
     steps:
     - uses: actions/checkout@v3
 
