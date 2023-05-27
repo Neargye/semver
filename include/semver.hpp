@@ -316,7 +316,7 @@ struct version {
   }
 
 
-  explicit constexpr version(std::string_view str) : version(0, 0, 0, prerelease::none, 0) {
+  explicit constexpr version(std::string_view str) : version(0, 0, 0, prerelease::none, std::nullopt) {
     from_string(str);
   }
 
