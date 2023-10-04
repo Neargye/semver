@@ -406,6 +406,33 @@ TEST_CASE("operators") {
     }
   }
 
+#if __cpp_impl_three_way_comparison >= 201907L
+  SECTION("operator <=>") {
+    constexpr version v1{1, 2, 3, prerelease::rc, 4};
+    constexpr version v2{1, 2, 3};
+    constexpr version v3{1, 2, 3};
+    REQUIRE(v1 <=> v1 == std::strong_ordering::equal);
+    REQUIRE(v2 <=> v3 == std::strong_ordering::equal);
+
+    auto validate_threeway_compare = [] (auto v1, auto v2) {
+      if (v1 < v2)
+        REQUIRE(v1 <=> v2 == std::strong_ordering::less);
+      else if (v1 > v2)
+        REQUIRE(v1 <=> v2 == std::strong_ordering::greater);
+      else if (v1 == v2)
+        REQUIRE(v1 <=> v2 == std::strong_ordering::equal);
+    };
+
+    for (std::size_t i = 1; i < versions.size(); ++i) {
+      for (std::size_t j = 1; j < i; ++j) {
+        version v = versions[i - j];
+        validate_threeway_compare(versions[i - j], versions[i]);
+        validate_threeway_compare(v, versions[i - j]);
+      }
+    }
+  }
+#endif
+
   SECTION("operator _version") {
     constexpr version v = "1.2.3-rc.4"_version;
     static_assert(v == version{1, 2, 3, prerelease::rc, 4});
