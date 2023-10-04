@@ -76,6 +76,11 @@
 #  pragma clang diagnostic ignored "-Wmissing-braces" // Ignore warning: suggest braces around initialization of subobject 'return {first, std::errc::invalid_argument};'.
 #endif
 
+#if __cpp_impl_three_way_comparison >= 201907L
+#include <compare>
+#endif
+
+
 namespace semver {
 
 enum struct prerelease : std::uint8_t {
@@ -481,6 +486,17 @@ struct version {
 [[nodiscard]] constexpr bool operator<=(const version& lhs, const version& rhs) noexcept {
   return lhs.compare(rhs) <= 0;
 }
+
+#if __cpp_impl_three_way_comparison >= 201907L
+[[nodiscard]] constexpr std::strong_ordering operator<=>(const version& lhs, const version& rhs) {
+  int compare = lhs.compare(rhs);
+  if ( compare == 0 )
+    return std::strong_ordering::equal;
+  if ( compare > 0 )
+    return std::strong_ordering::greater;
+  return std::strong_ordering::less;
+}
+#endif
 
 [[nodiscard]] constexpr version operator""_version(const char* str, std::size_t length) {
   return version{std::string_view{str, length}};
