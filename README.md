@@ -1,38 +1,11 @@
-```text
-         _____                            _   _
-        / ____|                          | | (_)
-       | (___   ___ _ __ ___   __ _ _ __ | |_ _  ___
-        \___ \ / _ \ '_ ` _ \ / _` | '_ \| __| |/ __|
-        ____) |  __/ | | | | | (_| | | | | |_| | (__
-       |_____/ \___|_| |_| |_|\__,_|_| |_|\__|_|\___|
-__      __           _             _                _____
-\ \    / /          (_)           (_)              / ____|_     _
- \ \  / /__ _ __ ___ _  ___  _ __  _ _ __   __ _  | |   _| |_ _| |_
-  \ \/ / _ \ '__/ __| |/ _ \| '_ \| | '_ \ / _` | | |  |_   _|_   _|
-   \  /  __/ |  \__ \ | (_) | | | | | | | | (_| | | |____|_|   |_|
-    \/ \___|_|  |___/_|\___/|_| |_|_|_| |_|\__, |  \_____|
-                                            __/ |
-                                           |___/
-```
-
 [![Github releases](https://img.shields.io/github/release/Neargye/semver.svg)](https://github.com/Neargye/semver/releases)
 [![Vcpkg package](https://img.shields.io/badge/Vcpkg-package-blueviolet)](https://github.com/microsoft/vcpkg/tree/master/ports/neargye-semver)
-[![Conan package](https://img.shields.io/badge/Conan-package-blueviolet)](https://conan.io/center/neargye-semver)
+[![Conan package](https://img.shields.io/badge/Conan-package-blueviolet)](https://conan.io/center/recipes/neargye-semver)
 [![License](https://img.shields.io/github/license/Neargye/semver.svg)](LICENSE)
 
 C++ library compare and manipulate versions are available as extensions to the `<major>.<minor>.<patch>-<prerelease_type>.<prerelease_number>` format complying with [Semantic Versioning 2.0.0](https://semver.org)
 
-## Features
-
-* C++17
-* Header-only
-* Dependency-free
-* Constexpr comparison: <, <=, ==, !=, > >=
-* Constexpr from string
-* Constexpr to string
-* Constexpr range matching
-
-## [Examples](example/)
+## [Features & Examples](example/)
 
 * Create
 
