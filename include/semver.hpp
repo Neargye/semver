@@ -11,7 +11,7 @@
 //    \  /  __/ |  \__ \ | (_) | | | | | | | | (_| | | |____|_|   |_|
 //     \/ \___|_|  |___/_|\___/|_| |_|_|_| |_|\__, |  \_____|
 // https://github.com/Neargye/semver           __/ |
-// version 0.3.0                              |___/
+// version 0.3.1                              |___/
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
@@ -41,7 +41,7 @@
 
 #define SEMVER_VERSION_MAJOR 0
 #define SEMVER_VERSION_MINOR 3
-#define SEMVER_VERSION_PATCH 0
+#define SEMVER_VERSION_PATCH 1
 
 #include <cstddef>
 #include <cstdint>
