@@ -1,7 +1,6 @@
 #include <semver.hpp>
 #include <catch.hpp>
 #include <array>
-#include <cstring>
 
 using namespace semver;
 

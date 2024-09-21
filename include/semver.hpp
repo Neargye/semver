@@ -75,30 +75,6 @@
 
 namespace semver {
 
-#if __has_include(<charconv>)
-struct from_chars_result : std::from_chars_result {
-  [[nodiscard]] constexpr operator bool() const noexcept { return ec == std::errc{}; }
-};
-
-struct to_chars_result : std::to_chars_result {
-  [[nodiscard]] constexpr operator bool() const noexcept { return ec == std::errc{}; }
-};
-#else
-struct from_chars_result {
-  const char* ptr;
-  std::errc ec;
-
-  [[nodiscard]] constexpr operator bool() const noexcept { return ec == std::errc{}; }
-};
-
-struct to_chars_result {
-  char* ptr;
-  std::errc ec;
-
-  [[nodiscard]] constexpr operator bool() const noexcept { return ec == std::errc{}; }
-};
-#endif
-
 namespace detail {
 
 constexpr bool is_digit(char c) noexcept {
@@ -674,22 +650,6 @@ class version_parser {
   }
 };
 
-constexpr bool is_prerelease_valid(std::string_view pr) noexcept {
-  lexer lexer(pr);
-  detail::token token{detail::token_type::hyphen, detail::token_range{0, 1}};
-  version_parser parser(lexer, token);
-  std::string_view prerelease;
-  return parser.init() && parser.parse_prerelease(prerelease);
-}
-
-constexpr bool is_build_metadata_valid(std::string_view bm) noexcept {
-  lexer lexer(bm);
-  detail::token token{detail::token_type::plus, detail::token_range{0, 1}};
-  version_parser parser(lexer, token);
-  std::string_view build_metadata;
-  return parser.init() && parser.parse_build(build_metadata);
-}
-
 constexpr int compare_prerelease(std::string_view lhs, std::string_view rhs) noexcept {
   return prerelease_comparator{lhs, rhs}.compare();
 }
@@ -734,14 +694,33 @@ constexpr bool parse(std::string_view str, version& result) {
 }
 
 constexpr int parse_and_compare(std::string_view lhs, std::string_view rhs) {
-  // TODO: error handling
   version lhs_version, rhs_version;
-  parse(lhs, lhs_version);
-  parse(rhs, rhs_version);
+  if (!parse(lhs, lhs_version)) {
+    SEMVER_THROW("invalid version: " + std::string(lhs));
+  }
+  if (!parse(rhs, rhs_version)) {
+    SEMVER_THROW("invalid version: " + std::string(rhs));
+  }
   return compare(lhs_version, rhs_version);
 }
 
 } // namespace semver::detail
+
+template <typename Int>
+struct version_view {
+  Int major, minor, patch;
+  std::string_view prerelease;
+  std::string_view build_metadata;
+
+  explicit version_view(std::string_view str) noexcept {
+    from_string(str);
+  }
+
+private:
+  void from_string(std::string_view str) noexcept {
+    (void) str;
+  }
+};
 
 template<typename I1, typename I2, typename I3>
 constexpr bool parse(std::string_view version, I1& major, I2& minor, I3& patch,
@@ -969,7 +948,7 @@ class range {
         SEMVER_THROW("semver::range invalid range.");
       }
     } while (is_logical_or_token());
-    
+
     return false;
   }
 
@@ -1055,7 +1034,7 @@ class range {
           v_parser.parse_major(major) &&
           v_parser.parse_minor(minor) &&
           v_parser.parse_patch(patch) &&
-          v_parser.parse_prerelease(prerelease)) { // TODO: parse build?
+          v_parser.parse_prerelease(prerelease)) {
         return version{major, minor, patch, prerelease, {}};
       }
 

@@ -69,7 +69,7 @@ TEST_CASE("operators") {
     std::string_view{"1.1.1-rc.0"},
     std::string_view{"1.1.1-rc.1"},
     std::string_view{"1.1.1"},
-    }};
+  }};
 
   SECTION("operator ==") {
     constexpr std::string_view v1 = "1.2.3-rc.4";
