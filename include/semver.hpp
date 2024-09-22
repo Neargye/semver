@@ -11,12 +11,12 @@
 //    \  /  __/ |  \__ \ | (_) | | | | | | | | (_| | | |____|_|   |_|
 //     \/ \___|_|  |___/_|\___/|_| |_|_|_| |_|\__, |  \_____|
 // https://github.com/Neargye/semver           __/ |
-// version 0.4.0                              |___/
+// version 0.3.1                              |___/
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018 - 2022 Daniil Goncharov <neargye@gmail.com>.
-// Copyright (c) 2020 - 2022 Alexander Gorbunov <naratzul@gmail.com>.
+// Copyright (c) 2018 - 2024 Daniil Goncharov <neargye@gmail.com>.
+// Copyright (c) 2020 - 2021 Alexander Gorbunov <naratzul@gmail.com>.
 //
 // Permission is hereby  granted, free of charge, to any  person obtaining a copy
 // of this software and associated  documentation files (the "Software"), to deal
@@ -39,7 +39,10 @@
 #ifndef NEARGYE_SEMANTIC_VERSIONING_HPP
 #define NEARGYE_SEMANTIC_VERSIONING_HPP
 
-#include <algorithm>
+#define SEMVER_VERSION_MAJOR 0
+#define SEMVER_VERSION_MINOR 3
+#define SEMVER_VERSION_PATCH 1
+
 #include <cstddef>
 #include <cstdint>
 #include <iosfwd>
@@ -72,6 +75,11 @@
 #  pragma clang diagnostic push
 #  pragma clang diagnostic ignored "-Wmissing-braces" // Ignore warning: suggest braces around initialization of subobject 'return {first, std::errc::invalid_argument};'.
 #endif
+
+#if __cpp_impl_three_way_comparison >= 201907L
+#include <compare>
+#endif
+
 
 namespace semver {
 
@@ -109,8 +117,8 @@ constexpr bool is_letter(char c) noexcept {
   return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
 }
 
-constexpr std::uint8_t to_digit(char c) noexcept {
-  return static_cast<std::uint8_t>(c - '0');
+constexpr std::uint16_t to_digit(char c) noexcept {
+  return static_cast<std::uint16_t>(c - '0');
 }
 
 template<typename Int>
@@ -147,7 +155,7 @@ constexpr bool parse_int(std::string_view s, Int& d) noexcept {
   int i = 0;
   Int t = 0;
   for (char c : s) {
-    t = t * 10 + to_digit(c);
+    t = static_cast<Int>(t * 10 + to_digit(c));
     ++i;
   }
   if (i <= std::numeric_limits<Int>::digits10) {
