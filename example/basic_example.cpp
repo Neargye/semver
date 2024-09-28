@@ -21,13 +21,33 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE  OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <semver.hpp>
-
+#include <assert.h>
 #include <iostream>
-
-using namespace semver;
+#include "semver.hpp"
 
 int main() {
-  // TODO
+  semver::version version;
+  bool result = semver::parse("1.2.3-alpha.1+dev", version);
+  assert(result);
+
+  std::cout << version.major << std::endl; // 1
+  std::cout << version.minor << std::endl; // 2
+  std::cout << version.patch << std::endl; // 3
+  std::cout << version.prerelease_tag << std::endl; // alpha.1
+  std::cout << version.build_metadata << std::endl; // dev
+
+  std::cout << semver::major<int>("1.2.3-alpha.1+dev").value() << std::endl; // 1
+  std::cout << semver::minor<int>("1.2.3-alpha.1+dev").value() << std::endl; // 2
+  std::cout << semver::patch<int>("1.2.3-alpha.1+dev").value() << std::endl; // 3
+  std::cout << semver::prerelease_tag("1.2.3-alpha.1+dev") << std::endl; // alpha.1
+  std::cout << semver::build_metadata("1.2.3-alpha.1+dev") << std::endl; // dev
+
+  assert(semver::valid("1.2.3"));
+  assert(!semver::valid("a.b.c"));
+
+  assert(semver::less("1.0.0", "1.0.1"));
+  assert(semver::greater("2.0.0", "1.0.0"));
+  assert(semver::equal("1.2.3", "1.2.3"));
+
   return 0;
 }

@@ -117,6 +117,10 @@ constexpr bool is_letter(char c) noexcept {
   return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
 }
 
+constexpr bool is_null_terminator(char c) noexcept {
+  return c == '\0';
+}
+
 constexpr std::uint16_t to_digit(char c) noexcept {
   return static_cast<std::uint16_t>(c - '0');
 }
@@ -261,11 +265,11 @@ class lexer {
   explicit constexpr lexer(std::string_view text) noexcept : text_{text}, current_pos_{0} {}
 
   constexpr token get_next_token() noexcept {
+    const auto pos = current_pos_;
+
     if (eol()) {
       return {token_type::eol, {}};
     }
-
-    const auto pos = current_pos_;
 
     if (is_space(text_[pos])) {
       advance(1);
@@ -662,7 +666,7 @@ constexpr int compare_prerelease(std::string_view lhs, std::string_view rhs) noe
   return prerelease_comparator{lhs, rhs}.compare();
 }
 
-struct version {
+struct version_view {
   std::string_view major;
   std::string_view minor;
   std::string_view patch;
@@ -670,7 +674,7 @@ struct version {
   std::string_view build_metadata;
 };
 
-constexpr int compare(const version& lhs, const version& rhs) {
+constexpr int compare(const version_view& lhs, const version_view& rhs) {
   if (int result = compare_numerically(lhs.major, rhs.major); result != 0) {
     return result;
   }
@@ -690,7 +694,7 @@ constexpr int compare(const version& lhs, const version& rhs) {
   return detail::compare_prerelease(lhs.prerelease, rhs.prerelease);
 }
 
-constexpr bool parse(std::string_view str, version& result) {
+constexpr bool parse(std::string_view str, version_view& result) {
   lexer lexer{str};
   detail::token token{token_type::none, token_range{}};
   version_parser parser{lexer, token};
@@ -702,7 +706,7 @@ constexpr bool parse(std::string_view str, version& result) {
 }
 
 constexpr int parse_and_compare(std::string_view lhs, std::string_view rhs) {
-  version lhs_version, rhs_version;
+  version_view lhs_version, rhs_version;
   if (!parse(lhs, lhs_version)) {
     SEMVER_THROW("invalid version: " + std::string(lhs));
   }
@@ -714,65 +718,40 @@ constexpr int parse_and_compare(std::string_view lhs, std::string_view rhs) {
 
 } // namespace semver::detail
 
-template <typename Int>
-struct version_view {
-  Int major, minor, patch;
-  std::string_view prerelease;
-  std::string_view build_metadata;
-
-  explicit version_view(std::string_view str) noexcept {
-    from_string(str);
-  }
-
-private:
-  void from_string(std::string_view str) noexcept {
-    (void) str;
-  }
+template <typename I1 = int, typename I2 = int, typename I3 = int>
+struct version {
+  I1 major = 0;
+  I2 minor = 0;
+  I3 patch = 0;
+  std::string prerelease_tag;
+  std::string build_metadata;
 };
 
 template<typename I1, typename I2, typename I3>
-constexpr bool parse(std::string_view version, I1& major, I2& minor, I3& patch,
-                     char* prerelease_begin = nullptr,
-                     char* prerelease_end = nullptr,
-                     char* build_begin = nullptr,
-                     char* build_end = nullptr) {
-  detail::version result;
-  if (!detail::parse(version, result)) {
+constexpr bool parse(std::string_view str, version<I1, I2, I3>& output) {
+  detail::version_view result;
+  if (!detail::parse(str, result)) {
     return false;
   }
 
-  if (!detail::parse_int(result.major, major)) {
+  if (!detail::parse_int(result.major, output.major)) {
     return false;
   }
 
-  if (!detail::parse_int(result.minor, minor)) {
+  if (!detail::parse_int(result.minor, output.minor)) {
     return false;
   }
 
-  if (!detail::parse_int(result.patch, patch)) {
+  if (!detail::parse_int(result.patch, output.patch)) {
     return false;
   }
 
   if (!result.prerelease.empty()) {
-    if (prerelease_begin && prerelease_end) {
-      auto length = static_cast<long>(result.prerelease.size());
-      if (prerelease_end - prerelease_begin < length) {
-        return false;
-      }
-      std::copy(result.prerelease.begin(), result.prerelease.end(),
-                prerelease_begin);
-    }
+    output.prerelease_tag = std::string(result.prerelease);
   }
 
   if (!result.build_metadata.empty()) {
-    if (build_begin && build_end) {
-      auto length = static_cast<long>(result.build_metadata.size());
-      if (build_end - build_begin < length) {
-        return false;
-      }
-      std::copy(result.build_metadata.begin(), result.build_metadata.end(),
-                build_begin);
-    }
+    output.build_metadata = std::string(result.build_metadata);
   }
 
   return true;
@@ -780,7 +759,7 @@ constexpr bool parse(std::string_view version, I1& major, I2& minor, I3& patch,
 
 template <typename I>
 constexpr std::optional<I> major(std::string_view version) {
-  detail::version parsed_version;
+  detail::version_view parsed_version;
   if (!detail::parse(version, parsed_version)) {
     return std::nullopt;
   }
@@ -795,7 +774,7 @@ constexpr std::optional<I> major(std::string_view version) {
 
 template <typename I>
 constexpr std::optional<I> minor(std::string_view version) {
-  detail::version parsed_version;
+  detail::version_view parsed_version;
   if (!detail::parse(version, parsed_version)) {
     return std::nullopt;
   }
@@ -810,7 +789,7 @@ constexpr std::optional<I> minor(std::string_view version) {
 
 template <typename I>
 constexpr std::optional<I> patch(std::string_view version) {
-  detail::version parsed_version;
+  detail::version_view parsed_version;
   if (!detail::parse(version, parsed_version)) {
     return std::nullopt;
   }
@@ -823,8 +802,8 @@ constexpr std::optional<I> patch(std::string_view version) {
   return result;
 }
 
-constexpr std::string_view prerelease(std::string_view version) {
-  detail::version parsed_version;
+constexpr std::string_view prerelease_tag(std::string_view version) {
+  detail::version_view parsed_version;
   if (!detail::parse(version, parsed_version)) {
     return {};
   }
@@ -833,7 +812,7 @@ constexpr std::string_view prerelease(std::string_view version) {
 }
 
 constexpr std::string_view build_metadata(std::string_view version) {
-  detail::version parsed_version;
+  detail::version_view parsed_version;
   if (!detail::parse(version, parsed_version)) {
     return {};
   }
@@ -842,7 +821,7 @@ constexpr std::string_view build_metadata(std::string_view version) {
 }
 
 constexpr bool valid(std::string_view version) {
-  detail::version v;
+  detail::version_view v;
   return detail::parse(version, v);
 }
 
@@ -877,10 +856,10 @@ enum struct comparators_option : std::uint8_t {
   include_prerelease
 };
 
-[[nodiscard]] constexpr int compare(const detail::version& lhs, const detail::version& rhs, comparators_option option = comparators_option::include_prerelease) noexcept {
+[[nodiscard]] constexpr int compare(const detail::version_view& lhs, const detail::version_view& rhs, comparators_option option = comparators_option::include_prerelease) noexcept {
   if (option == comparators_option::exclude_prerelease) {
-    return detail::compare(detail::version{lhs.major, lhs.minor, lhs.patch, {}, {}},
-                           detail::version{rhs.major, rhs.minor, rhs.patch, {}, {}});
+    return detail::compare(detail::version_view{lhs.major, lhs.minor, lhs.patch, {}, {}},
+                           detail::version_view{rhs.major, rhs.minor, rhs.patch, {}, {}});
   }
 
   return detail::compare(lhs, rhs);
@@ -899,7 +878,7 @@ class range {
   explicit constexpr range(std::string_view str) noexcept : parser{str} {}
 
   constexpr bool satisfies(std::string_view version_str, bool include_prerelease) {
-    version version{};
+    version_view version{};
     if (!parse(version_str, version)) {
       SEMVER_THROW("semver::range invalid version.");
     }
@@ -963,9 +942,9 @@ class range {
  private:
   struct range_comparator {
     range_operator op;
-    version ver;
+    version_view ver;
 
-    constexpr bool satisfies(const version& version) const {
+    constexpr bool satisfies(const version_view& version) const {
       switch (op) {
         case range_operator::equal:
           return detail::compare(version, ver) == 0;
@@ -1028,7 +1007,7 @@ class range {
       return std::nullopt;
     }
 
-    constexpr std::optional<version> parse_version() {
+    constexpr std::optional<version_view> parse_version() {
       if (!skip_whitespaces()) {
         return std::nullopt;
       }
@@ -1043,7 +1022,7 @@ class range {
           v_parser.parse_minor(minor) &&
           v_parser.parse_patch(patch) &&
           v_parser.parse_prerelease(prerelease)) {
-        return version{major, minor, patch, prerelease, {}};
+        return version_view{major, minor, patch, prerelease, {}};
       }
 
       return std::nullopt;
