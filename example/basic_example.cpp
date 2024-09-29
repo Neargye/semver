@@ -28,7 +28,7 @@
 int main() {
   semver::version version;
   bool result = semver::parse("1.2.3-alpha.1+dev", version);
-  assert(result);
+  std::cout << (result ? "true" : "false") << std::endl; // true
 
   std::cout << version.major << std::endl; // 1
   std::cout << version.minor << std::endl; // 2
