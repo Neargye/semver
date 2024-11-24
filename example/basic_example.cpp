@@ -23,31 +23,30 @@
 
 #include <assert.h>
 #include <iostream>
+#include <vector>
 #include "semver.hpp"
 
+static constexpr semver::version<> collect_numbers() {
+  constexpr std::string_view str = "155.2.32-alpha/.23+";
+  semver::detail::lexer lexer{ str };
+  semver::detail::version_parser parser{ lexer };
+
+  semver::version ver{};
+  const auto res = parser.parse(ver);
+
+  return ver;
+}
+
 int main() {
-  semver::version version;
-  bool result = semver::parse("1.2.3-alpha.1+dev", version);
-  std::cout << (result ? "true" : "false") << std::endl; // true
+  static_assert(collect_numbers().major() == 155);
+  static_assert(collect_numbers().minor() == 2);
+  static_assert(collect_numbers().patch() == 32);
+  static_assert(collect_numbers().prerelease_tag() == "alpha");
+  static_assert(collect_numbers().build_metadata() == "");
 
-  std::cout << version.major << std::endl; // 1
-  std::cout << version.minor << std::endl; // 2
-  std::cout << version.patch << std::endl; // 3
-  std::cout << version.prerelease_tag << std::endl; // alpha.1
-  std::cout << version.build_metadata << std::endl; // dev
+  static_assert(!semver::valid("1.2.3a"));
 
-  std::cout << semver::major<int>("1.2.3-alpha.1+dev").value() << std::endl; // 1
-  std::cout << semver::minor<int>("1.2.3-alpha.1+dev").value() << std::endl; // 2
-  std::cout << semver::patch<int>("1.2.3-alpha.1+dev").value() << std::endl; // 3
-  std::cout << semver::prerelease_tag("1.2.3-alpha.1+dev") << std::endl; // alpha.1
-  std::cout << semver::build_metadata("1.2.3-alpha.1+dev") << std::endl; // dev
-
-  assert(semver::valid("1.2.3"));
-  assert(!semver::valid("a.b.c"));
-
-  assert(semver::less("1.0.0", "1.0.1"));
-  assert(semver::greater("2.0.0", "1.0.0"));
-  assert(semver::equal("1.2.3", "1.2.3"));
+  collect_numbers();
 
   return 0;
 }

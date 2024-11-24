@@ -24,9 +24,9 @@ TEST_CASE("parse") {
     for (const auto& [version, expected]: versions) {
       semver::version result;
       REQUIRE(parse(version, result));
-      REQUIRE(result.major == expected.major);
-      REQUIRE(result.minor == expected.minor);
-      REQUIRE(result.patch == expected.patch);
+      REQUIRE(result.major() == expected.major);
+      REQUIRE(result.minor() == expected.minor);
+      REQUIRE(result.patch() == expected.patch);
     }
   }
 
@@ -81,9 +81,9 @@ TEST_CASE("parse") {
 
     semver::version<std::int16_t, std::int16_t, std::int16_t> result2;
     REQUIRE(parse(v, result2));
-    REQUIRE(result2.major == 0);
-    REQUIRE(result2.minor == 0);
-    REQUIRE(result2.patch == 128);
+    REQUIRE(result2.major() == 0);
+    REQUIRE(result2.minor() == 0);
+    REQUIRE(result2.patch() == 128);
 
     constexpr std::string_view v2 = "0.4294967296.0";
     semver::version<std::int32_t, std::int32_t, std::int32_t> result3;
@@ -91,9 +91,9 @@ TEST_CASE("parse") {
 
     semver::version<std::int64_t, std::int64_t, std::int64_t> result4;
     REQUIRE(parse(v2, result4));
-    REQUIRE(result4.major == 0);
-    REQUIRE(result4.minor == 4294967296);
-    REQUIRE(result4.patch == 0);
+    REQUIRE(result4.major() == 0);
+    REQUIRE(result4.minor() == 4294967296);
+    REQUIRE(result4.patch() == 0);
   }
 
   SECTION("prerelease") {
@@ -111,10 +111,10 @@ TEST_CASE("parse") {
     for (const auto& [version, expected]: versions) {
       semver::version result;
       REQUIRE(parse(version, result));
-      REQUIRE(result.major == expected.major);
-      REQUIRE(result.minor == expected.minor);
-      REQUIRE(result.patch == expected.patch);
-      REQUIRE(result.prerelease_tag == expected.prerelease_tag);
+      REQUIRE(result.major() == expected.major);
+      REQUIRE(result.minor() == expected.minor);
+      REQUIRE(result.patch() == expected.patch);
+      REQUIRE(result.prerelease_tag() == expected.prerelease_tag);
     }
   }
 
@@ -133,11 +133,11 @@ TEST_CASE("parse") {
     for (const auto& [version, expected]: versions) {
       semver::version result;
       REQUIRE(parse(version, result));
-      REQUIRE(result.major == expected.major);
-      REQUIRE(result.minor == expected.minor);
-      REQUIRE(result.patch == expected.patch);
-      REQUIRE(result.prerelease_tag.empty());
-      REQUIRE(result.build_metadata == expected.build_metadata);
+      REQUIRE(result.major() == expected.major);
+      REQUIRE(result.minor() == expected.minor);
+      REQUIRE(result.patch() == expected.patch);
+      REQUIRE(result.prerelease_tag().empty());
+      REQUIRE(result.build_metadata() == expected.build_metadata);
     }
   }
 
@@ -156,39 +156,11 @@ TEST_CASE("parse") {
     for (const auto& [version, expected]: versions) {
       semver::version result;
       REQUIRE(parse(version, result));
-      REQUIRE(result.major == expected.major);
-      REQUIRE(result.minor == expected.minor);
-      REQUIRE(result.patch == expected.patch);
-      REQUIRE(result.prerelease_tag == expected.prerelease_tag);
-      REQUIRE(result.build_metadata == expected.build_metadata);
+      REQUIRE(result.major() == expected.major);
+      REQUIRE(result.minor() == expected.minor);
+      REQUIRE(result.patch() == expected.patch);
+      REQUIRE(result.prerelease_tag() == expected.prerelease_tag);
+      REQUIRE(result.build_metadata() == expected.build_metadata);
     }
   }
-}
-
-TEST_CASE("major") {
-  auto m = major<int>("5.0.0");
-  REQUIRE(m);
-  REQUIRE(*m == 5);
-}
-
-TEST_CASE("minor") {
-  auto mr = minor<int>("0.8.0");
-  REQUIRE(mr);
-  REQUIRE(*mr == 8);
-}
-
-TEST_CASE("patch") {
-  auto p = patch<int>("0.0.13");
-  REQUIRE(p);
-  REQUIRE(*p == 13);
-}
-
-TEST_CASE("prerelease") {
-  std::string_view pre = prerelease_tag("0.0.1-beta.21.34");
-  REQUIRE(pre == "beta.21.34");
-}
-
-TEST_CASE("build_metadata") {
-  std::string_view build = build_metadata("0.0.1-beta.21.34+meta-info-55");
-  REQUIRE(build == "meta-info-55");
 }

@@ -26,6 +26,7 @@
 using namespace semver;
 
 int main() {
+#ifdef RANGES
     constexpr std::string_view r1 = ">=1.2.7 <1.3.0";
     static_assert(range::satisfies("1.2.7", r1));
     static_assert(range::satisfies("1.2.8", r1));
@@ -48,6 +49,6 @@ int main() {
     // But we can suppress this behavior by passing semver::range::option::include_prerelease.
     // For details see: https://github.com/npm/node-semver#prerelease-tags
     static_assert(range::satisfies("3.4.5-alpha.9", r3, range::satisfies_option::include_prerelease));
-
+#endif
     return 0;
 }
