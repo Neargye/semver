@@ -2,20 +2,46 @@
 #include <catch.hpp>
 #include <array>
 
-using namespace semver;
+static void test_parse_and_check(std::string_view range_str, std::string_view ver_str,
+  semver::version_compare_option option = semver::version_compare_option::exclude_prerelease)
+{
+  INFO(range_str << " : " << ver_str);
+
+  semver::version v;
+  REQUIRE(semver::parse(ver_str, v));
+
+  semver::range_set rs;
+  REQUIRE(semver::parse(range_str, rs));
+
+  REQUIRE(rs.contains(v, option));
+}
+
+static void test_parse_and_check_false(std::string_view range_str, std::string_view ver_str,
+  semver::version_compare_option option = semver::version_compare_option::exclude_prerelease)
+{
+  INFO(range_str << " : " << ver_str);
+
+  semver::version v;
+  REQUIRE(semver::parse(ver_str, v));
+
+  semver::range_set rs;
+  REQUIRE(semver::parse(range_str, rs));
+
+  REQUIRE_FALSE(rs.contains(v, option));
+}
 
 TEST_CASE("ranges") {
   SECTION("constructor") {
     constexpr std::string_view v1{"1.2.3"};
     constexpr std::string_view r1{">1.0.0 <=2.0.0"};
-    STATIC_REQUIRE(range::satisfies(v1, r1));
+    test_parse_and_check(r1, v1);
 
     constexpr std::string_view v2{"2.1.0"};
-    STATIC_REQUIRE_FALSE(range::satisfies(v2, r1));
+    test_parse_and_check_false(r1, v2);
 
     constexpr std::string_view r2{"1.1.1"};
     constexpr std::string_view v3{"1.1.1"};
-    STATIC_REQUIRE(range::satisfies(v3, r2));
+    test_parse_and_check(r2, v3);
   }
 
   struct range_test_case {
@@ -35,7 +61,12 @@ TEST_CASE("ranges") {
     }};
 
     for (const auto& test : tests) {
-      REQUIRE(range::satisfies(test.ver, test.range) == test.contains);
+      if (test.contains) {
+        test_parse_and_check(test.range, test.ver);
+      }
+      else {
+        test_parse_and_check_false(test.range, test.ver);
+      }
     }
   }
 
@@ -47,11 +78,11 @@ TEST_CASE("ranges") {
     constexpr std::string_view v4{"1.2.8"};
     constexpr std::string_view v5{"2.0.0"};
 
-    STATIC_REQUIRE(range::satisfies(v1, range));
-    STATIC_REQUIRE(range::satisfies(v2, range));
-    STATIC_REQUIRE(range::satisfies(v3, range));
-    STATIC_REQUIRE_FALSE(range::satisfies(v4, range));
-    STATIC_REQUIRE_FALSE(range::satisfies(v5, range));
+    test_parse_and_check(range, v1);
+    test_parse_and_check(range, v2);
+    test_parse_and_check(range, v3);
+    test_parse_and_check_false(range, v4);
+    test_parse_and_check_false(range, v5);
   }
 }
 
@@ -71,29 +102,29 @@ TEST_CASE("ranges with prerelease tags") {
     constexpr std::string_view v5{"2.0.0-alpha.5"};
 
     SECTION("exclude prerelease") {
-      STATIC_REQUIRE(range::satisfies(v1, r1));
-      STATIC_REQUIRE_FALSE(range::satisfies(v2, r1));
-      STATIC_REQUIRE(range::satisfies(v3, r1));
-      STATIC_REQUIRE(range::satisfies(v4, r1));
-      STATIC_REQUIRE_FALSE(range::satisfies(v1, r2));
-      STATIC_REQUIRE(range::satisfies(v1, r3));
-      STATIC_REQUIRE(range::satisfies(v5, r4));
-      STATIC_REQUIRE_FALSE(range::satisfies(v1, r4));
-      STATIC_REQUIRE(range::satisfies(v5, r5));
-      STATIC_REQUIRE_FALSE(range::satisfies(v5, r6));
+      test_parse_and_check(r1, v1);
+      test_parse_and_check_false(r1, v2);
+      test_parse_and_check(r1, v3);
+      test_parse_and_check(r1, v4);
+      test_parse_and_check_false(r2, v1);
+      test_parse_and_check(r3, v1);
+      test_parse_and_check(r4, v5);
+      test_parse_and_check_false(r4, v1);
+      test_parse_and_check(r5, v5);
+      test_parse_and_check_false(r6, v5);
     }
 
     SECTION("include prerelease") {
-      STATIC_REQUIRE(range::satisfies(v1, r1, range::satisfies_option::include_prerelease));
-      STATIC_REQUIRE(range::satisfies(v2, r1, range::satisfies_option::include_prerelease));
-      STATIC_REQUIRE(range::satisfies(v3, r1, range::satisfies_option::include_prerelease));
-      STATIC_REQUIRE(range::satisfies(v4, r1, range::satisfies_option::include_prerelease));
-      STATIC_REQUIRE_FALSE(range::satisfies(v1, r2, range::satisfies_option::include_prerelease));
-      STATIC_REQUIRE(range::satisfies(v1, r3, range::satisfies_option::include_prerelease));
-      STATIC_REQUIRE(range::satisfies(v5, r4, range::satisfies_option::include_prerelease));
-      STATIC_REQUIRE_FALSE(range::satisfies(v1, r4, range::satisfies_option::include_prerelease));
-      STATIC_REQUIRE(range::satisfies(v5, r5, range::satisfies_option::include_prerelease));
-      STATIC_REQUIRE_FALSE(range::satisfies(v5, r6, range::satisfies_option::include_prerelease));
+      test_parse_and_check(r1, v1, semver::version_compare_option::include_prerelease);
+      test_parse_and_check(r1, v2, semver::version_compare_option::include_prerelease);
+      test_parse_and_check(r1, v3, semver::version_compare_option::include_prerelease);
+      test_parse_and_check(r1, v4, semver::version_compare_option::include_prerelease);
+      test_parse_and_check_false(r2, v1, semver::version_compare_option::include_prerelease);
+      test_parse_and_check(r3, v1, semver::version_compare_option::include_prerelease);
+      test_parse_and_check(r4, v5, semver::version_compare_option::include_prerelease);
+      test_parse_and_check_false(r4, v1, semver::version_compare_option::include_prerelease);
+      test_parse_and_check(r5, v5, semver::version_compare_option::include_prerelease);
+      test_parse_and_check_false(r6, v5, semver::version_compare_option::include_prerelease);
     }
   }
 
@@ -107,31 +138,31 @@ TEST_CASE("ranges with prerelease tags") {
     constexpr std::string_view r3{"<=1.0.0-rc.123"};
 
     SECTION("exclude prerelease") {
-      STATIC_REQUIRE(range::satisfies(v1, r1));
-      STATIC_REQUIRE_FALSE(range::satisfies(v2, r1));
-      STATIC_REQUIRE_FALSE(range::satisfies(v3, r1));
+      test_parse_and_check(r1, v1);
+      test_parse_and_check_false(r1, v2);
+      test_parse_and_check_false(r1, v3);
 
-      STATIC_REQUIRE(range::satisfies(v1, r2));
-      STATIC_REQUIRE(range::satisfies(v2, r2));
-      STATIC_REQUIRE_FALSE(range::satisfies(v3, r2));
+      test_parse_and_check(r2, v1);
+      test_parse_and_check(r2, v2);
+      test_parse_and_check_false(r2, v3);
 
-      STATIC_REQUIRE(range::satisfies(v1, r3));
-      STATIC_REQUIRE(range::satisfies(v2, r3));
-      STATIC_REQUIRE(range::satisfies(v3, r3));
+      test_parse_and_check(r3, v1);
+      test_parse_and_check(r3, v2);
+      test_parse_and_check(r3, v3);
     }
 
     SECTION("include prerelease") {
-      STATIC_REQUIRE(range::satisfies(v1, r1, range::satisfies_option::include_prerelease));
-      STATIC_REQUIRE_FALSE(range::satisfies(v2, r1, range::satisfies_option::include_prerelease));
-      STATIC_REQUIRE_FALSE(range::satisfies(v3, r1, range::satisfies_option::include_prerelease));
+      test_parse_and_check(r1, v1, semver::version_compare_option::include_prerelease);
+      test_parse_and_check_false(r1, v2, semver::version_compare_option::include_prerelease);
+      test_parse_and_check_false(r1, v3, semver::version_compare_option::include_prerelease);
 
-      STATIC_REQUIRE(range::satisfies(v1, r2, range::satisfies_option::include_prerelease));
-      STATIC_REQUIRE(range::satisfies(v2, r2, range::satisfies_option::include_prerelease));
-      STATIC_REQUIRE_FALSE(range::satisfies(v3, r2, range::satisfies_option::include_prerelease));
+      test_parse_and_check(r2, v1, semver::version_compare_option::include_prerelease);
+      test_parse_and_check(r2, v2, semver::version_compare_option::include_prerelease);
+      test_parse_and_check_false(r2, v3, semver::version_compare_option::include_prerelease);
 
-      STATIC_REQUIRE(range::satisfies(v1, r3, range::satisfies_option::include_prerelease));
-      STATIC_REQUIRE(range::satisfies(v2, r3, range::satisfies_option::include_prerelease));
-      STATIC_REQUIRE(range::satisfies(v3, r3, range::satisfies_option::include_prerelease));
+      test_parse_and_check(r3, v1, semver::version_compare_option::include_prerelease);
+      test_parse_and_check(r3, v2, semver::version_compare_option::include_prerelease);
+      test_parse_and_check(r3, v3, semver::version_compare_option::include_prerelease);
     }
   }
 }

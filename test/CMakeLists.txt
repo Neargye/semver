@@ -1,6 +1,6 @@
 ﻿include(CheckCXXCompilerFlag)
 
-set(SOURCES test.cpp test_validation.cpp test_parse.cpp test_operators.cpp)
+set(SOURCES test.cpp test_validation.cpp test_parse.cpp test_operators.cpp test_ranges)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     set(OPTIONS /W4 /WX)

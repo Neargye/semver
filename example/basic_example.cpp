@@ -26,27 +26,7 @@
 #include <vector>
 #include "semver.hpp"
 
-static constexpr semver::version<> collect_numbers() {
-  constexpr std::string_view str = "155.2.32-alpha/.23+";
-  semver::detail::lexer lexer{ str };
-  semver::detail::version_parser parser{ lexer };
-
-  semver::version ver{};
-  const auto res = parser.parse(ver);
-
-  return ver;
-}
-
 int main() {
-  static_assert(collect_numbers().major() == 155);
-  static_assert(collect_numbers().minor() == 2);
-  static_assert(collect_numbers().patch() == 32);
-  static_assert(collect_numbers().prerelease_tag() == "alpha");
-  static_assert(collect_numbers().build_metadata() == "");
-
-  static_assert(!semver::valid("1.2.3a"));
-
-  collect_numbers();
-
+  // TODO: add examples
   return 0;
 }

@@ -22,33 +22,10 @@
 // SOFTWARE.
 
 #include "semver.hpp"
-
-using namespace semver;
+#include <iostream>
+#include <cassert>
 
 int main() {
-#ifdef RANGES
-    constexpr std::string_view r1 = ">=1.2.7 <1.3.0";
-    static_assert(range::satisfies("1.2.7", r1));
-    static_assert(range::satisfies("1.2.8", r1));
-    static_assert(range::satisfies("1.2.99", r1));
-    static_assert(!range::satisfies("1.2.6", r1));
-    static_assert(!range::satisfies("1.3.0", r1));
-    static_assert(!range::satisfies("1.1.0", r1));
-
-    constexpr std::string_view r2 = "1.2.7 || >=1.2.9 <2.0.0";
-    static_assert(range::satisfies("1.2.7", r2));
-    static_assert(range::satisfies("1.2.9", r2));
-    static_assert(!range::satisfies("1.2.8", r2));
-    static_assert(!range::satisfies("2.0.0", r2));
-
-    // By default, we exclude prerelease tag from comparison.
-    constexpr std::string_view r3 = ">1.2.3-alpha.3";
-    static_assert(range::satisfies("1.2.3-alpha.7", r3));
-    static_assert(!range::satisfies("3.4.5-alpha.9", r3));
-
-    // But we can suppress this behavior by passing semver::range::option::include_prerelease.
-    // For details see: https://github.com/npm/node-semver#prerelease-tags
-    static_assert(range::satisfies("3.4.5-alpha.9", r3, range::satisfies_option::include_prerelease));
-#endif
+  // TODO: add examples
     return 0;
 }
