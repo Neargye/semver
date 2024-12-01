@@ -121,7 +121,6 @@ TEST_CASE("operators") {
   SECTION("operator >=") {
     for (std::size_t i = 1; i < versions.size(); ++i) {
       for (std::size_t j = 1; j < i; ++j) {
-        std::string_view v = versions[i];
         test_parse_and_compare_reverse_false(versions[i], versions[i - j], semver::operator>=<int, int, int>);
         test_parse_and_compare_reverse(versions[i], versions[i], semver::operator>=<int, int, int>);
       }
