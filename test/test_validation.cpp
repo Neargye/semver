@@ -7,24 +7,24 @@ using namespace semver;
 TEST_CASE("validation") {
   SECTION("constexpr valid") {
     constexpr std::string_view v1 = "0.0.1";
-    STATIC_REQUIRE(valid(v1));
+    REQUIRE(valid(v1));
 
     constexpr std::string_view v2 = "1.2.3-rc.4";
-    STATIC_REQUIRE(valid(v2));
+    REQUIRE(valid(v2));
 
     constexpr std::string_view v3 = "1.1.2-prerelease+meta";
-    STATIC_REQUIRE(valid(v3));
+    REQUIRE(valid(v3));
   }
 
   SECTION("constexpr invalid") {
     constexpr std::string_view v1 = "";
-    STATIC_REQUIRE_FALSE(valid(v1));
+    REQUIRE_FALSE(valid(v1));
 
     constexpr std::string_view v2 = "1.01.*";
-    STATIC_REQUIRE_FALSE(valid(v2));
+    REQUIRE_FALSE(valid(v2));
 
     constexpr std::string_view v3 = "1.1.2-prerelease_meta";
-    STATIC_REQUIRE_FALSE(valid(v3));
+    REQUIRE_FALSE(valid(v3));
   }
 
   SECTION("runtime valid") {
