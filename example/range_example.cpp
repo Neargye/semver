@@ -21,11 +21,46 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE  OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "semver.hpp"
-#include <iostream>
 #include <cassert>
+#include "semver.hpp"
 
 int main() {
-  // TODO: add examples
-    return 0;
+  constexpr std::string_view raw_range = ">=1.2.9 <2.0.0";
+  semver::range_set range;
+  const auto [ptr, ec] = semver::parse(raw_range, range);
+  if (ec == std::errc{}) {
+    assert(ptr == raw_range.end());
+
+    semver::version version;
+    if (semver::parse("1.3.0", version)) {
+      assert(range.contains(version));
+    }
+  }
+
+  semver::range_set range2;
+  if (semver::parse(">=1.0.0 <=2.0.0 || >=3.0.0", range2)) {
+    semver::version version;
+    if (semver::parse("3.5.0", version)) {
+      assert(range2.contains(version));
+    }
+  }
+
+  semver::range_set range3;
+  if (semver::parse(">1.2.3-alpha.3", range3)) {
+    semver::version version;
+    if (semver::parse("1.2.3-alpha.7", version)) {
+      assert(range3.contains(version));
+    }
+
+    if (semver::parse("3.4.5-alpha.9", version)) {
+      // By default, we exclude prerelease tag from comparison.
+      assert(range3.contains(version) == false);
+
+      // But we can suppress this behavior by passing semver::range::option::include_prerelease.
+      // For details see: https://github.com/npm/node-semver#prerelease-tags
+      assert(range3.contains(version, semver::version_compare_option::include_prerelease));
+    }
+  }
+
+  return 0;
 }

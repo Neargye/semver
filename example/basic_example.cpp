@@ -22,11 +22,39 @@
 // SOFTWARE.
 
 #include <assert.h>
-#include <iostream>
-#include <vector>
 #include "semver.hpp"
 
 int main() {
-  // TODO: add examples
-  return 0;
+  constexpr std::string_view raw_version = "1.2.3"; 
+  semver::version version;
+  const auto [ptr, ec] = semver::parse(raw_version, version);
+  if (ec == std::errc{}) {
+    assert(ptr == raw_version.end());
+    assert(version.major() == 1);
+    assert(version.minor() == 2);
+    assert(version.patch() == 3);
+  }
+
+  semver::version version2;
+  if (semver::parse("1.2.3-alpha0.1+build", version2)) {
+    assert(version2.major() == 1);
+    assert(version2.minor() == 2);
+    assert(version2.patch() == 3);
+    assert(version2.prerelease_tag() == "alpha0.1");
+    assert(version2.build_metadata() == "build");
+  }
+
+  assert(version > version2);
+  assert(version2 < version);
+
+  // use 64 bit integer for numbers
+  semver::version<int64_t, int64_t, int64_t> version3;
+  if (semver::parse("0.0.999999999999", version3)) {
+    assert(version3.major() == 0);
+    assert(version3.minor() == 0);
+    assert(version3.patch() == 999999999999);
+  }
+
+  const bool result = semver::valid("0.0.1-beta");
+  assert(result);
 }
