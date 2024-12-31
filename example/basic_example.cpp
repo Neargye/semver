@@ -22,6 +22,7 @@
 // SOFTWARE.
 
 #include <assert.h>
+#include <iostream>
 #include "semver.hpp"
 
 int main() {
@@ -30,18 +31,18 @@ int main() {
   const auto [ptr, ec] = semver::parse(raw_version, version);
   if (ec == std::errc{}) {
     assert(ptr == raw_version.end());
-    assert(version.major() == 1);
-    assert(version.minor() == 2);
-    assert(version.patch() == 3);
+    std::cout << version.major() << std::endl; // 1
+    std::cout << version.minor() << std::endl; // 2
+    std::cout << version.patch() << std::endl; // 3
   }
 
   semver::version version2;
   if (semver::parse("1.2.3-alpha0.1+build", version2)) {
-    assert(version2.major() == 1);
-    assert(version2.minor() == 2);
-    assert(version2.patch() == 3);
-    assert(version2.prerelease_tag() == "alpha0.1");
-    assert(version2.build_metadata() == "build");
+    std::cout << version2.major() << std::endl; // 1
+    std::cout << version2.minor() << std::endl; // 2
+    std::cout << version2.patch() << std::endl; // 3
+    std::cout << version2.prerelease_tag() << std::endl; // "alpha0.1"
+    std::cout << version2.build_metadata() << std::endl; // "build"
   }
 
   assert(version > version2);
@@ -50,11 +51,11 @@ int main() {
   // use 64 bit integer for numbers
   semver::version<int64_t, int64_t, int64_t> version3;
   if (semver::parse("0.0.999999999999", version3)) {
-    assert(version3.major() == 0);
-    assert(version3.minor() == 0);
-    assert(version3.patch() == 999999999999);
+    std::cout << version3.major() << std::endl; // 0
+    std::cout << version3.minor() << std::endl; // 0
+    std::cout << version3.patch() << std::endl; // 999999999999
   }
 
   const bool result = semver::valid("0.0.1-beta");
-  assert(result);
+  std::cout << std::boolalpha << result << std::endl; // true
 }

@@ -21,10 +21,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE  OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <cassert>
+#include <assert.h>
+#include <iostream>
 #include "semver.hpp"
 
 int main() {
+  std::cout << std::boolalpha;
+
   constexpr std::string_view raw_range = ">=1.2.9 <2.0.0";
   semver::range_set range;
   const auto [ptr, ec] = semver::parse(raw_range, range);
@@ -33,7 +36,8 @@ int main() {
 
     semver::version version;
     if (semver::parse("1.3.0", version)) {
-      assert(range.contains(version));
+      const bool result = range.contains(version);
+      std::cout << result << std::endl; // true
     }
   }
 
@@ -41,7 +45,8 @@ int main() {
   if (semver::parse(">=1.0.0 <=2.0.0 || >=3.0.0", range2)) {
     semver::version version;
     if (semver::parse("3.5.0", version)) {
-      assert(range2.contains(version));
+      const bool result = range2.contains(version);
+      std::cout << result << std::endl; // true
     }
   }
 
@@ -49,16 +54,19 @@ int main() {
   if (semver::parse(">1.2.3-alpha.3", range3)) {
     semver::version version;
     if (semver::parse("1.2.3-alpha.7", version)) {
-      assert(range3.contains(version));
+      const bool result = range3.contains(version);
+      std::cout << result << std::endl; // true
     }
 
     if (semver::parse("3.4.5-alpha.9", version)) {
       // By default, we exclude prerelease tag from comparison.
-      assert(range3.contains(version) == false);
+      bool result = range3.contains(version);
+      std::cout << result << std::endl; // false
 
       // But we can suppress this behavior by passing semver::range::option::include_prerelease.
       // For details see: https://github.com/npm/node-semver#prerelease-tags
-      assert(range3.contains(version, semver::version_compare_option::include_prerelease));
+      result = range3.contains(version, semver::version_compare_option::include_prerelease);
+      std::cout << result << std::endl; // true
     }
   }
 
