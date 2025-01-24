@@ -11,7 +11,7 @@
 //    \  /  __/ |  \__ \ | (_) | | | | | | | | (_| | | |____|_|   |_|
 //     \/ \___|_|  |___/_|\___/|_| |_|_|_| |_|\__, |  \_____|
 // https://github.com/Neargye/semver           __/ |
-// version 0.3.1                              |___/
+// version 1.0.0                              |___/
 //
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
@@ -39,9 +39,9 @@
 #ifndef NEARGYE_SEMANTIC_VERSIONING_HPP
 #define NEARGYE_SEMANTIC_VERSIONING_HPP
 
-#define SEMVER_VERSION_MAJOR 0
-#define SEMVER_VERSION_MINOR 3
-#define SEMVER_VERSION_PATCH 1
+#define SEMVER_VERSION_MAJOR 1
+#define SEMVER_VERSION_MINOR 0
+#define SEMVER_VERSION_PATCH 0
 
 #include <algorithm>
 #include <cstddef>
@@ -97,17 +97,16 @@ namespace semver {
 
   template <typename I1 = int, typename I2 = int, typename I3 = int>
   class version {
-  public:
     friend class detail::version_parser;
     friend class detail::prerelease_comparator;
-
+  public:
     SEMVER_CONSTEXPR version() = default; // https://semver.org/#how-should-i-deal-with-revisions-in-the-0yz-initial-development-phase
     SEMVER_CONSTEXPR version(const version&) = default;
     SEMVER_CONSTEXPR version(version&&) = default;
-    ~version() = default;
+    SEMVER_CONSTEXPR ~version() = default;
 
-    version& operator=(const version&) = default;
-    version& operator=(version&&) = default;
+    SEMVER_CONSTEXPR version& operator=(const version&) = default;
+    SEMVER_CONSTEXPR version& operator=(version&&) = default;
 
     SEMVER_CONSTEXPR I1 major() const noexcept { return major_; }
     SEMVER_CONSTEXPR I2 minor() const noexcept { return minor_; }

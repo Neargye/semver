@@ -21,12 +21,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE  OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <assert.h>
+#include <сassert>
 #include <iostream>
 #include "semver.hpp"
 
 int main() {
-  constexpr std::string_view raw_version = "1.2.3"; 
+  constexpr std::string_view raw_version = "1.2.3";
   semver::version version;
   const auto [ptr, ec] = semver::parse(raw_version, version);
   if (ec == std::errc{}) {
