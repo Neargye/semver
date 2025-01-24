@@ -958,9 +958,6 @@ SEMVER_CONSTEXPR from_chars_result parse(std::string_view str, range_set<I1, I2,
   return detail::range_parser{ std::move(token_stream) }.parse(out);
 }
 
-// Version lib semver.
-inline constexpr auto semver_version = "0.4.0";
-
 #undef SEMVER_CONSTEXPR
 
 } // namespace semver

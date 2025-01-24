@@ -30,7 +30,7 @@ int main() {
   semver::version version;
   const auto [ptr, ec] = semver::parse(raw_version, version);
   if (ec == std::errc{}) {
-    assert(ptr == raw_version.end());
+    assert(ptr == (raw_version.data() + raw_version.size()));
     std::cout << version.major() << std::endl; // 1
     std::cout << version.minor() << std::endl; // 2
     std::cout << version.patch() << std::endl; // 3

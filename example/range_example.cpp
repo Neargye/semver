@@ -32,7 +32,7 @@ int main() {
   semver::range_set range;
   const auto [ptr, ec] = semver::parse(raw_range, range);
   if (ec == std::errc{}) {
-    assert(ptr == raw_range.end());
+    assert(ptr == (raw_range.data() + raw_range.size()));
 
     semver::version version;
     if (semver::parse("1.3.0", version)) {
