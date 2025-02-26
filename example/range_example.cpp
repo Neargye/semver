@@ -1,7 +1,7 @@
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2020 - 2024 Daniil Goncharov <neargye@gmail.com>.
-// Copyright (c) 2020 - 2021 Alexander Gorbunov <naratzul@gmail.com>.
+// Copyright (c) 2020 - 2025 Daniil Goncharov <neargye@gmail.com>.
+// Copyright (c) 2020 - 2025 Alexander Gorbunov <naratzul@gmail.com>.
 //
 // Permission is hereby  granted, free of charge, to any  person obtaining a copy
 // of this software and associated  documentation files (the "Software"), to deal
@@ -21,33 +21,54 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE  OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <cassert>
+#include <iostream>
 #include "semver.hpp"
 
-using namespace semver;
-
 int main() {
-    constexpr std::string_view r1 = ">=1.2.7 <1.3.0";
-    static_assert(range::satisfies("1.2.7"_version, r1));
-    static_assert(range::satisfies("1.2.8"_version, r1));
-    static_assert(range::satisfies("1.2.99"_version, r1));
-    static_assert(!range::satisfies("1.2.6"_version, r1));
-    static_assert(!range::satisfies("1.3.0"_version, r1));
-    static_assert(!range::satisfies("1.1.0"_version, r1));
+  std::cout << std::boolalpha;
 
-    constexpr std::string_view r2 = "1.2.7 || >=1.2.9 <2.0.0";
-    static_assert(range::satisfies(version{1, 2, 7}, r2));
-    static_assert(range::satisfies({1, 2, 9}, r2));
-    static_assert(!range::satisfies("1.2.8"_version, r2));
-    static_assert(!range::satisfies("2.0.0"_version, r2));
+  constexpr std::string_view raw_range = ">=1.2.9 <2.0.0";
+  semver::range_set range;
+  const auto [ptr, ec] = semver::parse(raw_range, range);
+  if (ec == std::errc{}) {
+    assert(ptr == (raw_range.data() + raw_range.size()));
 
-    // By default, we exclude prerelease tag from comparison.
-    constexpr std::string_view r3 = ">1.2.3-alpha.3";
-    static_assert(range::satisfies("1.2.3-alpha.7"_version, r3));
-    static_assert(!range::satisfies("3.4.5-alpha.9"_version, r3));
+    semver::version version;
+    if (semver::parse("1.3.0", version)) {
+      const bool result = range.contains(version);
+      std::cout << result << std::endl; // true
+    }
+  }
 
-    // But we can suppress this behavior by passing semver::range::option::include_prerelease.
-    // For details see: https://github.com/npm/node-semver#prerelease-tags
-    static_assert(range::satisfies("3.4.5-alpha.9"_version, r3, range::satisfies_option::include_prerelease));
+  semver::range_set range2;
+  if (semver::parse(">=1.0.0 <=2.0.0 || >=3.0.0", range2)) {
+    semver::version version;
+    if (semver::parse("3.5.0", version)) {
+      const bool result = range2.contains(version);
+      std::cout << result << std::endl; // true
+    }
+  }
 
-    return 0;
+  semver::range_set range3;
+  if (semver::parse(">1.2.3-alpha.3", range3)) {
+    semver::version version;
+    if (semver::parse("1.2.3-alpha.7", version)) {
+      const bool result = range3.contains(version);
+      std::cout << result << std::endl; // true
+    }
+
+    if (semver::parse("3.4.5-alpha.9", version)) {
+      // By default, we exclude prerelease tag from comparison.
+      bool result = range3.contains(version);
+      std::cout << result << std::endl; // false
+
+      // But we can suppress this behavior by passing semver::range::option::include_prerelease.
+      // For details see: https://github.com/npm/node-semver#prerelease-tags
+      result = range3.contains(version, semver::version_compare_option::include_prerelease);
+      std::cout << result << std::endl; // true
+    }
+  }
+
+  return 0;
 }

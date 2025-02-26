@@ -1,7 +1,7 @@
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018 - 2024 Daniil Goncharov <neargye@gmail.com>.
-// Copyright (c) 2020 - 2021 Alexander Gorbunov <naratzul@gmail.com>.
+// Copyright (c) 2018 - 2025 Daniil Goncharov <neargye@gmail.com>.
+// Copyright (c) 2020 - 2025 Alexander Gorbunov <naratzul@gmail.com>.
 //
 // Permission is hereby  granted, free of charge, to any  person obtaining a copy
 // of this software and associated  documentation files (the "Software"), to deal
@@ -21,38 +21,41 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE  OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <semver.hpp>
-
+#include <cassert>
 #include <iostream>
-
-using namespace semver;
+#include "semver.hpp"
 
 int main() {
-  constexpr version v_default;
-  static_assert(v_default == version(0, 1, 0, prerelease::none, std::nullopt));
-  std::cout << v_default << std::endl; // 0.1.0
+  constexpr std::string_view raw_version = "1.2.3";
+  semver::version version;
+  const auto [ptr, ec] = semver::parse(raw_version, version);
+  if (ec == std::errc{}) {
+    assert(ptr == (raw_version.data() + raw_version.size()));
+    std::cout << version.major() << std::endl; // 1
+    std::cout << version.minor() << std::endl; // 2
+    std::cout << version.patch() << std::endl; // 3
+  }
 
-  constexpr version v1{1, 4, 3};
-  constexpr version v2{"1.2.4-alpha.10"};
-  std::cout << v1 << std::endl; // 1.4.3
-  std::cout << v2 << std::endl; // 1.2.4-alpha.10
-  static_assert(v1 != v2);
-  static_assert(!(v1 == v2));
-  static_assert(v1 > v2);
-  static_assert(v1 >= v2);
-  static_assert(!(v1 < v2));
-  static_assert(!(v1 <= v2));
+  semver::version version2;
+  if (semver::parse("1.2.3-alpha0.1+build", version2)) {
+    std::cout << version2.major() << std::endl; // 1
+    std::cout << version2.minor() << std::endl; // 2
+    std::cout << version2.patch() << std::endl; // 3
+    std::cout << version2.prerelease_tag() << std::endl; // "alpha0.1"
+    std::cout << version2.build_metadata() << std::endl; // "build"
+  }
 
-  version v_s;
-  v_s.from_string("1.2.3-rc.1");
-  std::string s1 = v_s.to_string();
-  std::cout << s1 << std::endl; // 1.2.3-rc.1
-  v_s.prerelease_number = std::nullopt;
-  std::string s2 = v_s.to_string();
-  std::cout << s2 << std::endl; // 1.2.3-rc
+  assert(version > version2);
+  assert(version2 < version);
 
-  constexpr version vo = "2.0.0-rc.3"_version;
-  std::cout << vo << std::endl; // 2.0.0-rc.3
+  // use 64 bit integer for numbers
+  semver::version<int64_t, int64_t, int64_t> version3;
+  if (semver::parse("0.0.999999999999", version3)) {
+    std::cout << version3.major() << std::endl; // 0
+    std::cout << version3.minor() << std::endl; // 0
+    std::cout << version3.patch() << std::endl; // 999999999999
+  }
 
-  return 0;
+  const bool result = semver::valid("0.0.1-beta");
+  std::cout << std::boolalpha << result << std::endl; // true
 }
