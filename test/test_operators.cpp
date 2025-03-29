@@ -1,5 +1,5 @@
-#include "test_utils.hpp"
 #include <semver.hpp>
+#include <catch.hpp>
 #include <array>
 
 template <typename Operator>

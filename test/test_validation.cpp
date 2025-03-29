@@ -1,125 +1,42 @@
 #include <semver.hpp>
 #include <catch.hpp>
-#include <array>
+#include "test_utils.hpp"
 
 using namespace semver;
 
 TEST_CASE("validation") {
+#ifdef SEMVER_CONSTEXPR_SUPPORT
   SECTION("constexpr valid") {
     constexpr std::string_view v1 = "0.0.1";
-    REQUIRE(valid(v1));
+    static_assert(valid(v1));
 
     constexpr std::string_view v2 = "1.2.3-rc.4";
-    REQUIRE(valid(v2));
+    static_assert(valid(v2));
 
     constexpr std::string_view v3 = "1.1.2-prerelease+meta";
-    REQUIRE(valid(v3));
+    static_assert(valid(v3));
   }
 
   SECTION("constexpr invalid") {
     constexpr std::string_view v1 = "";
-    REQUIRE_FALSE(valid(v1));
+    static_assert(!valid(v1));
 
     constexpr std::string_view v2 = "1.01.*";
-    REQUIRE_FALSE(valid(v2));
+    static_assert(!valid(v2));
 
     constexpr std::string_view v3 = "1.1.2-prerelease_meta";
-    REQUIRE_FALSE(valid(v3));
+    static_assert(!valid(v3));
   }
+#endif
 
   SECTION("runtime valid") {
-    constexpr std::array<std::string_view, 32> versions = {{
-    {"0.0.4"},
-    {"1.2.3"},
-    {"10.20.30"},
-    {"1.1.2-prerelease+meta"},
-    {"1.1.2+meta"},
-    {"1.1.2+meta-valid"},
-    {"1.0.0-alpha"},
-    {"1.0.0-beta"},
-    {"1.0.0-alpha.beta"},
-    {"1.0.0-alpha.beta.1"},
-    {"1.0.0-alpha.1"},
-    {"1.0.0-alpha0.valid"},
-    {"1.0.0-alpha.0valid"},
-    {"1.0.0-alpha-a.b-c-somethinglong+build.1-aef.1-its-okay"},
-    {"1.2.3-rc.4"},
-    {"1.0.0-rc.1+build.1"},
-    {"2.0.0-rc.1+build.123"},
-    {"1.2.3-beta"},
-    {"10.2.3-DEV-SNAPSHOT"},
-    {"1.2.3-SNAPSHOT-123"},
-    {"1.0.0"},
-    {"2.0.0"},
-    {"1.1.7"},
-    {"2.0.0+build.1848"},
-    {"2.0.1-alpha.1227"},
-    {"1.0.0-alpha+beta"},
-    {"1.2.3----RC-SNAPSHOT.12.9.1--.12+788"},
-    {"1.2.3----R-S.12.9.1--.12+meta"},
-    {"1.2.3----RC-SNAPSHOT.12.9.1--.12"},
-    {"1.0.0+0.build.1-rc.10000aaa-kk-0.1"},
-    {"999999999.999999999.999999999"},
-    {"1.0.0-0A.is.legal"}
-    }};
-
-    for (auto version: versions) {
+    for (auto version: valid_versions) {
       REQUIRE(valid(version));
     }
   }
 
   SECTION("runtime invalid") {
-    constexpr std::array<std::string_view, 47> versions = {{
-    {""},
-    {"1"},
-    {"1.2"},
-    {"1.*"},
-    {"1.2.3-0123"},
-    {"1.2.3-0123.0123"},
-    {"1.0.0-"},
-    {"1.0.0+"},
-    {"1.0.0-."},
-    {"1.0.0+."},
-    {"1.0.0-.+."},
-    {"1.1.2+.123"},
-    {"+invalid"},
-    {"-invalid"},
-    {"-invalid+invalid"},
-    {"-invalid.01"},
-    {"alpha"},
-    {"alpha.beta"},
-    {"alpha.beta.1"},
-    {"alpha.1"},
-    {"alpha+beta"},
-    {"alpha_beta"},
-    {"alpha."},
-    {"alpha.."},
-    {"beta"},
-    {"1.0.0-alpha_beta"},
-    {"-alpha."},
-    {"1.0.0-alpha.."},
-    {"1.0.0-alpha..1"},
-    {"1.0.0-alpha...1"},
-    {"1.0.0-alpha....1"},
-    {"1.0.0-alpha.....1"},
-    {"1.0.0-alpha......1"},
-    {"1.0.0-alpha.......1"},
-    {"01.1.1"},
-    {"1.01.1"},
-    {"1.1.01"},
-    {"1.2."},
-    {"1.2.3.DEV"},
-    {"1.2-SNAPSHOT"},
-    {"1.2.31.2.3----RC-SNAPSHOT.12.09.1--..12+788"},
-    {"1.2-RC-SNAPSHOT"},
-    {"-1.0.3-gamma+b7718"},
-    {"+justmeta"},
-    {"9.8.7+meta+meta"},
-    {"9.8.7-whatever+meta+meta"},
-    {"99999999999999999999999.999999999999999999.99999999999999999----RC-SNAPSHOT.12.09.1--------------------------------..12"}
-    }};
-
-    for (auto version: versions) {
+    for (auto version: invalid_versions) {
       REQUIRE_FALSE(valid(version));
     }
   }

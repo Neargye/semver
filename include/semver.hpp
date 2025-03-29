@@ -81,6 +81,40 @@
 namespace semver {
 
   namespace detail {
+
+    template <typename T, typename = void>
+    struct resize_uninitialized {
+      SEMVER_CONSTEXPR static auto resize(T& str, std::size_t size) -> std::void_t<decltype(str.resize(size))> {
+        str.resize(size);
+      }
+    };
+
+    template <typename T>
+    struct resize_uninitialized<T, std::void_t<decltype(std::declval<T>().__resize_default_init(42))>> {
+      SEMVER_CONSTEXPR static void resize(T& str, std::size_t size) {
+        str.__resize_default_init(size);
+      }
+    };
+
+    template <typename Int>
+    SEMVER_CONSTEXPR std::size_t length(Int n) noexcept {
+      std::size_t digits = 0;
+      do {
+        digits++;
+        n /= 10;
+      } while (n != 0);
+      return digits;
+    }
+
+    template <typename OutputIt, typename Int>
+    SEMVER_CONSTEXPR OutputIt to_chars(OutputIt dest, Int n) noexcept {
+      do {
+        *(--dest) = static_cast<char>('0' + (n % 10));
+        n /= 10;
+      } while (n != 0);
+      return dest;
+    }
+
     enum struct prerelease_identifier_type {
       numeric,
       alphanumeric
@@ -99,6 +133,7 @@ namespace semver {
   class version {
     friend class detail::version_parser;
     friend class detail::prerelease_comparator;
+
   public:
     SEMVER_CONSTEXPR version() = default; // https://semver.org/#how-should-i-deal-with-revisions-in-the-0yz-initial-development-phase
     SEMVER_CONSTEXPR version(const version&) = default;
@@ -115,6 +150,8 @@ namespace semver {
     SEMVER_CONSTEXPR const std::string& prerelease_tag() const { return prerelease_tag_; }
     SEMVER_CONSTEXPR const std::string& build_metadata() const { return build_metadata_; }
 
+    SEMVER_CONSTEXPR std::string to_string() const;
+
   private:
     I1 major_ = 0;
     I2 minor_ = 1;
@@ -123,7 +160,50 @@ namespace semver {
     std::string build_metadata_;
 
     std::vector<detail::prerelease_identifier> prerelease_identifiers;
+
+    SEMVER_CONSTEXPR std::size_t length() const noexcept {
+      return detail::length(major_) + detail::length(minor_) + detail::length(patch_) + 2
+        + (prerelease_tag_.empty() ? 0 : prerelease_tag_.length() + 1)
+        + (build_metadata_.empty() ? 0 : build_metadata_.length() + 1);
+    }
+
+    SEMVER_CONSTEXPR void clear() noexcept {
+      major_ = 0;
+      minor_ = 1;
+      patch_ = 0;
+
+      prerelease_tag_.clear();
+      prerelease_identifiers.clear();
+      build_metadata_.clear();
+    }
   };
+
+  template <typename I1, typename I2, typename I3>
+  SEMVER_CONSTEXPR std::string version<I1, I2, I3>::to_string() const {
+    std::string result;
+    detail::resize_uninitialized<std::string>{}.resize(result, length());
+
+    auto it = result.end();
+    if (!build_metadata_.empty()) {
+      it = std::copy_backward(build_metadata_.begin(), build_metadata_.end(), it);
+      *(--it) = '+';
+    }
+
+    if (!prerelease_tag_.empty()) {
+      it = std::copy_backward(prerelease_tag_.begin(), prerelease_tag_.end(), it);
+      *(--it) = '-';
+    }
+
+    it = detail::to_chars(it, patch_);
+    *(--it) = '.';
+
+    it = detail::to_chars(it, minor_);
+    *(--it) = '.';
+
+    it = detail::to_chars(it, major_);
+
+    return result;
+  }
 
 #if __has_include(<charconv>)
   struct from_chars_result : std::from_chars_result {
@@ -461,6 +541,8 @@ class version_parser {
 
   template <typename I1, typename I2, typename I3>
   SEMVER_CONSTEXPR from_chars_result parse(version<I1, I2, I3>& out) noexcept {
+    out.clear();
+
     from_chars_result result = parse_number(out.major_); 
     if (!result) {
       return result;
