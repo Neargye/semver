@@ -658,6 +658,7 @@ class version_parser {
   }
 
   SEMVER_CONSTEXPR from_chars_result parse_prerelease_identifier(std::string& out) {
+    bool first_char = true;
     std::string result;
     token token = stream.advance();
 
@@ -678,7 +679,7 @@ class version_parser {
         // 1.2.3-01b is valid as well, but
         // 1.2.3-01.alpha is not valid
 
-        if (is_leading_zero(digit)) {
+        if (first_char && is_leading_zero(digit)) {
           return failure(token.lexeme);
         }
 
@@ -688,6 +689,8 @@ class version_parser {
       default:
         return failure(token.lexeme);
       }
+
+      first_char = false;
     } while (stream.advanceIfMatch(token, token_type::hyphen) || stream.advanceIfMatch(token, token_type::letter) || stream.advanceIfMatch(token, token_type::digit));
 
     out = result;
