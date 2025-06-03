@@ -690,7 +690,6 @@ class version_parser {
       default:
         return failure(token.lexeme);
       }
-
     } while (stream.advanceIfMatch(token, token_type::hyphen) || stream.advanceIfMatch(token, token_type::letter) || stream.advanceIfMatch(token, token_type::digit));
 
     out = result;
