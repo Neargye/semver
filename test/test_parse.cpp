@@ -102,10 +102,11 @@ TEST_CASE("parse") {
       std::string_view prerelease_tag;
     };
 
-    constexpr std::array<std::pair<std::string_view, version>, 3> versions = {{
+    constexpr std::array<std::pair<std::string_view, version>, 4> versions = {{
       {"0.0.1-alpha.128", {0, 0, 1, "alpha.128"}},
       {"1.2.3-alpha.beta.rc-45.42", {1, 2, 3, "alpha.beta.rc-45.42"}},
-      {"0.0.1-alpha-beta", {0, 0, 1, "alpha-beta"}}
+      {"0.0.1-alpha-beta", {0, 0, 1, "alpha-beta"}},
+      {"1.0.1-alpha.5-114-ga2f3905", {1, 0, 1, "alpha.5-114-ga2f3905"}}
     }};
 
     for (const auto& [version, expected]: versions) {
