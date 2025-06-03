@@ -14,7 +14,7 @@ jobs:
         - { cc: "gcc-11",   cxx: "g++-11",     os: "ubuntu-22.04" }
         - { cc: "gcc-12",   cxx: "g++-12",     os: "ubuntu-22.04" }
         - { cc: "gcc-13",   cxx: "g++-13",     os: "ubuntu-22.04" }
-        - { cc: "gcc-14",   cxx: "g++-14",     os: "ubuntu-22.04" }
+        - { cc: "gcc-14",   cxx: "g++-14",     os: "ubuntu-24.04" }
         - { cc: "clang-13", cxx: "clang++-13", os: "ubuntu-22.04" }
         - { cc: "clang-14", cxx: "clang++-14", os: "ubuntu-22.04" }
         - { cc: "clang-15", cxx: "clang++-15", os: "ubuntu-22.04" }
@@ -33,15 +33,15 @@ jobs:
       run: |
         if [[ "${{ matrix.compiler.cc }}" == "clang"* ]]; then
           wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key|sudo apt-key add -
-          sudo apt-add-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-focal-13 main"
-          sudo apt-add-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-focal-14 main"
-          sudo apt-add-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-focal-15 main"
-          sudo apt-add-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-focal-16 main"
-          sudo apt-add-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-focal-17 main"
-          sudo apt-add-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-focal-18 main"
-          sudo apt-add-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-focal-19 main"
-          sudo apt-add-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-focal-20 main"
-          sudo apt-add-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-focal main"
+          sudo apt-add-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-13 main"
+          sudo apt-add-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-14 main"
+          sudo apt-add-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-15 main"
+          sudo apt-add-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-16 main"
+          sudo apt-add-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main"
+          sudo apt-add-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-18 main"
+          sudo apt-add-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-19 main"
+          sudo apt-add-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-20 main"
+          sudo apt-add-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy main"
           sudo apt update
           sudo apt install ${{ matrix.compiler.cc }} -y
         fi
