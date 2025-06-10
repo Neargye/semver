@@ -678,7 +678,9 @@ class version_parser {
         // 1.2.3-01b is valid as well, but
         // 1.2.3-01.alpha is not valid
 
-        if (is_leading_zero(digit)) {
+        // Only check for leading zero when digit is the first character of the
+        // prerelease identifier.
+        if (result.empty() && is_leading_zero(digit)) {
           return failure(token.lexeme);
         }
 
