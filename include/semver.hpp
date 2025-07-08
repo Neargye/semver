@@ -947,7 +947,7 @@ class range_set {
 public:
   friend class detail::range_parser;
 
-  SEMVER_CONSTEXPR bool contains(const version<I1, I2, I3>& v, version_compare_option option = version_compare_option::exclude_prerelease) noexcept {
+  SEMVER_CONSTEXPR bool contains(const version<I1, I2, I3>& v, version_compare_option option = version_compare_option::exclude_prerelease) const noexcept {
     return std::any_of(ranges.begin(), ranges.end(), [&](const auto& range) {
       return range.contains(v, option);
     });
