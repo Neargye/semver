@@ -78,6 +78,12 @@
 #define SEMVER_CONSTEXPR inline
 #endif
 
+#ifdef __OpenBSD__
+/* undef sys/types.h macro */
+#undef major
+#undef minor
+#endif
+
 namespace semver {
 
   namespace detail {
