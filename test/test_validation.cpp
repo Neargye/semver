@@ -345,10 +345,13 @@ TEST_CASE("consteval _semver literal") {
 
   // Literal produces same result as runtime parse
   SUBCASE("literal matches runtime parse") {
-    constexpr auto lit = "1.0.0-alpha+build"_semver;
     semver::version<> parsed;
     REQUIRE(semver::parse("1.0.0-alpha+build", parsed));
-    REQUIRE(lit == parsed);
+    REQUIRE("1.0.0-alpha+build"_semver == parsed);
+    static_assert([] {
+      const auto v = "1.0.0-alpha+build"_semver;
+      return v.prerelease_tag() == "alpha" && v.build_metadata() == "build";
+    }());
   }
 }
 #endif

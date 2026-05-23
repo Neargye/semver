@@ -52,7 +52,7 @@ jobs:
         fi
         cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=${{ matrix.compiler.cxx }} $CMAKE_EXTRA
         cmake --build . -j 4 --config Release
-        ctest --output-on-failure -C Release
+        ctest -V --output-on-failure -C Release
 
     - name: Build Debug
       run: |
@@ -65,4 +65,4 @@ jobs:
         fi
         cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=${{ matrix.compiler.cxx }} $CMAKE_EXTRA
         cmake --build . -j 4 --config Debug
-        ctest --output-on-failure -C Debug
+        ctest -V --output-on-failure -C Debug
