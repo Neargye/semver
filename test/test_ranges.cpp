@@ -206,6 +206,68 @@ TEST_CASE("range parse failures") {
   }
 }
 
+TEST_CASE("range from_chars_result contract") {
+  SUBCASE("ptr points past last consumed byte on success") {
+    semver::range_set rs;
+    constexpr std::string_view sv = ">=1.0.0 <2.0.0 || 3.0.0";
+    const auto [ptr, ec] = semver::parse(sv, rs);
+    REQUIRE(ec == std::errc{});
+    REQUIRE(ptr == sv.data() + sv.size());
+  }
+
+  SUBCASE("errc::invalid_argument for structurally malformed input") {
+    semver::range_set rs;
+    const auto result = semver::parse("||", rs);
+    REQUIRE_FALSE(result);
+    REQUIRE(result.ec == std::errc::invalid_argument);
+  }
+
+  SUBCASE("ptr points to first invalid byte after a valid range prefix") {
+    semver::range_set rs;
+    constexpr std::string_view bad = ">=1.0.0 abc";
+    const auto [ptr, ec] = semver::parse(bad, rs);
+    REQUIRE(ec == std::errc::invalid_argument);
+    REQUIRE(ptr == bad.data() + 8);
+  }
+
+  SUBCASE("failed parse clears output on early syntax failure") {
+    semver::range_set rs;
+    semver::version v;
+    REQUIRE(semver::parse(">=1.0.0", rs));
+    REQUIRE(semver::parse("2.0.0", v));
+    REQUIRE(rs.contains(v));
+
+    const auto result = semver::parse("broken", rs);
+    REQUIRE_FALSE(result);
+    REQUIRE(result.ec == std::errc::invalid_argument);
+    REQUIRE_FALSE(rs.contains(v));
+  }
+
+  SUBCASE("lexer failure preserves the previous range prefix") {
+    semver::range_set rs;
+    semver::version v;
+    REQUIRE(semver::parse(">=1.0.0 <2.0.0", rs));
+    REQUIRE(semver::parse("1.5.0", v));
+    REQUIRE(rs.contains(v));
+
+    const auto result = semver::parse(">=1.0.0\t<2.0.0", rs);
+    REQUIRE_FALSE(result);
+    REQUIRE(result.ec == std::errc::invalid_argument);
+    REQUIRE(rs.contains(v));
+  }
+
+  SUBCASE("trailing garbage preserves the parsed range prefix") {
+    semver::range_set rs;
+    semver::version v;
+    REQUIRE(semver::parse("1.5.0", v));
+
+    const auto result = semver::parse(">=1.0.0 <2.0.0 tail", rs);
+    REQUIRE_FALSE(result);
+    REQUIRE(result.ec == std::errc::invalid_argument);
+    REQUIRE(rs.contains(v));
+  }
+}
+
 TEST_CASE("range boundary conditions") {
   SUBCASE("exact version as range") {
     test_parse_and_check("1.0.0", "1.0.0");

@@ -282,6 +282,20 @@ TEST_CASE("from_chars_result contract") {
     REQUIRE(v.build_metadata().empty());
   }
 
+  SUBCASE("lexer failure preserves the previous output object") {
+    semver::version v;
+    REQUIRE(semver::parse("2.3.4-alpha+meta", v));
+
+    const auto result = semver::parse("1.2.3\t", v);
+    REQUIRE_FALSE(result);
+    REQUIRE(result.ec == std::errc::invalid_argument);
+    REQUIRE(v.major() == 2);
+    REQUIRE(v.minor() == 3);
+    REQUIRE(v.patch() == 4);
+    REQUIRE(v.prerelease_tag() == "alpha");
+    REQUIRE(v.build_metadata() == "meta");
+  }
+
   SUBCASE("trailing garbage preserves parsed prefix like from_chars") {
     semver::version v;
     const auto result = semver::parse("2.3.4tail", v);

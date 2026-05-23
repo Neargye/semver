@@ -3,148 +3,83 @@
 [![Conan package](https://img.shields.io/badge/Conan-package-blueviolet)](https://conan.io/center/recipes/neargye-semver)
 [![License](https://img.shields.io/github/license/Neargye/semver.svg)](LICENSE)
 
-C++ library to compare and manipulate versions in `<major>.<minor>.<patch>[-<prerelease>][+<build>]` format, complying with [Semantic Versioning 2.0.0](https://semver.org). Header-only, C++17, no dependencies.
+Header-only C++17 library for parsing, comparing and matching [Semantic Versioning 2.0.0](https://semver.org) strings. No dependencies.
 
-## [Features & Examples](example/)
+## Usage
 
-* Parse
+```cpp
+#include <semver.hpp>
 
-  ```cpp
-  semver::version v1;
-  if (semver::parse("1.4.3", v1)) {
-    const int patch = v1.patch(); // 3
-  }
+// Parse
+semver::version v;
+if (semver::parse("1.2.3-alpha+build", v)) {
+  v.major();          // 1
+  v.minor();          // 2
+  v.patch();          // 3
+  v.prerelease_tag(); // "alpha"
+  v.build_metadata(); // "build"
+}
 
-  semver::version v2;
-  if (semver::parse("1.2.4-alpha.10+build.1", v2)) {
-    v2.prerelease_tag(); // "alpha.10"
-    v2.build_metadata(); // "build.1"
-  }
+// from_chars-style result
+const auto [ptr, ec] = semver::parse("1.2.3", v);
 
-  // Detailed result: ptr points past last consumed char, ec holds the error code
-  const auto [ptr, ec] = semver::parse("1.2.3", v1);
-  if (ec == std::errc{}) { /* success */ }
-  ```
+// Construct directly
+semver::version v2{1, 0, 0};
+std::cout << v2 << '\n';       // "1.0.0"
+std::string s = v2.to_string();
 
-* Construct & serialize
+// Compare
+assert(v2 > v);   // 1.0.0 > 1.2.3-alpha (prerelease < release)
 
-  ```cpp
-  semver::version v{1, 2, 3};       // version(major, minor, patch); asserts non-negative
-  std::string s = v.to_string();    // "1.2.3"
-  std::cout << v << '\n';           // operator<< supported
-  ```
+// Ranges (npm-style)
+semver::range_set range;
+if (semver::parse(">=1.0.0 <2.0.0 || >3.2.1", range)) {
+  assert(range.contains(v));
+}
 
-* Comparison
+// Validate without parsing into a variable
+assert(semver::valid("1.0.0"));
 
-  ```cpp
-  assert(v1 != v2);
-  assert(v1 > v2);
-  assert(v1 >= v2);
-  assert(v2 < v1);
-  assert(v2 <= v1);
-  // C++20: three-way comparison
-  assert((v1 <=> v2) > 0);
-  ```
+// Wider integer types
+semver::version<int64_t> big;
+semver::parse("0.0.999999999999", big);
+```
 
-* Validate
+More examples in [example/](example/).
 
-  ```cpp
-  const bool result = semver::valid("1.2.3-alpha+build");
-  assert(result);
-  ```
+## Notes
 
-* Custom integer types
-
-  ```cpp
-  // Use a wider type when version numbers exceed int range
-  semver::version<int64_t> big;
-  semver::parse("0.0.999999999999", big); // patch == 999999999999
-
-  // Independent types per component; mixed-type comparison works
-  semver::version<uint32_t> a; semver::parse("2.0.0", a);
-  semver::version<int>      b; semver::parse("2.0.0", b);
-  assert(a == b);
-  ```
-
-* Range matching
-
-  ```cpp
-  semver::range_set range;
-  if (semver::parse(">=1.0.0 <2.0.0 || >3.2.1", range)) {
-    semver::version version;
-    if (semver::parse("1.2.3", version)) {
-      assert(range.contains(version));
-    }
-
-    // Prerelease versions are excluded by default (npm semver spec).
-    // Pass include_prerelease to override:
-    semver::version pre; semver::parse("1.2.3-rc.1", pre);
-    range.contains(pre, semver::version_compare_option::include_prerelease);
-  }
-  ```
-
-Check the *examples* folder to see more various usage examples
-
-## Default-constructed version
-
-A default-constructed `semver::version{}` represents `0.1.0`, not `0.0.0`.
-This is intentional and follows the [Semantic Versioning 2.0.0 FAQ](https://semver.org/#how-should-i-deal-with-revisions-in-the-0yz-initial-development-phase):
-
-> The simplest thing to do is start your initial development release at **0.1.0** and then increment the minor version for each subsequent release.
-
-## Error handling
-
-`semver::parse()` returns a `from_chars_result` with two fields:
-- `ptr` — points past the last consumed character on success, or at the offending character on failure.
-- `ec` — `std::errc{}` on success; `std::errc::invalid_argument` for syntax errors; `std::errc::value_too_large` if input exceeds `SEMVER_MAX_INPUT_LENGTH`; `std::errc::result_out_of_range` if a numeric component overflows the target integer type.
-
-`from_chars_result` is contextually convertible to `bool` (`true` = success).
-
-> **Note:** On parse failure the output `version`/`range_set` object is left in an indeterminate (partially-written) state. Always check the return value before using the output.
+- Default-constructed `version` is `0.1.0` per [semver FAQ](https://semver.org/#how-should-i-deal-with-revisions-in-the-0yz-initial-development-phase).
+- `parse()` returns `from_chars_result{ptr, ec}` — contextually convertible to `bool`. `ptr` points past consumed input on success or at the bad char on failure. Possible error codes: `invalid_argument`, `value_too_large`, `result_out_of_range`.
+- On parse failure the output object is left in an unspecified state (like `std::from_chars`). Always check the result before using the output.
+- Prerelease versions excluded from range matching by default. Pass `version_compare_option::include_prerelease` to override.
+- `std::hash<semver::version<...>>` and `std::formatter` (C++20) are provided out of the box.
 
 ## Configuration
 
-| Macro | Default | Description |
-|-------|---------|-------------|
-| `SEMVER_MAX_INPUT_LENGTH` | `4096` | Maximum allowed input string length for `parse()`. Strings exceeding this limit are rejected immediately with `std::errc::value_too_large`. Define before including the header to override. |
-| `SEMVER_CONFIG_FILE` | *(undefined)* | Path to a user-provided configuration header included early in `semver.hpp`. |
-
-```cpp
-// Override before including the header:
-#define SEMVER_MAX_INPUT_LENGTH 256
-#include <semver.hpp>
-```
+| Macro | Default | Purpose |
+|-------|---------|---------|
+| `SEMVER_MAX_INPUT_LENGTH` | `4096` | Max input length; exceeding → `value_too_large` |
+| `SEMVER_CONFIG_FILE` | — | Custom config header included early |
 
 ## Integration
 
-You should add required file [semver.hpp](include/semver.hpp).
+Copy [semver.hpp](include/semver.hpp) into your project, or use a package manager:
 
-If you are using [vcpkg](https://github.com/Microsoft/vcpkg/) on your project for external dependencies, then you can use the [neargye-semver](https://github.com/microsoft/vcpkg/tree/master/ports/neargye-semver).
+- **vcpkg**: `neargye-semver`
+- **Conan**: `neargye-semver/x.y.z`
+- **CPM**:
+  ```cmake
+  CPMAddPackage(GITHUB_REPOSITORY Neargye/semver GIT_TAG x.y.z)
+  ```
 
-If you are using [Conan](https://www.conan.io/) to manage your dependencies, merely add `neargye-semver/x.y.z` to your conan's requires, where `x.y.z` is the release version you want to use.
+## Compiler support
 
+C++17 required. C++20 adds `constexpr` support, `operator<=>`, `consteval` literals, and concepts.
 
-Alternatively, you can use something like [CPM](https://github.com/TheLartians/CPM) which is based on CMake's `Fetch_Content` module.
-
-```cmake
-CPMAddPackage(
-    NAME semver
-    GITHUB_REPOSITORY Neargye/semver
-    GIT_TAG x.y.z # Where `x.y.z` is the release version you want to use.
-)
-```
-
-## Compiler compatibility
-
-Requires **C++17**. C++20 enables additional features:
-- Full `constexpr` support (`std::string`/`std::vector` become `constexpr`)
-- `operator<=>` (three-way comparison)
-- `consteval operator""_semver` literal (in `semver::literals` namespace)
-- Concepts-constrained template parameters
-
-* Clang/LLVM >= 5
-* MSVC++ >= 14.11 / Visual Studio >= 2017
-* Xcode >= 10
 * GCC >= 7
+* Clang >= 5
+* MSVC >= 14.20 (VS 2019)
+* Xcode >= 10
 
-## Licensed under the [MIT License](LICENSE)
+## [MIT License](LICENSE)

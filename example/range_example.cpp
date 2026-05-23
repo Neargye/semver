@@ -63,7 +63,7 @@ int main() {
       bool result = range3.contains(version);
       std::cout << result << std::endl; // false
 
-      // But we can suppress this behavior by passing semver::range::option::include_prerelease.
+      // But we can suppress this behavior by passing semver::version_compare_option::include_prerelease.
       // For details see: https://github.com/npm/node-semver#prerelease-tags
       result = range3.contains(version, semver::version_compare_option::include_prerelease);
       std::cout << result << std::endl; // true
