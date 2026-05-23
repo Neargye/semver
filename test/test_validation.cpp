@@ -116,14 +116,12 @@ TEST_CASE("from_chars_result pointer semantics") {
     semver::version<> v;
     auto result = semver::parse(std::string_view{input, 5}, v);
     REQUIRE(result);
-    // ptr points one past the last consumed character (end of input)
     REQUIRE(result.ptr == input + 5);
   }
 
   SUBCASE("partial input: ptr shows where parsing ended") {
     const char input[] = "1.2.3-alpha";
     semver::version<> v;
-    // Parse the full string successfully
     auto result = semver::parse(std::string_view{input, 11}, v);
     REQUIRE(result);
     REQUIRE(result.ptr == input + 11);
@@ -171,7 +169,6 @@ TEST_CASE("re-parsing into same object resets state") {
 
 #ifdef SEMVER_CONSTEXPR_SUPPORT
 TEST_CASE("constexpr parse and accessors") {
-  // Full compile-time parse → accessor chain
   static_assert([] {
     semver::version<> v;
     (void)semver::parse("10.20.30", v);
@@ -269,7 +266,6 @@ TEST_CASE("constexpr to_string round-trip") {
 }
 
 TEST_CASE("constexpr valid/invalid detection") {
-  // Verify valid() itself works at compile time with non-trivial inputs
   static_assert(semver::valid("1.0.0-alpha-a.b-c-somethinglong+build.1-aef.1-its-okay"));
   static_assert(semver::valid("1.2.3----RC-SNAPSHOT.12.9.1--.12+788"));
   static_assert(!semver::valid("1.2.3-0123")); // leading zero in numeric prerelease
