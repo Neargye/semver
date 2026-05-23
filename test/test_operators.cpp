@@ -99,14 +99,16 @@ TEST_CASE("operators") {
 
   SECTION("operator ==") {
     for (auto version : versions) {
-      test_parse_and_compare_reverse(version, version, semver::operator==<int, int, int>);
+      test_parse_and_compare_reverse(version, version,
+          [](const semver::version<>& a, const semver::version<>& b) { return a == b; });
     }
   }
 
   SECTION("operator !=") {
     for (std::size_t i = 1; i < versions.size(); ++i) {
       for (std::size_t j = 1; j < i; ++j) {
-        test_parse_and_compare_reverse(versions[i], versions[i - j], semver::operator!=<int, int, int>);
+        test_parse_and_compare_reverse(versions[i], versions[i - j],
+            [](const semver::version<>& a, const semver::version<>& b) { return a != b; });
       }
     }
   }
@@ -114,7 +116,8 @@ TEST_CASE("operators") {
   SECTION("operator >") {
     for (std::size_t i = 1; i < versions.size(); ++i) {
       for (std::size_t j = 1; j < i; ++j) {
-        test_parse_and_compare_reverse_false(versions[i], versions[i - j], semver::operator><int, int, int>);
+        test_parse_and_compare_reverse_false(versions[i], versions[i - j],
+            [](const semver::version<>& a, const semver::version<>& b) { return a > b; });
       }
     }
   }
@@ -122,8 +125,10 @@ TEST_CASE("operators") {
   SECTION("operator >=") {
     for (std::size_t i = 1; i < versions.size(); ++i) {
       for (std::size_t j = 1; j < i; ++j) {
-        test_parse_and_compare_reverse_false(versions[i], versions[i - j], semver::operator>=<int, int, int>);
-        test_parse_and_compare_reverse(versions[i], versions[i], semver::operator>=<int, int, int>);
+        test_parse_and_compare_reverse_false(versions[i], versions[i - j],
+            [](const semver::version<>& a, const semver::version<>& b) { return a >= b; });
+        test_parse_and_compare_reverse(versions[i], versions[i],
+            [](const semver::version<>& a, const semver::version<>& b) { return a >= b; });
       }
     }
   }
@@ -131,7 +136,8 @@ TEST_CASE("operators") {
   SECTION("operator <") {
     for (std::size_t i = 1; i < versions.size(); ++i) {
       for (std::size_t j = 1; j < i; ++j) {
-        test_parse_and_compare_reverse_false(versions[i - j], versions[i], semver::operator< <int, int, int>);
+        test_parse_and_compare_reverse_false(versions[i - j], versions[i],
+            [](const semver::version<>& a, const semver::version<>& b) { return a < b; });
       }
     }
   }
@@ -139,8 +145,10 @@ TEST_CASE("operators") {
   SECTION("operator <=") {
     for (std::size_t i = 1; i < versions.size(); ++i) {
       for (std::size_t j = 1; j < i; ++j) {
-        test_parse_and_compare_reverse_false(versions[i - j], versions[i], semver::operator<=<int, int, int>);
-        test_parse_and_compare_reverse(versions[i - j], versions[i - j], semver::operator<=<int, int, int>);
+        test_parse_and_compare_reverse_false(versions[i - j], versions[i],
+            [](const semver::version<>& a, const semver::version<>& b) { return a <= b; });
+        test_parse_and_compare_reverse(versions[i - j], versions[i - j],
+            [](const semver::version<>& a, const semver::version<>& b) { return a <= b; });
       }
     }
   }
@@ -156,26 +164,29 @@ TEST_CASE("operators") {
     constexpr std::string_view v7 = "1.0.0-rc.1";
     constexpr std::string_view v8 = "1.0.0";
 
-    test_parse_and_compare_reverse_false(v1, v2, semver::operator< <int, int, int>);
-    test_parse_and_compare_reverse_false(v2, v3, semver::operator< <int, int, int>);
-    test_parse_and_compare_reverse_false(v3, v4, semver::operator< <int, int, int>);
-    test_parse_and_compare_reverse_false(v4, v5, semver::operator< <int, int, int>);
-    test_parse_and_compare_reverse_false(v5, v6, semver::operator< <int, int, int>);
-    test_parse_and_compare_reverse_false(v6, v7, semver::operator< <int, int, int>);
-    test_parse_and_compare_reverse_false(v7, v8, semver::operator< <int, int, int>);
+    auto lt = [](const semver::version<>& a, const semver::version<>& b) { return a < b; };
+    auto gt = [](const semver::version<>& a, const semver::version<>& b) { return a > b; };
 
-    test_parse_and_compare_reverse_false(v2, v1, semver::operator><int, int, int>);
-    test_parse_and_compare_reverse_false(v3, v2, semver::operator><int, int, int>);
-    test_parse_and_compare_reverse_false(v4, v3, semver::operator><int, int, int>);
-    test_parse_and_compare_reverse_false(v5, v4, semver::operator><int, int, int>);
-    test_parse_and_compare_reverse_false(v6, v5, semver::operator><int, int, int>);
-    test_parse_and_compare_reverse_false(v7, v6, semver::operator><int, int, int>);
-    test_parse_and_compare_reverse_false(v8, v7, semver::operator><int, int, int>);
+    test_parse_and_compare_reverse_false(v1, v2, lt);
+    test_parse_and_compare_reverse_false(v2, v3, lt);
+    test_parse_and_compare_reverse_false(v3, v4, lt);
+    test_parse_and_compare_reverse_false(v4, v5, lt);
+    test_parse_and_compare_reverse_false(v5, v6, lt);
+    test_parse_and_compare_reverse_false(v6, v7, lt);
+    test_parse_and_compare_reverse_false(v7, v8, lt);
+
+    test_parse_and_compare_reverse_false(v2, v1, gt);
+    test_parse_and_compare_reverse_false(v3, v2, gt);
+    test_parse_and_compare_reverse_false(v4, v3, gt);
+    test_parse_and_compare_reverse_false(v5, v4, gt);
+    test_parse_and_compare_reverse_false(v6, v5, gt);
+    test_parse_and_compare_reverse_false(v7, v6, gt);
+    test_parse_and_compare_reverse_false(v8, v7, gt);
 
     constexpr std::string_view v9 = "1.0.0-alpha.5";
     constexpr std::string_view v10 = "1.0.0-alpha.10";
-    test_parse_and_compare_reverse_false(v9, v10, semver::operator< <int, int, int>);
-    test_parse_and_compare_reverse_false(v10, v9, semver::operator><int, int, int>);
+    test_parse_and_compare_reverse_false(v9, v10, lt);
+    test_parse_and_compare_reverse_false(v10, v9, gt);
   }
 }
 
@@ -222,5 +233,42 @@ TEST_CASE("hash") {
     REQUIRE(semver::parse("1.0.0", v));
     map[v] = "stable";
     REQUIRE(map.at(v) == "stable");
+  }
+}
+
+TEST_CASE("mixed-type comparisons") {
+  // version<int,int,int> and version<unsigned,unsigned,unsigned> with the same
+  // numeric values must be equal, and ordering must be consistent.
+  semver::version<int, int, int>           a;
+  semver::version<unsigned, unsigned, unsigned> b;
+  semver::version<int64_t, int64_t, int64_t>    c;
+
+  REQUIRE(semver::parse("1.2.3", a));
+  REQUIRE(semver::parse("1.2.3", b));
+  REQUIRE(semver::parse("1.2.3", c));
+
+  SECTION("equality across types") {
+    REQUIRE(a == b);
+    REQUIRE(a == c);
+    REQUIRE(b == c);
+  }
+
+  SECTION("ordering across types") {
+    semver::version<int>      lo;
+    semver::version<unsigned> hi;
+    REQUIRE(semver::parse("1.2.2", lo));
+    REQUIRE(semver::parse("1.2.3", hi));
+    REQUIRE(lo < hi);
+    REQUIRE(hi > lo);
+    REQUIRE(lo <= hi);
+    REQUIRE(hi >= lo);
+  }
+
+  SECTION("prerelease ordering across types") {
+    semver::version<int>      pre;
+    semver::version<unsigned> rel;
+    REQUIRE(semver::parse("1.0.0-alpha", pre));
+    REQUIRE(semver::parse("1.0.0",       rel));
+    REQUIRE(pre < rel);
   }
 }

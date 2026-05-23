@@ -204,70 +204,31 @@ TEST_CASE("construct") {
     REQUIRE(semver::parse("1.0.0", parsed));
     REQUIRE(v == parsed);
   }
+}
 
-  SECTION("make_version — numeric only") {
-    const auto v = semver::make_version(1, 2, 3);
-    REQUIRE(v.has_value());
-    REQUIRE(v->major() == 1);
-    REQUIRE(v->minor() == 2);
-    REQUIRE(v->patch() == 3);
-    REQUIRE(v->prerelease_tag().empty());
+TEST_CASE("parse number overflow") {
+  // Regression: a 20+-digit component must NOT silently wrap around.
+  // Before the fix, uint64_t overflow produced a valid-looking but wrong value.
+  semver::version<> v;
+
+  SECTION("20-digit major wraps uint64_t — must be rejected") {
+    // 18446744073709551616 == 2^64, overflows uint64_t to 0
+    auto result = semver::parse("18446744073709551616.0.0", v);
+    REQUIRE_FALSE(result);
+    REQUIRE(result.ec == std::errc::result_out_of_range);
   }
 
-  SECTION("make_version — with prerelease") {
-    const auto v = semver::make_version(1, 0, 0, "alpha.1");
-    REQUIRE(v.has_value());
-    REQUIRE(v->major() == 1);
-    REQUIRE(v->minor() == 0);
-    REQUIRE(v->patch() == 0);
-    REQUIRE(v->prerelease_tag() == "alpha.1");
-
-    // must compare correctly against a parsed version
-    semver::version parsed;
-    REQUIRE(semver::parse("1.0.0-alpha.1", parsed));
-    REQUIRE(*v == parsed);
-
-    // prerelease version is less than the release
-    const auto release = semver::make_version(1, 0, 0);
-    REQUIRE(release.has_value());
-    REQUIRE(*v < *release);
+  SECTION("all-nines 20-digit component") {
+    auto result = semver::parse("99999999999999999999.0.0", v);
+    REQUIRE_FALSE(result);
+    REQUIRE(result.ec == std::errc::result_out_of_range);
   }
 
-  SECTION("make_version — with prerelease and build metadata") {
-    const auto v = semver::make_version(1, 0, 0, "rc.1", "sha.abc123");
-    REQUIRE(v.has_value());
-    REQUIRE(v->prerelease_tag() == "rc.1");
-    REQUIRE(v->build_metadata() == "sha.abc123");
-
-    semver::version parsed;
-    REQUIRE(semver::parse("1.0.0-rc.1+sha.abc123", parsed));
-    // build metadata is ignored in equality (semver spec §10)
-    REQUIRE(*v == parsed);
-  }
-
-  SECTION("make_version — invalid prerelease returns nullopt") {
-    REQUIRE_FALSE(semver::make_version(1, 0, 0, "01.alpha").has_value()); // leading zero in numeric identifier
-    REQUIRE_FALSE(semver::make_version(1, 0, 0, "bad version").has_value()); // space not allowed
-    REQUIRE(semver::make_version(1, 0, 0, "").has_value()); // empty prerelease is valid
-  }
-
-  SECTION("make_version — invalid build_metadata returns nullopt") {
-    REQUIRE_FALSE(semver::make_version(1, 0, 0, "", "bad!meta").has_value()); // '!' not allowed
-    REQUIRE_FALSE(semver::make_version(1, 0, 0, "", "has space").has_value()); // space not allowed
-    REQUIRE(semver::make_version(1, 0, 0, "", "sha.abc-123").has_value()); // valid build metadata
-  }
-
-  SECTION("make_version — negative components return nullopt") {
-    REQUIRE_FALSE(semver::make_version(-1, 0, 0).has_value());
-    REQUIRE_FALSE(semver::make_version(0, -1, 0).has_value());
-    REQUIRE_FALSE(semver::make_version(0, 0, -1).has_value());
-  }
-
-  SECTION("make_version<uint32_t> — single type argument") {
-    const auto v = semver::make_version<uint32_t>(2u, 0u, 0u, "beta");
-    REQUIRE(v.has_value());
-    REQUIRE(v->major() == 2u);
-    REQUIRE(v->prerelease_tag() == "beta");
+  SECTION("uint64_t max is still accepted for uint64_t version") {
+    // 18446744073709551615 == UINT64_MAX — valid for uint64_t components
+    semver::version<uint64_t> big;
+    REQUIRE(semver::parse("18446744073709551615.0.0", big));
+    REQUIRE(big.major() == std::numeric_limits<uint64_t>::max());
   }
 }
 

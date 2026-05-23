@@ -170,16 +170,12 @@ namespace semver {
   template <typename I1 = int, typename I2 = I1, typename I3 = I1>
 #endif
   class version {
-    friend class detail::version_parser;
-    friend class detail::prerelease_comparator;
-    template <typename T1, typename T2, typename T3>
-    friend std::optional<version<T1, T2, T3>> make_version(T1, T2, T3, std::string_view, std::string_view);
-
-    // In C++17, concepts are unavailable; static_assert is the best constraint.
-    // In C++20+, the concept on the template parameter handles this via SFINAE.
     static_assert(std::is_integral_v<I1>, "semver: I1 must be an integral type");
     static_assert(std::is_integral_v<I2>, "semver: I2 must be an integral type");
     static_assert(std::is_integral_v<I3>, "semver: I3 must be an integral type");
+
+    friend class detail::version_parser;
+    friend class detail::prerelease_comparator;
 
   public:
     SEMVER_CONSTEXPR version() = default; // https://semver.org/#how-should-i-deal-with-revisions-in-the-0yz-initial-development-phase
@@ -231,7 +227,11 @@ namespace semver {
     }
   };
 
+#if __cpp_concepts >= 201907L
+  template <std::integral I1, std::integral I2, std::integral I3>
+#else
   template <typename I1, typename I2, typename I3>
+#endif
   SEMVER_CONSTEXPR std::string version<I1, I2, I3>::to_string() const {
     std::string result;
     detail::resize_uninitialized<std::string>{}.resize(result, length());
@@ -298,8 +298,8 @@ SEMVER_CONSTEXPR std::uint8_t to_digit(char c) noexcept {
   return static_cast<std::uint8_t>(c - '0');
 }
 
-SEMVER_CONSTEXPR char to_char(int i) noexcept {
-  return '0' + (char)i;
+SEMVER_CONSTEXPR char to_char(std::uint8_t i) noexcept {
+  return static_cast<char>('0' + i);
 }
 
 SEMVER_CONSTEXPR int compare(std::string_view lhs, std::string_view rhs) noexcept {
@@ -377,7 +377,7 @@ public:
   SEMVER_CONSTEXPR token_stream() = default;
   SEMVER_CONSTEXPR explicit token_stream(std::vector<token> tokens) noexcept : tokens(std::move(tokens)) {}
 
-  SEMVER_CONSTEXPR void push(const token& token) noexcept {
+  SEMVER_CONSTEXPR void push(const token& token) {
     tokens.push_back(token);
   }
 
@@ -392,6 +392,7 @@ public:
   }
 
   SEMVER_CONSTEXPR token previous() const noexcept {
+    assert(current > 0 && "token_stream::previous() called before any advance()");
     return get(current - 1);
   }
 
@@ -431,7 +432,7 @@ class lexer {
 public:
   explicit SEMVER_CONSTEXPR lexer(std::string_view text) noexcept : text_{text}, current_pos_{0} {}
 
-  SEMVER_CONSTEXPR from_chars_result scan_tokens(token_stream& token_stream) noexcept {
+  SEMVER_CONSTEXPR from_chars_result scan_tokens(token_stream& token_stream) {
     from_chars_result result{ text_.data(), std::errc{} };
 
     while (!is_eol()) {
@@ -450,7 +451,7 @@ private:
   std::string_view text_;
   std::size_t current_pos_;
 
-  SEMVER_CONSTEXPR from_chars_result scan_token(token_stream& stream) noexcept {
+  SEMVER_CONSTEXPR from_chars_result scan_token(token_stream& stream) {
     const char c = advance();
 
     switch (c) {
@@ -496,7 +497,7 @@ private:
     return success(get_prev_symbol());
   }
 
-  SEMVER_CONSTEXPR void add_token(token_stream& stream, token_type type, token::value_t value = {}) noexcept {
+  SEMVER_CONSTEXPR void add_token(token_stream& stream, token_type type, token::value_t value = {}) {
     const char* lexeme = get_prev_symbol();
     stream.push({ type, value, lexeme});
   }
@@ -527,8 +528,8 @@ private:
 
 class prerelease_comparator {
 public:
-  template <typename I1, typename I2, typename I3>
-  [[nodiscard]] SEMVER_CONSTEXPR int compare(const version<I1, I2, I3>& lhs, const version<I1, I2, I3>& rhs) const noexcept {
+  template <typename L1, typename L2, typename L3, typename R1, typename R2, typename R3>
+  [[nodiscard]] SEMVER_CONSTEXPR int compare(const version<L1, L2, L3>& lhs, const version<R1, R2, R3>& rhs) const noexcept {
     if (lhs.prerelease_identifiers.empty() != rhs.prerelease_identifiers.empty()) {
       return lhs.prerelease_identifiers.empty() ? 1 : -1;
     }
@@ -564,7 +565,7 @@ public:
   SEMVER_CONSTEXPR explicit version_parser(token_stream& stream) : stream{stream} {}
 
   template <typename I1, typename I2, typename I3>
-  SEMVER_CONSTEXPR from_chars_result parse(version<I1, I2, I3>& out) noexcept {
+  SEMVER_CONSTEXPR from_chars_result parse(version<I1, I2, I3>& out) {
     out.clear();
 
     from_chars_result result = parse_number(out.major_);
@@ -628,7 +629,11 @@ private:
     }
 
     while (stream.advance_if_match(token, token_type::digit)) {
-      result = result * 10 + std::get<std::uint8_t>(token.value);
+      const auto d = std::get<std::uint8_t>(token.value);
+      if (result > (std::numeric_limits<std::uint64_t>::max() - d) / 10) {
+        return failure(token.lexeme, std::errc::result_out_of_range);
+      }
+      result = result * 10 + d;
     }
 
     if (detail::number_in_range<Int>(result)) {
@@ -793,13 +798,13 @@ private:
   }
 };
 
-template <typename I1, typename I2, typename I3>
-SEMVER_CONSTEXPR int compare_prerelease(const version<I1, I2, I3>& lhs, const version<I1, I2, I3>& rhs) noexcept {
+template <typename L1, typename L2, typename L3, typename R1, typename R2, typename R3>
+SEMVER_CONSTEXPR int compare_prerelease(const version<L1, L2, L3>& lhs, const version<R1, R2, R3>& rhs) noexcept {
   return prerelease_comparator{}.compare(lhs, rhs);
 }
 
-template <typename I1, typename I2, typename I3>
-SEMVER_CONSTEXPR int compare_parsed(const version<I1, I2, I3>& lhs, const version<I1, I2, I3>& rhs, version_compare_option compare_option) noexcept {
+template <typename L1, typename L2, typename L3, typename R1, typename R2, typename R3>
+SEMVER_CONSTEXPR int compare_parsed(const version<L1, L2, L3>& lhs, const version<R1, R2, R3>& rhs, version_compare_option compare_option) noexcept {
   if (detail::cmp_less(lhs.major(), rhs.major())) return -1;
   if (detail::cmp_less(rhs.major(), lhs.major())) return  1;
 
@@ -838,44 +843,42 @@ SEMVER_CONSTEXPR from_chars_result parse(std::string_view str, version<I1, I2, I
 
 } // namespace semver::detail
 
-template <typename I1, typename I2, typename I3>
-[[nodiscard]] SEMVER_CONSTEXPR bool operator==(const version<I1, I2, I3>& lhs, const version<I1, I2, I3>& rhs) noexcept {
+template <typename L1, typename L2, typename L3, typename R1, typename R2, typename R3>
+[[nodiscard]] SEMVER_CONSTEXPR bool operator==(const version<L1, L2, L3>& lhs, const version<R1, R2, R3>& rhs) noexcept {
   return detail::compare_parsed(lhs, rhs, version_compare_option::include_prerelease) == 0;
 }
 
-template <typename I1, typename I2, typename I3>
-[[nodiscard]] SEMVER_CONSTEXPR bool operator!=(const version<I1, I2, I3>& lhs, const version<I1, I2, I3>& rhs) noexcept {
+template <typename L1, typename L2, typename L3, typename R1, typename R2, typename R3>
+[[nodiscard]] SEMVER_CONSTEXPR bool operator!=(const version<L1, L2, L3>& lhs, const version<R1, R2, R3>& rhs) noexcept {
   return detail::compare_parsed(lhs, rhs, version_compare_option::include_prerelease) != 0;
 }
 
-template <typename I1, typename I2, typename I3>
-[[nodiscard]] SEMVER_CONSTEXPR bool operator>(const version<I1, I2, I3>& lhs, const version<I1, I2, I3>& rhs) noexcept {
+template <typename L1, typename L2, typename L3, typename R1, typename R2, typename R3>
+[[nodiscard]] SEMVER_CONSTEXPR bool operator>(const version<L1, L2, L3>& lhs, const version<R1, R2, R3>& rhs) noexcept {
   return detail::compare_parsed(lhs, rhs, version_compare_option::include_prerelease) > 0;
 }
 
-template <typename I1, typename I2, typename I3>
-[[nodiscard]] SEMVER_CONSTEXPR bool operator>=(const version<I1, I2, I3>& lhs, const version<I1, I2, I3>& rhs) noexcept {
+template <typename L1, typename L2, typename L3, typename R1, typename R2, typename R3>
+[[nodiscard]] SEMVER_CONSTEXPR bool operator>=(const version<L1, L2, L3>& lhs, const version<R1, R2, R3>& rhs) noexcept {
   return detail::compare_parsed(lhs, rhs, version_compare_option::include_prerelease) >= 0;
 }
 
-template <typename I1, typename I2, typename I3>
-[[nodiscard]] SEMVER_CONSTEXPR bool operator<(const version<I1, I2, I3>& lhs, const version<I1, I2, I3>& rhs) noexcept {
+template <typename L1, typename L2, typename L3, typename R1, typename R2, typename R3>
+[[nodiscard]] SEMVER_CONSTEXPR bool operator<(const version<L1, L2, L3>& lhs, const version<R1, R2, R3>& rhs) noexcept {
   return detail::compare_parsed(lhs, rhs, version_compare_option::include_prerelease) < 0;
 }
 
-template <typename I1, typename I2, typename I3>
-[[nodiscard]] SEMVER_CONSTEXPR bool operator<=(const version<I1, I2, I3>& lhs, const version<I1, I2, I3>& rhs) noexcept {
+template <typename L1, typename L2, typename L3, typename R1, typename R2, typename R3>
+[[nodiscard]] SEMVER_CONSTEXPR bool operator<=(const version<L1, L2, L3>& lhs, const version<R1, R2, R3>& rhs) noexcept {
   return detail::compare_parsed(lhs, rhs, version_compare_option::include_prerelease) <= 0;
 }
 
 #if __cpp_impl_three_way_comparison >= 201907L
-template <typename I1, typename I2, typename I3>
-[[nodiscard]] SEMVER_CONSTEXPR std::strong_ordering operator<=>(const version<I1, I2, I3>& lhs, const version<I1, I2, I3>& rhs) noexcept {
-  int compare = detail::compare_parsed(lhs, rhs, version_compare_option::include_prerelease);
-  if (compare == 0)
-    return std::strong_ordering::equal;
-  if (compare > 0)
-    return std::strong_ordering::greater;
+template <typename L1, typename L2, typename L3, typename R1, typename R2, typename R3>
+[[nodiscard]] SEMVER_CONSTEXPR std::strong_ordering operator<=>(const version<L1, L2, L3>& lhs, const version<R1, R2, R3>& rhs) noexcept {
+  const int cmp = detail::compare_parsed(lhs, rhs, version_compare_option::include_prerelease);
+  if (cmp == 0) return std::strong_ordering::equal;
+  if (cmp > 0)  return std::strong_ordering::greater;
   return std::strong_ordering::less;
 }
 #endif
@@ -885,8 +888,9 @@ SEMVER_CONSTEXPR from_chars_result parse(std::string_view str, version<I1, I2, I
   return detail::parse(str, output);
 }
 
+template <typename I1 = int, typename I2 = I1, typename I3 = I1>
 SEMVER_CONSTEXPR bool valid(std::string_view str) {
-  version v{};
+  version<I1, I2, I3> v{};
   return detail::parse(str, v);
 }
 
@@ -894,40 +898,6 @@ template <typename OStream, typename I1, typename I2, typename I3>
 OStream& operator<<(OStream& os, const version<I1, I2, I3>& v) {
   os << v.to_string();
   return os;
-}
-
-// Build a version from components; returns nullopt if any component is negative,
-// or if prerelease/build_metadata is syntactically invalid.
-template <typename I1 = int, typename I2 = I1, typename I3 = I1>
-[[nodiscard]] std::optional<version<I1, I2, I3>>
-make_version(I1 major, I2 minor, I3 patch,
-             std::string_view prerelease = {},
-             std::string_view build_metadata = {}) {
-  if (detail::cmp_less(major, I1{}) || detail::cmp_less(minor, I2{}) || detail::cmp_less(patch, I3{})) {
-    return std::nullopt;
-  }
-
-  version<I1, I2, I3> v;
-  v.major_ = major;
-  v.minor_ = minor;
-  v.patch_ = patch;
-
-  if (!prerelease.empty() || !build_metadata.empty()) {
-    // Validate prerelease/build_metadata via a minimal surrogate string;
-    // "0.1.0" is always in-range for any integral type.
-    std::string probe{"0.1.0"};
-    if (!prerelease.empty())     { probe += '-'; probe.append(prerelease); }
-    if (!build_metadata.empty()) { probe += '+'; probe.append(build_metadata); }
-    version<I1, I2, I3> dummy;
-    if (!detail::parse(probe, dummy)) {
-      return std::nullopt;
-    }
-    v.prerelease_tag_        = std::move(dummy.prerelease_tag_);
-    v.prerelease_identifiers = std::move(dummy.prerelease_identifiers);
-    v.build_metadata_        = std::move(dummy.build_metadata_);
-  }
-
-  return v;
 }
 
 namespace detail {
@@ -1020,10 +990,10 @@ private:
 namespace detail {
   class range_parser {
   public:
-    SEMVER_CONSTEXPR explicit range_parser(token_stream stream) noexcept : stream(std::move(stream)) {}
+    SEMVER_CONSTEXPR explicit range_parser(token_stream ts) noexcept : stream(std::move(ts)) {}
 
     template <typename I1, typename I2, typename I3>
-    SEMVER_CONSTEXPR from_chars_result parse(range_set<I1, I2, I3>& out) noexcept {
+    SEMVER_CONSTEXPR from_chars_result parse(range_set<I1, I2, I3>& out) {
       std::vector<range<I1, I2, I3>> ranges;
 
       do {
@@ -1046,7 +1016,7 @@ namespace detail {
     token_stream stream;
 
     template <typename I1, typename I2, typename I3>
-    SEMVER_CONSTEXPR from_chars_result parse_range(detail::range<I1, I2, I3>& out) noexcept {
+    SEMVER_CONSTEXPR from_chars_result parse_range(detail::range<I1, I2, I3>& out) {
       do {
         skip_whitespaces();
 
@@ -1062,7 +1032,7 @@ namespace detail {
     }
 
     template <typename I1, typename I2, typename I3>
-    SEMVER_CONSTEXPR from_chars_result parse_range_comparator(std::vector<detail::range_comparator<I1, I2, I3>>& out) noexcept {
+    SEMVER_CONSTEXPR from_chars_result parse_range_comparator(std::vector<detail::range_comparator<I1, I2, I3>>& out) {
       range_operator op = range_operator::equal;
       token token;
       if (stream.advance_if_match(token, token_type::range_operator)) {
@@ -1101,9 +1071,9 @@ SEMVER_CONSTEXPR from_chars_result parse(std::string_view str, range_set<I1, I2,
   return detail::range_parser{ std::move(token_stream) }.parse(out);
 }
 
-#undef SEMVER_CONSTEXPR
-
 } // namespace semver
+
+#undef SEMVER_CONSTEXPR
 
 #if defined(__clang__)
 #  pragma clang diagnostic pop

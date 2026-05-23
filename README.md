@@ -3,7 +3,7 @@
 [![Conan package](https://img.shields.io/badge/Conan-package-blueviolet)](https://conan.io/center/recipes/neargye-semver)
 [![License](https://img.shields.io/github/license/Neargye/semver.svg)](LICENSE)
 
-C++ library compare and manipulate versions are available as extensions to the `<major>.<minor>.<patch>-<prerelease_tag>+<build_metadata>` format complying with [Semantic Versioning 2.0.0](https://semver.org)
+C++ library to compare and manipulate versions in `<major>.<minor>.<patch>[-<prerelease>][+<build>]` format, complying with [Semantic Versioning 2.0.0](https://semver.org). Header-only, C++17, no dependencies.
 
 ## [Features & Examples](example/)
 
@@ -13,17 +13,28 @@ C++ library compare and manipulate versions are available as extensions to the `
   semver::version v1;
   if (semver::parse("1.4.3", v1)) {
     const int patch = v1.patch(); // 3
-    // do something...
   }
 
   semver::version v2;
-  if (semver::parse("1.2.4-alpha.10")) {
-    const std::string prerelease_tag = v2.prerelease_tag() // alpha.10
-    // do something...
+  if (semver::parse("1.2.4-alpha.10+build.1", v2)) {
+    v2.prerelease_tag(); // "alpha.10"
+    v2.build_metadata(); // "build.1"
   }
+
+  // Detailed result: ptr points past last consumed char, ec holds the error code
+  const auto [ptr, ec] = semver::parse("1.2.3", v1);
+  if (ec == std::errc{}) { /* success */ }
   ```
 
-* Сomparison
+* Construct & serialize
+
+  ```cpp
+  semver::version v{1, 2, 3};       // version(major, minor, patch); asserts non-negative
+  std::string s = v.to_string();    // "1.2.3"
+  std::cout << v << '\n';           // operator<< supported
+  ```
+
+* Comparison
 
   ```cpp
   assert(v1 != v2);
@@ -31,6 +42,8 @@ C++ library compare and manipulate versions are available as extensions to the `
   assert(v1 >= v2);
   assert(v2 < v1);
   assert(v2 <= v1);
+  // C++20: three-way comparison
+  assert((v1 <=> v2) > 0);
   ```
 
 * Validate
@@ -38,6 +51,19 @@ C++ library compare and manipulate versions are available as extensions to the `
   ```cpp
   const bool result = semver::valid("1.2.3-alpha+build");
   assert(result);
+  ```
+
+* Custom integer types
+
+  ```cpp
+  // Use a wider type when version numbers exceed int range
+  semver::version<int64_t> big;
+  semver::parse("0.0.999999999999", big); // patch == 999999999999
+
+  // Independent types per component; mixed-type comparison works
+  semver::version<uint32_t> a; semver::parse("2.0.0", a);
+  semver::version<int>      b; semver::parse("2.0.0", b);
+  assert(a == b);
   ```
 
 * Range matching
@@ -49,6 +75,11 @@ C++ library compare and manipulate versions are available as extensions to the `
     if (semver::parse("1.2.3", version)) {
       assert(range.contains(version));
     }
+
+    // Prerelease versions are excluded by default (npm semver spec).
+    // Pass include_prerelease to override:
+    semver::version pre; semver::parse("1.2.3-rc.1", pre);
+    range.contains(pre, semver::version_compare_option::include_prerelease);
   }
   ```
 
@@ -81,6 +112,8 @@ CPMAddPackage(
 ```
 
 ## Compiler compatibility
+
+Requires **C++17**. C++20 enables `constexpr` for `std::string`/`std::vector`, enabling wider `constexpr` use of the library.
 
 * Clang/LLVM >= 5
 * MSVC++ >= 14.11 / Visual Studio >= 2017
