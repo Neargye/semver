@@ -6,7 +6,7 @@
 #define SEMVER_CONSTEXPR_SUPPORT
 #endif
 
-inline constexpr std::array<std::string_view, 33> valid_versions = { {
+inline constexpr std::array<std::string_view, 37> valid_versions = { {
   {"0.0.4"},
   {"1.2.3"},
   {"10.20.30"},
@@ -39,10 +39,14 @@ inline constexpr std::array<std::string_view, 33> valid_versions = { {
   {"1.0.0+0.build.1-rc.10000aaa-kk-0.1"},
   {"999999999.999999999.999999999"},
   {"1.0.0-0A.is.legal"},
-  {"0.16.411-PullRequest0434.25+45cf6d2"}
+  {"0.16.411-PullRequest0434.25+45cf6d2"},
+  {"0.0.0"},
+  {"1.0.0-0"},
+  {"1.0.0-0.3.7"},
+  {"1.0.0+001"},
 }};
 
-inline constexpr std::array<std::string_view, 47> invalid_versions = { {
+inline constexpr std::array<std::string_view, 49> invalid_versions = { {
   {""},
   {"1"},
   {"1.2"},
@@ -89,5 +93,7 @@ inline constexpr std::array<std::string_view, 47> invalid_versions = { {
   {"+justmeta"},
   {"9.8.7+meta+meta"},
   {"9.8.7-whatever+meta+meta"},
-  {"99999999999999999999999.999999999999999999.99999999999999999----RC-SNAPSHOT.12.09.1--------------------------------..12"}
+  {"99999999999999999999999.999999999999999999.99999999999999999----RC-SNAPSHOT.12.09.1--------------------------------..12"},
+  {"v1.0.0"},
+  {"1.2.3.4"},
 } };
