@@ -262,6 +262,56 @@ TEST_CASE("from_chars_result contract") {
     REQUIRE_FALSE(result);
     REQUIRE(result.ec == std::errc::result_out_of_range);
   }
+
+  SUBCASE("ptr points to first invalid byte on malformed input") {
+    semver::version v;
+    constexpr std::string_view bad = "1.2.x";
+    const auto [ptr, ec] = semver::parse(bad, v);
+    REQUIRE(ec == std::errc::invalid_argument);
+    REQUIRE(ptr == bad.data() + 4);
+  }
+
+  SUBCASE("failed parse resets output object") {
+    semver::version v;
+    REQUIRE(semver::parse("2.3.4-alpha+meta", v));
+    REQUIRE_FALSE(semver::parse("broken", v));
+    REQUIRE(v.major() == 0);
+    REQUIRE(v.minor() == 1);
+    REQUIRE(v.patch() == 0);
+    REQUIRE(v.prerelease_tag().empty());
+    REQUIRE(v.build_metadata().empty());
+  }
+
+  SUBCASE("trailing garbage preserves parsed prefix like from_chars") {
+    semver::version v;
+    const auto result = semver::parse("2.3.4tail", v);
+    REQUIRE_FALSE(result);
+    REQUIRE(result.ec == std::errc::invalid_argument);
+    REQUIRE(v.major() == 2);
+    REQUIRE(v.minor() == 3);
+    REQUIRE(v.patch() == 4);
+    REQUIRE(v.prerelease_tag().empty());
+    REQUIRE(v.build_metadata().empty());
+  }
+}
+
+TEST_CASE("parse malformed identifiers") {
+  semver::version v;
+
+  SUBCASE("reject empty prerelease identifiers") {
+    REQUIRE_FALSE(semver::parse("1.0.0-.", v));
+    REQUIRE_FALSE(semver::parse("1.0.0-alpha..1", v));
+  }
+
+  SUBCASE("reject empty build metadata identifiers") {
+    REQUIRE_FALSE(semver::parse("1.0.0+.", v));
+    REQUIRE_FALSE(semver::parse("1.0.0+meta..1", v));
+  }
+
+  SUBCASE("reject numeric prerelease leading zero but allow alphanumeric") {
+    REQUIRE_FALSE(semver::parse("1.0.0-01", v));
+    REQUIRE(semver::parse("1.0.0-01a", v));
+  }
 }
 
 TEST_CASE("prerelease precedence \u2014 semver spec \u00a711") {

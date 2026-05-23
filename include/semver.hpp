@@ -51,7 +51,6 @@
 #include <optional>
 #include <string>
 #include <string_view>
-#include <variant>
 #include <vector>
 #if __has_include(<charconv>)
 #include <charconv>
@@ -92,36 +91,21 @@ namespace semver {
 
   namespace detail {
 
-    template <typename T, typename = void>
-    struct resize_uninitialized {
-      SEMVER_CONSTEXPR static auto resize(T& str, std::size_t size) -> std::void_t<decltype(str.resize(size))> {
-        str.resize(size);
-      }
-    };
-
-    template <typename T>
-    struct resize_uninitialized<T, std::void_t<decltype(std::declval<T>().__resize_default_init(42))>> {
-      SEMVER_CONSTEXPR static void resize(T& str, std::size_t size) {
-        str.__resize_default_init(size);
-      }
-    };
-
     template <typename Int>
     SEMVER_CONSTEXPR std::size_t length(Int n) noexcept {
+      auto un = static_cast<std::make_unsigned_t<Int>>(n);
       std::size_t digits = 0;
-      do {
-        digits++;
-        n /= 10;
-      } while (n != 0);
+      do { ++digits; un /= 10; } while (un != 0);
       return digits;
     }
 
     template <typename OutputIt, typename Int>
     SEMVER_CONSTEXPR OutputIt to_chars(OutputIt dest, Int n) noexcept {
+      auto un = static_cast<std::make_unsigned_t<Int>>(n);
       do {
-        *(--dest) = static_cast<char>('0' + (n % 10));
-        n /= 10;
-      } while (n != 0);
+        *(--dest) = static_cast<char>('0' + (un % 10));
+        un /= 10;
+      } while (un != 0);
       return dest;
     }
 
@@ -132,7 +116,8 @@ namespace semver {
 
     struct prerelease_identifier {
       prerelease_identifier_type type;
-      std::string identifier;
+      std::size_t offset;
+      std::size_t length;
     };
 
     template<class T, class U>
@@ -196,8 +181,8 @@ namespace semver {
     SEMVER_CONSTEXPR I2 minor() const noexcept { return minor_; }
     SEMVER_CONSTEXPR I3 patch() const noexcept { return patch_; }
 
-    SEMVER_CONSTEXPR const std::string& prerelease_tag() const { return prerelease_tag_; }
-    SEMVER_CONSTEXPR const std::string& build_metadata() const { return build_metadata_; }
+    SEMVER_CONSTEXPR const std::string& prerelease_tag() const noexcept { return prerelease_tag_; }
+    SEMVER_CONSTEXPR const std::string& build_metadata() const noexcept { return build_metadata_; }
 
     SEMVER_CONSTEXPR std::string to_string() const;
 
@@ -216,7 +201,7 @@ namespace semver {
         + (build_metadata_.empty() ? 0 : build_metadata_.length() + 1);
     }
 
-    SEMVER_CONSTEXPR void clear() noexcept {
+    SEMVER_CONSTEXPR void reset() noexcept {
       major_ = 0;
       minor_ = 1;
       patch_ = 0;
@@ -234,7 +219,7 @@ namespace semver {
 #endif
   SEMVER_CONSTEXPR std::string version<I1, I2, I3>::to_string() const {
     std::string result;
-    detail::resize_uninitialized<std::string>{}.resize(result, length());
+    result.resize(length());
 
     auto it = result.end();
     if (!build_metadata_.empty()) {
@@ -366,16 +351,18 @@ enum class range_operator : std::uint8_t {
 };
 
 struct token {
-  using value_t = std::variant<std::monostate, std::uint8_t, char, range_operator>;
   token_type type{};
-  value_t value{};
+  union {
+    std::uint8_t digit;    // token_type::digit
+    char         letter;   // token_type::letter
+    range_operator op;     // token_type::range_operator
+  } value{};
   const char* lexeme = nullptr;
 };
 
 class token_stream {
 public:
   SEMVER_CONSTEXPR token_stream() = default;
-  SEMVER_CONSTEXPR explicit token_stream(std::vector<token> tokens) noexcept : tokens(std::move(tokens)) {}
 
   SEMVER_CONSTEXPR void push(const token& token) {
     tokens.push_back(token);
@@ -408,10 +395,6 @@ public:
   SEMVER_CONSTEXPR bool advance_if_match(token_type type) noexcept {
     token token;
     return advance_if_match(token, type);
-  }
-
-  SEMVER_CONSTEXPR bool consume(token_type type) noexcept {
-    return advance().type == type;
   }
 
   SEMVER_CONSTEXPR bool check(token_type type) const noexcept {
@@ -497,9 +480,23 @@ private:
     return success(get_prev_symbol());
   }
 
-  SEMVER_CONSTEXPR void add_token(token_stream& stream, token_type type, token::value_t value = {}) {
-    const char* lexeme = get_prev_symbol();
-    stream.push({ type, value, lexeme});
+  SEMVER_CONSTEXPR void add_token(token_stream& stream, token_type type) {
+    stream.push({ type, {}, get_prev_symbol() });
+  }
+
+  SEMVER_CONSTEXPR void add_token(token_stream& stream, token_type type, std::uint8_t digit) {
+    token t{}; t.type = type; t.value.digit = digit; t.lexeme = get_prev_symbol();
+    stream.push(t);
+  }
+
+  SEMVER_CONSTEXPR void add_token(token_stream& stream, token_type type, char letter) {
+    token t{}; t.type = type; t.value.letter = letter; t.lexeme = get_prev_symbol();
+    stream.push(t);
+  }
+
+  SEMVER_CONSTEXPR void add_token(token_stream& stream, token_type type, range_operator op) {
+    token t{}; t.type = type; t.value.op = op; t.lexeme = get_prev_symbol();
+    stream.push(t);
   }
 
   SEMVER_CONSTEXPR char advance() noexcept {
@@ -529,7 +526,7 @@ private:
 class prerelease_comparator {
 public:
   template <typename L1, typename L2, typename L3, typename R1, typename R2, typename R3>
-  [[nodiscard]] SEMVER_CONSTEXPR int compare(const version<L1, L2, L3>& lhs, const version<R1, R2, R3>& rhs) const noexcept {
+  [[nodiscard]] static SEMVER_CONSTEXPR int compare(const version<L1, L2, L3>& lhs, const version<R1, R2, R3>& rhs) noexcept {
     if (lhs.prerelease_identifiers.empty() != rhs.prerelease_identifiers.empty()) {
       return lhs.prerelease_identifiers.empty() ? 1 : -1;
     }
@@ -537,7 +534,9 @@ public:
     const std::size_t count = std::min(lhs.prerelease_identifiers.size(), rhs.prerelease_identifiers.size());
 
     for (std::size_t i = 0; i < count; ++i) {
-      const int compare_result = compare_identifier(lhs.prerelease_identifiers[i], rhs.prerelease_identifiers[i]);
+      const int compare_result = compare_identifier(
+        lhs.prerelease_tag_, lhs.prerelease_identifiers[i],
+        rhs.prerelease_tag_, rhs.prerelease_identifiers[i]);
       if (compare_result != 0) {
         return compare_result;
       }
@@ -549,11 +548,24 @@ public:
   }
 
 private:
-  [[nodiscard]] SEMVER_CONSTEXPR int compare_identifier(const prerelease_identifier& lhs, const prerelease_identifier& rhs) const noexcept {
+  [[nodiscard]] static SEMVER_CONSTEXPR std::string_view identifier_view(
+    const std::string& prerelease_tag,
+    const prerelease_identifier& identifier) noexcept {
+    return std::string_view(prerelease_tag.data() + identifier.offset, identifier.length);
+  }
+
+  [[nodiscard]] static SEMVER_CONSTEXPR int compare_identifier(
+    const std::string& lhs_tag,
+    const prerelease_identifier& lhs,
+    const std::string& rhs_tag,
+    const prerelease_identifier& rhs) noexcept {
+    const auto lhs_identifier = identifier_view(lhs_tag, lhs);
+    const auto rhs_identifier = identifier_view(rhs_tag, rhs);
+
     if (lhs.type == prerelease_identifier_type::numeric && rhs.type == prerelease_identifier_type::numeric) {
-      return compare_numerically(lhs.identifier, rhs.identifier);
+      return compare_numerically(lhs_identifier, rhs_identifier);
     } else if (lhs.type == prerelease_identifier_type::alphanumeric && rhs.type == prerelease_identifier_type::alphanumeric) {
-      return detail::compare(lhs.identifier, rhs.identifier);
+      return detail::compare(lhs_identifier, rhs_identifier);
     }
 
     return lhs.type == prerelease_identifier_type::alphanumeric ? 1 : -1;
@@ -566,15 +578,15 @@ public:
 
   template <typename I1, typename I2, typename I3>
   SEMVER_CONSTEXPR from_chars_result parse(version<I1, I2, I3>& out) {
-    out.clear();
+    out.reset();
 
     from_chars_result result = parse_number(out.major_);
     if (!result) {
       return result;
     }
 
-    if (!stream.consume(token_type::dot)) {
-      return failure(stream.previous().lexeme);
+    if (!stream.advance_if_match(token_type::dot)) {
+      return failure(stream.peek().lexeme);
     }
 
     result = parse_number(out.minor_);
@@ -582,8 +594,8 @@ public:
       return result;
     }
 
-    if (!stream.consume(token_type::dot)) {
-      return failure(stream.previous().lexeme);
+    if (!stream.advance_if_match(token_type::dot)) {
+      return failure(stream.peek().lexeme);
     }
 
     result = parse_number(out.patch_);
@@ -608,7 +620,6 @@ public:
     return result;
   }
 
-
 private:
   token_stream& stream;
 
@@ -620,7 +631,7 @@ private:
       return failure(token.lexeme);
     }
 
-    const auto first_digit = std::get<std::uint8_t>(token.value);
+    const auto first_digit = token.value.digit;
     std::uint64_t result = first_digit;
 
     if (first_digit == 0) {
@@ -629,7 +640,7 @@ private:
     }
 
     while (stream.advance_if_match(token, token_type::digit)) {
-      const auto d = std::get<std::uint8_t>(token.value);
+      const auto d = token.value.digit;
       if (result > (std::numeric_limits<std::uint64_t>::max() - d) / 10) {
         return failure(token.lexeme, std::errc::result_out_of_range);
       }
@@ -645,81 +656,90 @@ private:
   }
 
   SEMVER_CONSTEXPR from_chars_result parse_prerelease_tag(std::string& out, std::vector<detail::prerelease_identifier>& out_identifiers) {
-    std::string result;
+    out.clear();
+    out_identifiers.clear();
 
     do {
-      if (!result.empty()) {
-        result.push_back('.');
-      }
+      if (!out.empty()) out.push_back('.');
+      const auto id_start = out.size();
 
-      std::string identifier;
-      if (const auto res = parse_prerelease_identifier(identifier); !res) {
+      if (const auto res = parse_prerelease_identifier(out); !res) {
+        if (id_start > 0) out.resize(id_start - 1); // roll back '.'
+        out_identifiers.clear();
         return res;
       }
 
-      result.append(identifier);
-      out_identifiers.push_back(make_prerelease_identifier(identifier));
+      const auto id_length = out.size() - id_start;
+      out_identifiers.push_back(make_prerelease_identifier(
+        std::string_view(out.data() + id_start, id_length), id_start));
 
     } while (stream.advance_if_match(token_type::dot));
 
-    out = result;
     return success(stream.peek().lexeme);
   }
 
   SEMVER_CONSTEXPR from_chars_result parse_build_metadata(std::string& out) {
-    std::string result;
+    out.clear();
 
     do {
-      if (!result.empty()) {
-        result.push_back('.');
-      }
+      if (!out.empty()) out.push_back('.');
+      const auto id_start = out.size();
 
-      std::string identifier;
-      if (const auto res = parse_build_identifier(identifier); !res) {
+      if (const auto res = parse_build_identifier(out); !res) {
+        if (id_start > 0) out.resize(id_start - 1); // roll back '.'
         return res;
       }
 
-      result.append(identifier);
     } while (stream.advance_if_match(token_type::dot));
 
-    out = result;
+    return success(stream.peek().lexeme);
+  }
+
+  // Unified dot-separated identifier parser.
+  // CheckLeadingZeros=true: prerelease identifiers obey spec §9 (no leading zeros in numeric IDs).
+  // CheckLeadingZeros=false: build-metadata identifiers have no such restriction.
+  template <bool CheckLeadingZeros>
+  SEMVER_CONSTEXPR from_chars_result parse_identifier(std::string& out) {
+    const auto start = out.size(); // append mode: track where this identifier begins
+    token tok = stream.advance();
+
+    do {
+      switch (tok.type) {
+      case token_type::hyphen:
+        out.push_back('-');
+        break;
+      case token_type::letter:
+        out.push_back(tok.value.letter);
+        break;
+      case token_type::digit: {
+        const auto digit = tok.value.digit;
+        if constexpr (CheckLeadingZeros) {
+          // Purely numeric identifiers must not have leading zeros (spec §9).
+          // "1.2.3-01.alpha" → invalid; "1.2.3-01b" → valid (alphanumeric).
+          if (out.size() == start && is_leading_zero(digit)) {
+            out.resize(start);
+            return failure(tok.lexeme);
+          }
+        }
+        out.push_back(to_char(digit));
+        break;
+      }
+      default:
+        out.resize(start);
+        return failure(tok.lexeme);
+      }
+    } while (stream.advance_if_match(tok, token_type::hyphen)
+          || stream.advance_if_match(tok, token_type::letter)
+          || stream.advance_if_match(tok, token_type::digit));
+
     return success(stream.peek().lexeme);
   }
 
   SEMVER_CONSTEXPR from_chars_result parse_prerelease_identifier(std::string& out) {
-    std::string result;
-    token token = stream.advance();
-
-    do {
-      switch (token.type) {
-      case token_type::hyphen:
-        result.push_back('-');
-        break;
-      case token_type::letter:
-        result.push_back(std::get<char>(token.value));
-        break;
-      case token_type::digit:
-      {
-        const auto digit = std::get<std::uint8_t>(token.value);
-        // Purely numeric identifiers must not have leading zeros (spec §9).
-        // "1.2.3-01.alpha" → invalid; "1.2.3-01b" → valid (alphanumeric).
-        if (result.empty() && is_leading_zero(digit)) {
-          return failure(token.lexeme);
-        }
-
-        result.push_back(to_char(digit));
-        break;
-      }
-      default:
-        return failure(token.lexeme);
-      }
-    } while (stream.advance_if_match(token, token_type::hyphen) || stream.advance_if_match(token, token_type::letter) || stream.advance_if_match(token, token_type::digit));
-
-    out = result;
-    return success(stream.peek().lexeme);
+    return parse_identifier<true>(out);
   }
 
-  SEMVER_CONSTEXPR detail::prerelease_identifier make_prerelease_identifier(const std::string& identifier) {
+  SEMVER_CONSTEXPR detail::prerelease_identifier make_prerelease_identifier(std::string_view identifier, std::size_t offset) {
     auto type = detail::prerelease_identifier_type::numeric;
     for (char c : identifier) {
       if (c == '-' || detail::is_letter(c)) {
@@ -727,70 +747,30 @@ private:
         break;
       }
     }
-    return detail::prerelease_identifier{ type, identifier };
+    return detail::prerelease_identifier{ type, offset, identifier.size() };
   }
 
   SEMVER_CONSTEXPR from_chars_result parse_build_identifier(std::string& out) {
-    std::string result;
-    token token = stream.advance();
-
-    do {
-      switch (token.type) {
-      case token_type::hyphen:
-        result.push_back('-');
-        break;
-      case token_type::letter:
-        result.push_back(std::get<char>(token.value));
-        break;
-      case token_type::digit:
-      {
-        const auto digit = std::get<std::uint8_t>(token.value);
-        result.push_back(to_char(digit));
-        break;
-      }
-      default:
-        return failure(token.lexeme);
-      }
-    } while (stream.advance_if_match(token, token_type::hyphen) || stream.advance_if_match(token, token_type::letter) || stream.advance_if_match(token, token_type::digit));
-
-    out = result;
-    return success(stream.peek().lexeme);
+    return parse_identifier<false>(out);
   }
 
   SEMVER_CONSTEXPR bool is_leading_zero(int digit) noexcept {
-    if (digit != 0) {
-      return false;
+    if (digit != 0) return false;
+    // '0' is a leading zero in a purely-numeric identifier.
+    // Scan ahead: if any following alphanumeric char is a letter or hyphen,
+    // the identifier is alphanumeric and leading-zero rules do not apply.
+    // If all following alphanumeric chars are digits (and there's at least one),
+    // the identifier is purely numeric with a leading zero — reject it.
+    for (std::size_t k = 0; ; ++k) {
+      const token t = stream.peek(k);
+      if (!is_alphanumeric(t)) break;        // end of identifier
+      if (!is_digit(t))        return false;  // letter or hyphen → alphanumeric → OK
     }
-
-    int k = 0;
-    int alpha_numerics = 0;
-    int digits = 0;
-
-    while (true) {
-      const token token = stream.peek(k);
-
-      if (!is_alphanumeric(token)) {
-        break;
-      }
-
-      ++alpha_numerics;
-
-      if (is_digit(token)) {
-        ++digits;
-      }
-
-      ++k;
-    }
-
-    return digits > 0 && digits == alpha_numerics;
+    return is_digit(stream.peek(0)); // true iff '0' is followed by ≥1 digit
   }
 
   SEMVER_CONSTEXPR bool is_digit(const token& token) const noexcept {
     return token.type == token_type::digit;
-  }
-
-  SEMVER_CONSTEXPR bool is_eol(const token& token) const noexcept {
-    return token.type == token_type::eol;
   }
 
   SEMVER_CONSTEXPR bool is_alphanumeric(const token& token) const noexcept {
@@ -800,7 +780,7 @@ private:
 
 template <typename L1, typename L2, typename L3, typename R1, typename R2, typename R3>
 SEMVER_CONSTEXPR int compare_prerelease(const version<L1, L2, L3>& lhs, const version<R1, R2, R3>& rhs) noexcept {
-  return prerelease_comparator{}.compare(lhs, rhs);
+  return prerelease_comparator::compare(lhs, rhs);
 }
 
 template <typename L1, typename L2, typename L3, typename R1, typename R2, typename R3>
@@ -834,8 +814,8 @@ SEMVER_CONSTEXPR from_chars_result parse(std::string_view str, version<I1, I2, I
     return result;
   }
 
-  if (!token_stream.consume(token_type::eol)) {
-    return failure(token_stream.previous().lexeme);
+  if (!token_stream.advance_if_match(token_type::eol)) {
+    return failure(token_stream.peek().lexeme);
   }
 
   return success(token_stream.previous().lexeme);
@@ -875,11 +855,11 @@ template <typename L1, typename L2, typename L3, typename R1, typename R2, typen
 
 #if __cpp_impl_three_way_comparison >= 201907L
 template <typename L1, typename L2, typename L3, typename R1, typename R2, typename R3>
-[[nodiscard]] SEMVER_CONSTEXPR std::strong_ordering operator<=>(const version<L1, L2, L3>& lhs, const version<R1, R2, R3>& rhs) noexcept {
+[[nodiscard]] SEMVER_CONSTEXPR std::weak_ordering operator<=>(const version<L1, L2, L3>& lhs, const version<R1, R2, R3>& rhs) noexcept {
   const int cmp = detail::compare_parsed(lhs, rhs, version_compare_option::include_prerelease);
-  if (cmp == 0) return std::strong_ordering::equal;
-  if (cmp > 0)  return std::strong_ordering::greater;
-  return std::strong_ordering::less;
+  if (cmp == 0) return std::weak_ordering::equivalent;
+  if (cmp > 0)  return std::weak_ordering::greater;
+  return std::weak_ordering::less;
 }
 #endif
 
@@ -990,7 +970,7 @@ private:
 namespace detail {
   class range_parser {
   public:
-    SEMVER_CONSTEXPR explicit range_parser(token_stream ts) noexcept : stream(std::move(ts)) {}
+    SEMVER_CONSTEXPR explicit range_parser(token_stream& ts) noexcept : stream(ts) {}
 
     template <typename I1, typename I2, typename I3>
     SEMVER_CONSTEXPR from_chars_result parse(range_set<I1, I2, I3>& out) {
@@ -1002,7 +982,7 @@ namespace detail {
           return res;
         }
 
-        ranges.push_back(range);
+        ranges.push_back(std::move(range));
         skip_whitespaces();
 
       } while (stream.advance_if_match(token_type::logical_or));
@@ -1013,7 +993,7 @@ namespace detail {
     }
     
   private:
-    token_stream stream;
+    token_stream& stream;
 
     template <typename I1, typename I2, typename I3>
     SEMVER_CONSTEXPR from_chars_result parse_range(detail::range<I1, I2, I3>& out) {
@@ -1036,7 +1016,7 @@ namespace detail {
       range_operator op = range_operator::equal;
       token token;
       if (stream.advance_if_match(token, token_type::range_operator)) {
-        op = std::get<range_operator>(token.value);
+        op = token.value.op;
       }
 
       skip_whitespaces();
@@ -1062,13 +1042,30 @@ namespace detail {
 
 template <typename I1, typename I2, typename I3>
 SEMVER_CONSTEXPR from_chars_result parse(std::string_view str, range_set<I1, I2, I3>& out) {
+  if (!str.empty() && str.front() == ' ') {
+    return detail::failure(str.data());
+  }
+
+  if (!str.empty() && str.back() == ' ') {
+    return detail::failure(str.data() + str.size() - 1);
+  }
+
   detail::token_stream token_stream;
   const from_chars_result result = detail::lexer{str}.scan_tokens(token_stream);
   if (!result) {
     return result;
   }
 
-  return detail::range_parser{ std::move(token_stream) }.parse(out);
+  const from_chars_result parse_result = detail::range_parser{ token_stream }.parse(out);
+  if (!parse_result) {
+    return parse_result;
+  }
+
+  if (!token_stream.advance_if_match(detail::token_type::eol)) {
+    return detail::failure(token_stream.peek().lexeme);
+  }
+
+  return detail::success(token_stream.previous().lexeme);
 }
 
 } // namespace semver

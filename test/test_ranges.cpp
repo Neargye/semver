@@ -180,6 +180,30 @@ TEST_CASE("range parse failures") {
   SUBCASE("dangling union separator") {
     REQUIRE_FALSE(semver::parse(">=1.0.0 ||", rs));
   }
+
+  SUBCASE("isolated or misplaced union separators") {
+    REQUIRE_FALSE(semver::parse("||", rs));
+    REQUIRE_FALSE(semver::parse("|| >=1.0.0", rs));
+    REQUIRE_FALSE(semver::parse(">=1.0.0 || || <2.0.0", rs));
+  }
+
+  SUBCASE("tabs are invalid separators") {
+    REQUIRE_FALSE(semver::parse(">=1.0.0\t<2.0.0", rs));
+  }
+
+  SUBCASE("leading and trailing spaces are rejected") {
+    REQUIRE_FALSE(semver::parse(" >=1.0.0", rs));
+    REQUIRE_FALSE(semver::parse(">=1.0.0 ", rs));
+  }
+
+  SUBCASE("trailing garbage after valid comparator") {
+    REQUIRE_FALSE(semver::parse(">=1.0.0 abc", rs));
+    REQUIRE_FALSE(semver::parse("<=2.0.0 ???", rs));
+  }
+
+  SUBCASE("trailing garbage after valid union") {
+    REQUIRE_FALSE(semver::parse(">=1.0.0 || <2.0.0 tail", rs));
+  }
 }
 
 TEST_CASE("range boundary conditions") {
@@ -220,6 +244,24 @@ TEST_CASE("range boundary conditions") {
     test_parse_and_check_false(r, "2.0.0");
     test_parse_and_check_false(r, "4.5.0");
     test_parse_and_check_false(r, "0.9.9");
+  }
+}
+
+TEST_CASE("range prerelease behavior in unions") {
+  // exclude_prerelease should accept prerelease only when at least one
+  // comparator in the matching comparator-set carries a prerelease.
+  constexpr std::string_view union_range = ">=1.2.3 <2.0.0 || >=1.2.3-alpha.1 <1.2.3";
+
+  SUBCASE("matching prerelease branch includes prerelease") {
+    test_parse_and_check(union_range, "1.2.3-alpha.2", semver::version_compare_option::exclude_prerelease);
+  }
+
+  SUBCASE("plain branch does not include prerelease by default") {
+    test_parse_and_check_false(">=1.2.3 <2.0.0", "1.5.0-alpha.1", semver::version_compare_option::exclude_prerelease);
+  }
+
+  SUBCASE("include_prerelease overrides exclusion") {
+    test_parse_and_check(">=1.2.3 <2.0.0", "1.5.0-alpha.1", semver::version_compare_option::include_prerelease);
   }
 }
 
