@@ -75,7 +75,7 @@ Copy [semver.hpp](include/semver.hpp) into your project, or use a package manage
 
 ## Compiler support
 
-C++17 required. C++20 adds `constexpr` support, `operator<=>`, `consteval` literals, and concepts.
+C++17 required. C++20 adds `operator<=>`, concepts, and, when the toolchain provides working `constexpr std::string`/`std::vector`, full compile-time parsing and `consteval` literals.
 
 * GCC >= 7
 * Clang >= 5
