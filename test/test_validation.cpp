@@ -333,22 +333,23 @@ TEST_CASE("constexpr version constructor") {
 TEST_CASE("consteval _semver literal") {
   using namespace semver::literals;
 
-  static_assert("1.2.3"_semver.major() == 1);
-  static_assert("1.2.3"_semver.minor() == 2);
-  static_assert("1.2.3"_semver.patch() == 3);
-  static_assert("0.1.0"_semver == semver::version<>{0, 1, 0});
-  static_assert("1.0.0-alpha"_semver < "1.0.0-beta"_semver);
-  static_assert("1.0.0-alpha.1"_semver < "1.0.0-alpha.2"_semver);
+  // version<> contains std::string members whose SSO representation stores a
+  // self-referential pointer (_M_p → _M_local_buf in libstdc++).  This makes a
+  // consteval-produced version<> "not a constant expression" outside a transient
+  // evaluation context.  Wrapping each assertion in a lambda keeps all version<>
+  // objects transient (they live only within the lambda's evaluation), which
+  // satisfies every implementation's constexpr evaluator.
+  static_assert([] { return "1.2.3"_semver.major() == 1; }());
+  static_assert([] { return "1.2.3"_semver.minor() == 2; }());
+  static_assert([] { return "1.2.3"_semver.patch() == 3; }());
+  static_assert([] { return "0.1.0"_semver == semver::version<>{0, 1, 0}; }());
+  static_assert([] { return "1.0.0-alpha"_semver < "1.0.0-beta"_semver; }());
+  static_assert([] { return "1.0.0-alpha.1"_semver < "1.0.0-alpha.2"_semver; }());
 
   // Complex prerelease preserved
-  static_assert("1.2.3----RC-SNAPSHOT.12.9.1--.12"_semver.patch() == 3);
+  static_assert([] { return "1.2.3----RC-SNAPSHOT.12.9.1--.12"_semver.patch() == 3; }());
 
-  // Literal produces same result as runtime parse
   SUBCASE("literal matches runtime parse") {
-    // `consteval version<>` with non-empty strings cannot appear in runtime
-    // REQUIRE or be stored as `constexpr auto` — std::string SSO has a
-    // self-referential pointer (_M_p → _M_local_buf) that is not a valid
-    // constant expression outside a transient evaluation context.
     static_assert([] {
       const auto v = "1.0.0-alpha+build"_semver;
       return v.prerelease_tag() == "alpha" && v.build_metadata() == "build";
