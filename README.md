@@ -53,7 +53,14 @@ C++ library compare and manipulate versions are available as extensions to the `
   ```
 
 Check the *examples* folder to see more various usage examples
-  
+
+## Default-constructed version
+
+A default-constructed `semver::version{}` represents `0.1.0`, not `0.0.0`.
+This is intentional and follows the [Semantic Versioning 2.0.0 FAQ](https://semver.org/#how-should-i-deal-with-revisions-in-the-0yz-initial-development-phase):
+
+> The simplest thing to do is start your initial development release at **0.1.0** and then increment the minor version for each subsequent release.
+
 ## Integration
 
 You should add required file [semver.hpp](include/semver.hpp).
