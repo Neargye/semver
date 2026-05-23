@@ -48,14 +48,14 @@
 #include <cstdint>
 #include <cassert>
 #include <limits>
-#include <optional>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <vector>
-#if __has_include(<charconv>)
-#include <charconv>
-#else
 #include <system_error>
+
+#ifndef SEMVER_MAX_INPUT_LENGTH
+#define SEMVER_MAX_INPUT_LENGTH 4096
 #endif
 
 #if defined(SEMVER_CONFIG_FILE)
@@ -92,7 +92,7 @@ namespace semver {
   namespace detail {
 
     template <typename Int>
-    SEMVER_CONSTEXPR std::size_t length(Int n) noexcept {
+    constexpr std::size_t length(Int n) noexcept {
       auto un = static_cast<std::make_unsigned_t<Int>>(n);
       std::size_t digits = 0;
       do { ++digits; un /= 10; } while (un != 0);
@@ -100,7 +100,7 @@ namespace semver {
     }
 
     template <typename OutputIt, typename Int>
-    SEMVER_CONSTEXPR OutputIt to_chars(OutputIt dest, Int n) noexcept {
+    constexpr OutputIt to_chars(OutputIt dest, Int n) noexcept {
       auto un = static_cast<std::make_unsigned_t<Int>>(n);
       do {
         *(--dest) = static_cast<char>('0' + (un % 10));
@@ -109,19 +109,8 @@ namespace semver {
       return dest;
     }
 
-    enum struct prerelease_identifier_type {
-      numeric,
-      alphanumeric
-    };
-
-    struct prerelease_identifier {
-      prerelease_identifier_type type;
-      std::size_t offset;
-      std::size_t length;
-    };
-
     template<class T, class U>
-    SEMVER_CONSTEXPR bool cmp_less(T t, U u) noexcept {
+    constexpr bool cmp_less(T t, U u) noexcept {
       if constexpr (std::is_signed_v<T> == std::is_signed_v<U>)
         return t < u;
       else if constexpr (std::is_signed_v<T>)
@@ -131,22 +120,21 @@ namespace semver {
     }
 
     template<class T, class U>
-    SEMVER_CONSTEXPR bool cmp_less_equal(T t, U u) noexcept {
+    constexpr bool cmp_less_equal(T t, U u) noexcept {
       return !cmp_less(u, t);
     }
 
     template<class T, class U>
-    SEMVER_CONSTEXPR bool cmp_greater_equal(T t, U u) noexcept {
+    constexpr bool cmp_greater_equal(T t, U u) noexcept {
       return !cmp_less(t, u);
     }
 
     template<typename R, typename T>
-    SEMVER_CONSTEXPR bool number_in_range(T t) noexcept {
+    constexpr bool number_in_range(T t) noexcept {
       return cmp_greater_equal(t, std::numeric_limits<R>::min()) && cmp_less_equal(t, std::numeric_limits<R>::max());
     }
 
     class version_parser;
-    class prerelease_comparator;
   }
 
 #if __cpp_concepts >= 201907L
@@ -160,7 +148,6 @@ namespace semver {
     static_assert(std::is_integral_v<I3>, "semver: I3 must be an integral type");
 
     friend class detail::version_parser;
-    friend class detail::prerelease_comparator;
 
   public:
     SEMVER_CONSTEXPR version() = default; // https://semver.org/#how-should-i-deal-with-revisions-in-the-0yz-initial-development-phase
@@ -177,14 +164,14 @@ namespace semver {
     SEMVER_CONSTEXPR version& operator=(const version&) = default;
     SEMVER_CONSTEXPR version& operator=(version&&) = default;
 
-    SEMVER_CONSTEXPR I1 major() const noexcept { return major_; }
-    SEMVER_CONSTEXPR I2 minor() const noexcept { return minor_; }
-    SEMVER_CONSTEXPR I3 patch() const noexcept { return patch_; }
+    [[nodiscard]] SEMVER_CONSTEXPR I1 major() const noexcept { return major_; }
+    [[nodiscard]] SEMVER_CONSTEXPR I2 minor() const noexcept { return minor_; }
+    [[nodiscard]] SEMVER_CONSTEXPR I3 patch() const noexcept { return patch_; }
 
-    SEMVER_CONSTEXPR const std::string& prerelease_tag() const noexcept { return prerelease_tag_; }
-    SEMVER_CONSTEXPR const std::string& build_metadata() const noexcept { return build_metadata_; }
+    [[nodiscard]] constexpr std::string_view prerelease_tag() const noexcept { return prerelease_tag_; }
+    [[nodiscard]] constexpr std::string_view build_metadata() const noexcept { return build_metadata_; }
 
-    SEMVER_CONSTEXPR std::string to_string() const;
+    [[nodiscard]] SEMVER_CONSTEXPR std::string to_string() const;
 
   private:
     I1 major_ = 0;
@@ -192,8 +179,6 @@ namespace semver {
     I3 patch_ = 0;
     std::string prerelease_tag_;
     std::string build_metadata_;
-
-    std::vector<detail::prerelease_identifier> prerelease_identifiers;
 
     SEMVER_CONSTEXPR std::size_t length() const noexcept {
       return detail::length(major_) + detail::length(minor_) + detail::length(patch_) + 2
@@ -207,7 +192,6 @@ namespace semver {
       patch_ = 0;
 
       prerelease_tag_.clear();
-      prerelease_identifiers.clear();
       build_metadata_.clear();
     }
   };
@@ -243,19 +227,13 @@ namespace semver {
     return result;
   }
 
-#if __has_include(<charconv>)
-  struct from_chars_result : std::from_chars_result {
-    [[nodiscard]] SEMVER_CONSTEXPR operator bool() const noexcept { return ec == std::errc{}; }
-  };
-#else
   struct from_chars_result {
     const char* ptr;
     std::errc ec;
 
-    [[nodiscard]] SEMVER_CONSTEXPR operator bool() const noexcept { return ec == std::errc{}; }
+    [[nodiscard]] constexpr operator bool() const noexcept { return ec == std::errc{}; }
   };
-#endif
-  
+
   enum class version_compare_option : std::uint8_t {
     exclude_prerelease,
     include_prerelease
@@ -263,34 +241,34 @@ namespace semver {
 
 namespace detail {
 
-SEMVER_CONSTEXPR from_chars_result success(const char* ptr) noexcept {
+constexpr from_chars_result success(const char* ptr) noexcept {
   return from_chars_result{ ptr, std::errc{} };
 }
 
-SEMVER_CONSTEXPR from_chars_result failure(const char* ptr, std::errc error_code = std::errc::invalid_argument) noexcept {
+constexpr from_chars_result failure(const char* ptr, std::errc error_code = std::errc::invalid_argument) noexcept {
   return from_chars_result{ ptr, error_code };
 }
 
-SEMVER_CONSTEXPR bool is_digit(char c) noexcept {
+constexpr bool is_digit(char c) noexcept {
   return c >= '0' && c <= '9';
 }
 
-SEMVER_CONSTEXPR bool is_letter(char c) noexcept {
+constexpr bool is_letter(char c) noexcept {
   return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
 }
 
-SEMVER_CONSTEXPR std::uint8_t to_digit(char c) noexcept {
+constexpr std::uint8_t to_digit(char c) noexcept {
   return static_cast<std::uint8_t>(c - '0');
 }
 
-SEMVER_CONSTEXPR char to_char(std::uint8_t i) noexcept {
+constexpr char to_char(std::uint8_t i) noexcept {
   return static_cast<char>('0' + i);
 }
 
-SEMVER_CONSTEXPR int compare(std::string_view lhs, std::string_view rhs) noexcept {
+constexpr int compare(std::string_view lhs, std::string_view rhs) noexcept {
 #if defined(_MSC_VER) && _MSC_VER < 1920 && !defined(__clang__)
   // https://developercommunity.visualstudio.com/content/problem/360432/vs20178-regression-c-failed-in-test.html
-  // https://developercommunity.visualstudio.com/content/problem/232218/c-SEMVER_CONSTEXPR-string-view.html
+  // https://developercommunity.visualstudio.com/content/problem/232218/c-constexpr-string-view.html
   constexpr bool workaround = true;
 #else
   constexpr bool workaround = false;
@@ -312,7 +290,7 @@ SEMVER_CONSTEXPR int compare(std::string_view lhs, std::string_view rhs) noexcep
   }
 }
 
-SEMVER_CONSTEXPR int compare_numerically(std::string_view lhs, std::string_view rhs) noexcept {
+constexpr int compare_numerically(std::string_view lhs, std::string_view rhs) noexcept {
   // assume that strings don't have leading zeros (we've already checked it at parsing stage).
 
   if (lhs.size() != rhs.size()) {
@@ -362,16 +340,16 @@ struct token {
 
 class token_stream {
 public:
-  SEMVER_CONSTEXPR token_stream() = default;
+  SEMVER_CONSTEXPR token_stream() { tokens.reserve(32); }
 
   SEMVER_CONSTEXPR void push(const token& token) {
     tokens.push_back(token);
   }
 
   SEMVER_CONSTEXPR token advance() noexcept {
-    const token token = get(current);
+    const token t = get(current);
     ++current;
-    return token;
+    return t;
   }
 
   SEMVER_CONSTEXPR token peek(std::size_t k = 0) const noexcept {
@@ -406,7 +384,6 @@ private:
   std::vector<token> tokens;
 
   SEMVER_CONSTEXPR token get(std::size_t i) const noexcept {
-    assert(i < tokens.size());
     return tokens[i];
   }
 };
@@ -527,48 +504,63 @@ class prerelease_comparator {
 public:
   template <typename L1, typename L2, typename L3, typename R1, typename R2, typename R3>
   [[nodiscard]] static SEMVER_CONSTEXPR int compare(const version<L1, L2, L3>& lhs, const version<R1, R2, R3>& rhs) noexcept {
-    if (lhs.prerelease_identifiers.empty() != rhs.prerelease_identifiers.empty()) {
-      return lhs.prerelease_identifiers.empty() ? 1 : -1;
+    const auto lhs_tag = lhs.prerelease_tag();
+    const auto rhs_tag = rhs.prerelease_tag();
+
+    if (lhs_tag.empty() != rhs_tag.empty()) {
+      return lhs_tag.empty() ? 1 : -1;
     }
 
-    const std::size_t count = std::min(lhs.prerelease_identifiers.size(), rhs.prerelease_identifiers.size());
-
-    for (std::size_t i = 0; i < count; ++i) {
-      const int compare_result = compare_identifier(
-        lhs.prerelease_tag_, lhs.prerelease_identifiers[i],
-        rhs.prerelease_tag_, rhs.prerelease_identifiers[i]);
-      if (compare_result != 0) {
-        return compare_result;
-      }
+    if (lhs_tag.empty()) {
+      return 0;
     }
 
-    const auto ls = lhs.prerelease_identifiers.size();
-    const auto rs = rhs.prerelease_identifiers.size();
-    return ls < rs ? -1 : (ls > rs ? 1 : 0);
+    return compare_tags(lhs_tag, rhs_tag);
   }
 
 private:
-  [[nodiscard]] static SEMVER_CONSTEXPR std::string_view identifier_view(
-    const std::string& prerelease_tag,
-    const prerelease_identifier& identifier) noexcept {
-    return std::string_view(prerelease_tag.data() + identifier.offset, identifier.length);
+  [[nodiscard]] static constexpr bool is_numeric_identifier(std::string_view id) noexcept {
+    for (char c : id) {
+      if (!is_digit(c)) return false;
+    }
+    return !id.empty();
   }
 
-  [[nodiscard]] static SEMVER_CONSTEXPR int compare_identifier(
-    const std::string& lhs_tag,
-    const prerelease_identifier& lhs,
-    const std::string& rhs_tag,
-    const prerelease_identifier& rhs) noexcept {
-    const auto lhs_identifier = identifier_view(lhs_tag, lhs);
-    const auto rhs_identifier = identifier_view(rhs_tag, rhs);
+  [[nodiscard]] static constexpr std::string_view next_identifier(std::string_view& tag) noexcept {
+    const auto dot = tag.find('.');
+    std::string_view id;
+    if (dot == std::string_view::npos) {
+      id = tag;
+      tag = std::string_view{};
+    } else {
+      id = tag.substr(0, dot);
+      tag = tag.substr(dot + 1);
+    }
+    return id;
+  }
 
-    if (lhs.type == prerelease_identifier_type::numeric && rhs.type == prerelease_identifier_type::numeric) {
-      return compare_numerically(lhs_identifier, rhs_identifier);
-    } else if (lhs.type == prerelease_identifier_type::alphanumeric && rhs.type == prerelease_identifier_type::alphanumeric) {
-      return detail::compare(lhs_identifier, rhs_identifier);
+  [[nodiscard]] static SEMVER_CONSTEXPR int compare_tags(std::string_view lhs, std::string_view rhs) noexcept {
+    while (!lhs.empty() && !rhs.empty()) {
+      const auto lhs_id = next_identifier(lhs);
+      const auto rhs_id = next_identifier(rhs);
+
+      const bool lhs_numeric = is_numeric_identifier(lhs_id);
+      const bool rhs_numeric = is_numeric_identifier(rhs_id);
+
+      int cmp = 0;
+      if (lhs_numeric && rhs_numeric) {
+        cmp = compare_numerically(lhs_id, rhs_id);
+      } else if (!lhs_numeric && !rhs_numeric) {
+        cmp = detail::compare(lhs_id, rhs_id);
+      } else {
+        return lhs_numeric ? -1 : 1;
+      }
+
+      if (cmp != 0) return cmp;
     }
 
-    return lhs.type == prerelease_identifier_type::alphanumeric ? 1 : -1;
+    if (lhs.empty() && rhs.empty()) return 0;
+    return lhs.empty() ? -1 : 1;
   }
 };
 
@@ -604,7 +596,7 @@ public:
     }
 
     if (stream.advance_if_match(token_type::hyphen)) {
-      result = parse_prerelease_tag(out.prerelease_tag_, out.prerelease_identifiers);
+      result = parse_prerelease_tag(out.prerelease_tag_);
       if (!result) {
         return result;
       }
@@ -655,9 +647,9 @@ private:
     return failure(token.lexeme, std::errc::result_out_of_range);
   }
 
-  SEMVER_CONSTEXPR from_chars_result parse_prerelease_tag(std::string& out, std::vector<detail::prerelease_identifier>& out_identifiers) {
+  SEMVER_CONSTEXPR from_chars_result parse_prerelease_tag(std::string& out) {
     out.clear();
-    out_identifiers.clear();
+    out.reserve(16);
 
     do {
       if (!out.empty()) out.push_back('.');
@@ -665,13 +657,8 @@ private:
 
       if (const auto res = parse_prerelease_identifier(out); !res) {
         if (id_start > 0) out.resize(id_start - 1); // roll back '.'
-        out_identifiers.clear();
         return res;
       }
-
-      const auto id_length = out.size() - id_start;
-      out_identifiers.push_back(make_prerelease_identifier(
-        std::string_view(out.data() + id_start, id_length), id_start));
 
     } while (stream.advance_if_match(token_type::dot));
 
@@ -739,17 +726,6 @@ private:
     return parse_identifier<true>(out);
   }
 
-  SEMVER_CONSTEXPR detail::prerelease_identifier make_prerelease_identifier(std::string_view identifier, std::size_t offset) {
-    auto type = detail::prerelease_identifier_type::numeric;
-    for (char c : identifier) {
-      if (c == '-' || detail::is_letter(c)) {
-        type = detail::prerelease_identifier_type::alphanumeric;
-        break;
-      }
-    }
-    return detail::prerelease_identifier{ type, offset, identifier.size() };
-  }
-
   SEMVER_CONSTEXPR from_chars_result parse_build_identifier(std::string& out) {
     return parse_identifier<false>(out);
   }
@@ -802,7 +778,11 @@ SEMVER_CONSTEXPR int compare_parsed(const version<L1, L2, L3>& lhs, const versio
 }
 
 template <typename I1, typename I2, typename I3>
-SEMVER_CONSTEXPR from_chars_result parse(std::string_view str, version<I1, I2, I3>& out) {
+SEMVER_CONSTEXPR from_chars_result parse_version(std::string_view str, version<I1, I2, I3>& out) {
+  if (str.size() > SEMVER_MAX_INPUT_LENGTH) {
+    return failure(str.data(), std::errc::value_too_large);
+  }
+
   token_stream token_stream;
   from_chars_result result = lexer{ str }.scan_tokens(token_stream);
   if (!result) {
@@ -864,17 +844,18 @@ template <typename L1, typename L2, typename L3, typename R1, typename R2, typen
 #endif
 
 template <typename I1, typename I2, typename I3>
-SEMVER_CONSTEXPR from_chars_result parse(std::string_view str, version<I1, I2, I3>& output) {
-  return detail::parse(str, output);
+[[nodiscard]] SEMVER_CONSTEXPR from_chars_result parse(std::string_view str, version<I1, I2, I3>& output) {
+  return detail::parse_version(str, output);
 }
 
 template <typename I1 = int, typename I2 = I1, typename I3 = I1>
-SEMVER_CONSTEXPR bool valid(std::string_view str) {
+[[nodiscard]] SEMVER_CONSTEXPR bool valid(std::string_view str) {
   version<I1, I2, I3> v{};
-  return detail::parse(str, v);
+  return detail::parse_version(str, v);
 }
 
-template <typename OStream, typename I1, typename I2, typename I3>
+template <typename OStream, typename I1, typename I2, typename I3,
+          typename = decltype(std::declval<OStream&>() << std::declval<std::string>())>
 OStream& operator<<(OStream& os, const version<I1, I2, I3>& v) {
   os << v.to_string();
   return os;
@@ -884,7 +865,7 @@ namespace detail {
   template <typename I1, typename I2, typename I3>
   class range_comparator {
   public:
-    SEMVER_CONSTEXPR range_comparator(const version<I1, I2, I3>& v, range_operator op) noexcept : v(v), op(op) {}
+    SEMVER_CONSTEXPR range_comparator(const version<I1, I2, I3>& v, range_operator op) : v(v), op(op) {}
 
     SEMVER_CONSTEXPR bool contains(const version<I1, I2, I3>& other) const noexcept {
       switch (op) {
@@ -923,9 +904,10 @@ namespace detail {
         }
       }
 
-      return std::all_of(ranges_comparators.begin(), ranges_comparators.end(), [&](const auto& ranges_comparator) {
-        return ranges_comparator.contains(v);
-      });
+      for (const auto& rc : ranges_comparators) {
+        if (!rc.contains(v)) return false;
+      }
+      return true;
     }
   private:
     std::vector<range_comparator<I1, I2, I3>> ranges_comparators;
@@ -935,11 +917,12 @@ namespace detail {
         return true;
       }
 
-      return std::any_of(ranges_comparators.begin(), ranges_comparators.end(), [&](const auto& ranges_comparator) {
-        const bool has_prerelease = !ranges_comparator.get_version().prerelease_tag().empty();
-        const bool equal_without_prerelease = detail::compare_parsed(v, ranges_comparator.get_version(), version_compare_option::exclude_prerelease) == 0;
-        return has_prerelease && equal_without_prerelease;
-      });
+      for (const auto& rc : ranges_comparators) {
+        const bool has_prerelease = !rc.get_version().prerelease_tag().empty();
+        const bool equal_without_prerelease = detail::compare_parsed(v, rc.get_version(), version_compare_option::exclude_prerelease) == 0;
+        if (has_prerelease && equal_without_prerelease) return true;
+      }
+      return false;
     }
   };
 }
@@ -957,10 +940,11 @@ class range_set {
 public:
   friend class detail::range_parser;
 
-  SEMVER_CONSTEXPR bool contains(const version<I1, I2, I3>& v, version_compare_option option = version_compare_option::exclude_prerelease) const noexcept {
-    return std::any_of(ranges.begin(), ranges.end(), [&](const auto& range) {
-      return range.contains(v, option);
-    });
+  [[nodiscard]] SEMVER_CONSTEXPR bool contains(const version<I1, I2, I3>& v, version_compare_option option = version_compare_option::exclude_prerelease) const noexcept {
+    for (const auto& range : ranges) {
+      if (range.contains(v, option)) return true;
+    }
+    return false;
   }
 
 private:
@@ -974,7 +958,7 @@ namespace detail {
 
     template <typename I1, typename I2, typename I3>
     SEMVER_CONSTEXPR from_chars_result parse(range_set<I1, I2, I3>& out) {
-      std::vector<range<I1, I2, I3>> ranges;
+      out.ranges.clear();
 
       do {
         detail::range<I1, I2, I3> range;
@@ -982,12 +966,10 @@ namespace detail {
           return res;
         }
 
-        ranges.push_back(std::move(range));
+        out.ranges.push_back(std::move(range));
         skip_whitespaces();
 
       } while (stream.advance_if_match(token_type::logical_or));
-
-      out.ranges = std::move(ranges);
 
       return success(stream.peek().lexeme);
     }
@@ -1027,7 +1009,7 @@ namespace detail {
         return res;
       }
 
-      out.emplace_back(ver, op);
+      out.emplace_back(std::move(ver), op);
       return success(stream.peek().lexeme);
     }
 
@@ -1041,7 +1023,11 @@ namespace detail {
 
 
 template <typename I1, typename I2, typename I3>
-SEMVER_CONSTEXPR from_chars_result parse(std::string_view str, range_set<I1, I2, I3>& out) {
+[[nodiscard]] SEMVER_CONSTEXPR from_chars_result parse(std::string_view str, range_set<I1, I2, I3>& out) {
+  if (str.size() > SEMVER_MAX_INPUT_LENGTH) {
+    return detail::failure(str.data(), std::errc::value_too_large);
+  }
+
   if (!str.empty() && str.front() == ' ') {
     return detail::failure(str.data());
   }
@@ -1068,6 +1054,19 @@ SEMVER_CONSTEXPR from_chars_result parse(std::string_view str, range_set<I1, I2,
   return detail::success(token_stream.previous().lexeme);
 }
 
+#if __cpp_consteval >= 201811L && __cpp_lib_constexpr_string >= 201907L
+namespace literals {
+  consteval version<> operator""_semver(const char* str, std::size_t len) {
+    version<> v;
+    const auto result = detail::parse_version(std::string_view{str, len}, v);
+    if (!result) {
+      throw "invalid semver literal";
+    }
+    return v;
+  }
+} // namespace literals
+#endif
+
 } // namespace semver
 
 #undef SEMVER_CONSTEXPR
@@ -1081,10 +1080,13 @@ namespace std {
   struct hash<semver::version<I1, I2, I3>> {
     std::size_t operator()(const semver::version<I1, I2, I3>& v) const noexcept {
       // build_metadata excluded per spec §10 (ignored in ==).
+      auto hash_combine = [](std::size_t seed, std::size_t value) noexcept -> std::size_t {
+        return seed ^ (value + 0x9e3779b9 + (seed << 6) + (seed >> 2));
+      };
       std::size_t h = std::hash<I1>{}(v.major());
-      h = h * 31 + std::hash<I2>{}(v.minor());
-      h = h * 31 + std::hash<I3>{}(v.patch());
-      h = h * 31 + std::hash<std::string>{}(v.prerelease_tag());
+      h = hash_combine(h, std::hash<I2>{}(v.minor()));
+      h = hash_combine(h, std::hash<I3>{}(v.patch()));
+      h = hash_combine(h, std::hash<std::string_view>{}(v.prerelease_tag()));
       return h;
     }
   };

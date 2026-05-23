@@ -294,34 +294,34 @@ TEST_CASE("operator<=>") {
   SUBCASE("equal") {
     REQUIRE(semver::parse("1.2.3", a));
     REQUIRE(semver::parse("1.2.3", b));
-    REQUIRE((a <=> b) == std::strong_ordering::equal);
-    REQUIRE((a <=> a) == std::strong_ordering::equal);
+    REQUIRE((a <=> b) == std::weak_ordering::equivalent);
+    REQUIRE((a <=> a) == std::weak_ordering::equivalent);
   }
 
   SUBCASE("less") {
     REQUIRE(semver::parse("1.0.0-alpha", a));
     REQUIRE(semver::parse("1.0.0",       b));
-    REQUIRE((a <=> b) == std::strong_ordering::less);
+    REQUIRE((a <=> b) == std::weak_ordering::less);
 
     REQUIRE(semver::parse("1.0.0", a));
     REQUIRE(semver::parse("2.0.0", b));
-    REQUIRE((a <=> b) == std::strong_ordering::less);
+    REQUIRE((a <=> b) == std::weak_ordering::less);
   }
 
   SUBCASE("greater") {
     REQUIRE(semver::parse("2.0.0", a));
     REQUIRE(semver::parse("1.0.0", b));
-    REQUIRE((a <=> b) == std::strong_ordering::greater);
+    REQUIRE((a <=> b) == std::weak_ordering::greater);
 
     REQUIRE(semver::parse("1.0.0",       a));
     REQUIRE(semver::parse("1.0.0-alpha", b));
-    REQUIRE((a <=> b) == std::strong_ordering::greater);
+    REQUIRE((a <=> b) == std::weak_ordering::greater);
   }
 
   SUBCASE("build metadata ignored in <=>") {
     REQUIRE(semver::parse("1.0.0+build.1",   a));
     REQUIRE(semver::parse("1.0.0+build.999", b));
-    REQUIRE((a <=> b) == std::strong_ordering::equal);
+    REQUIRE((a <=> b) == std::weak_ordering::equivalent);
   }
 }
 #endif

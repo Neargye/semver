@@ -92,6 +92,29 @@ This is intentional and follows the [Semantic Versioning 2.0.0 FAQ](https://semv
 
 > The simplest thing to do is start your initial development release at **0.1.0** and then increment the minor version for each subsequent release.
 
+## Error handling
+
+`semver::parse()` returns a `from_chars_result` with two fields:
+- `ptr` — points past the last consumed character on success, or at the offending character on failure.
+- `ec` — `std::errc{}` on success; `std::errc::invalid_argument` for syntax errors; `std::errc::value_too_large` if input exceeds `SEMVER_MAX_INPUT_LENGTH`; `std::errc::result_out_of_range` if a numeric component overflows the target integer type.
+
+`from_chars_result` is contextually convertible to `bool` (`true` = success).
+
+> **Note:** On parse failure the output `version`/`range_set` object is left in an indeterminate (partially-written) state. Always check the return value before using the output.
+
+## Configuration
+
+| Macro | Default | Description |
+|-------|---------|-------------|
+| `SEMVER_MAX_INPUT_LENGTH` | `4096` | Maximum allowed input string length for `parse()`. Strings exceeding this limit are rejected immediately with `std::errc::value_too_large`. Define before including the header to override. |
+| `SEMVER_CONFIG_FILE` | *(undefined)* | Path to a user-provided configuration header included early in `semver.hpp`. |
+
+```cpp
+// Override before including the header:
+#define SEMVER_MAX_INPUT_LENGTH 256
+#include <semver.hpp>
+```
+
 ## Integration
 
 You should add required file [semver.hpp](include/semver.hpp).
@@ -113,7 +136,11 @@ CPMAddPackage(
 
 ## Compiler compatibility
 
-Requires **C++17**. C++20 enables `constexpr` for `std::string`/`std::vector`, enabling wider `constexpr` use of the library.
+Requires **C++17**. C++20 enables additional features:
+- Full `constexpr` support (`std::string`/`std::vector` become `constexpr`)
+- `operator<=>` (three-way comparison)
+- `consteval operator""_semver` literal (in `semver::literals` namespace)
+- Concepts-constrained template parameters
 
 * Clang/LLVM >= 5
 * MSVC++ >= 14.11 / Visual Studio >= 2017
