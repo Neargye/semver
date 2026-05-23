@@ -1,6 +1,7 @@
 #include <semver.hpp>
 #include <catch.hpp>
 #include <array>
+#include <unordered_map>
 
 template <typename Operator>
 static void test_parse_and_compare_reverse(const std::string_view v1, const std::string_view v2, Operator op) {
@@ -175,5 +176,51 @@ TEST_CASE("operators") {
     constexpr std::string_view v10 = "1.0.0-alpha.10";
     test_parse_and_compare_reverse_false(v9, v10, semver::operator< <int, int, int>);
     test_parse_and_compare_reverse_false(v10, v9, semver::operator><int, int, int>);
+  }
+}
+
+TEST_CASE("build metadata equality") {
+  // semver spec §10: build metadata MUST be ignored when determining precedence
+  SECTION("versions differing only in build metadata are equal") {
+    semver::version v1, v2, v3;
+    REQUIRE(semver::parse("1.0.0+build.1", v1));
+    REQUIRE(semver::parse("1.0.0+build.2", v2));
+    REQUIRE(semver::parse("1.0.0", v3));
+    REQUIRE(v1 == v2);
+    REQUIRE(v1 == v3);
+    REQUIRE_FALSE(v1 != v2);
+  }
+}
+
+TEST_CASE("hash") {
+  SECTION("same version, same hash") {
+    semver::version v1, v2;
+    REQUIRE(semver::parse("1.2.3", v1));
+    REQUIRE(semver::parse("1.2.3", v2));
+    REQUIRE(std::hash<semver::version<>>{}(v1) == std::hash<semver::version<>>{}(v2));
+  }
+
+  SECTION("build metadata ignored in hash") {
+    semver::version v1, v2;
+    REQUIRE(semver::parse("1.0.0+build.1", v1));
+    REQUIRE(semver::parse("1.0.0+build.999", v2));
+    REQUIRE(std::hash<semver::version<>>{}(v1) == std::hash<semver::version<>>{}(v2));
+  }
+
+  SECTION("different versions produce different hashes") {
+    semver::version v1, v2, v3;
+    REQUIRE(semver::parse("1.2.3", v1));
+    REQUIRE(semver::parse("1.2.4", v2));
+    REQUIRE(semver::parse("1.2.3-alpha", v3));
+    REQUIRE(std::hash<semver::version<>>{}(v1) != std::hash<semver::version<>>{}(v2));
+    REQUIRE(std::hash<semver::version<>>{}(v1) != std::hash<semver::version<>>{}(v3));
+  }
+
+  SECTION("usable in unordered_map") {
+    std::unordered_map<semver::version<>, std::string> map;
+    semver::version v;
+    REQUIRE(semver::parse("1.0.0", v));
+    map[v] = "stable";
+    REQUIRE(map.at(v) == "stable");
   }
 }

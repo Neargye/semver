@@ -6,7 +6,7 @@
 #define SEMVER_CONSTEXPR_SUPPORT
 #endif
 
-inline constexpr std::array<std::string_view, 32> valid_versions = { {
+inline constexpr std::array<std::string_view, 33> valid_versions = { {
   {"0.0.4"},
   {"1.2.3"},
   {"10.20.30"},
@@ -38,7 +38,8 @@ inline constexpr std::array<std::string_view, 32> valid_versions = { {
   {"1.2.3----RC-SNAPSHOT.12.9.1--.12"},
   {"1.0.0+0.build.1-rc.10000aaa-kk-0.1"},
   {"999999999.999999999.999999999"},
-  {"1.0.0-0A.is.legal"}
+  {"1.0.0-0A.is.legal"},
+  {"0.16.411-PullRequest0434.25+45cf6d2"}
 }};
 
 inline constexpr std::array<std::string_view, 47> invalid_versions = { {

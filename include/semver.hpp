@@ -72,6 +72,10 @@
 #include <compare>
 #endif
 
+#if __cpp_concepts >= 201907L
+#include <concepts>
+#endif
+
 #if __cpp_lib_constexpr_string >= 201907L
 #define SEMVER_CONSTEXPR constexpr
 #else
@@ -131,14 +135,51 @@ namespace semver {
       std::string identifier;
     };
 
+    template<class T, class U>
+    SEMVER_CONSTEXPR bool cmp_less(T t, U u) noexcept {
+      if constexpr (std::is_signed_v<T> == std::is_signed_v<U>)
+        return t < u;
+      else if constexpr (std::is_signed_v<T>)
+        return t < 0 || std::make_unsigned_t<T>(t) < u;
+      else
+        return u >= 0 && t < std::make_unsigned_t<U>(u);
+    }
+
+    template<class T, class U>
+    SEMVER_CONSTEXPR bool cmp_less_equal(T t, U u) noexcept {
+      return !cmp_less(u, t);
+    }
+
+    template<class T, class U>
+    SEMVER_CONSTEXPR bool cmp_greater_equal(T t, U u) noexcept {
+      return !cmp_less(t, u);
+    }
+
+    template<typename R, typename T>
+    SEMVER_CONSTEXPR bool number_in_range(T t) noexcept {
+      return cmp_greater_equal(t, std::numeric_limits<R>::min()) && cmp_less_equal(t, std::numeric_limits<R>::max());
+    }
+
     class version_parser;
     class prerelease_comparator;
   }
 
+#if __cpp_concepts >= 201907L
+  template <std::integral I1 = int, std::integral I2 = I1, std::integral I3 = I1>
+#else
   template <typename I1 = int, typename I2 = I1, typename I3 = I1>
+#endif
   class version {
     friend class detail::version_parser;
     friend class detail::prerelease_comparator;
+    template <typename T1, typename T2, typename T3>
+    friend std::optional<version<T1, T2, T3>> make_version(T1, T2, T3, std::string_view, std::string_view);
+
+    // In C++17, concepts are unavailable; static_assert is the best constraint.
+    // In C++20+, the concept on the template parameter handles this via SFINAE.
+    static_assert(std::is_integral_v<I1>, "semver: I1 must be an integral type");
+    static_assert(std::is_integral_v<I2>, "semver: I2 must be an integral type");
+    static_assert(std::is_integral_v<I3>, "semver: I3 must be an integral type");
 
   public:
     SEMVER_CONSTEXPR version() = default; // https://semver.org/#how-should-i-deal-with-revisions-in-the-0yz-initial-development-phase
@@ -259,34 +300,6 @@ SEMVER_CONSTEXPR std::uint8_t to_digit(char c) noexcept {
 
 SEMVER_CONSTEXPR char to_char(int i) noexcept {
   return '0' + (char)i;
-}
-
-template<class T, class U>
-SEMVER_CONSTEXPR bool cmp_less(T t, U u) noexcept
-{
-  if constexpr (std::is_signed_v<T> == std::is_signed_v<U>)
-    return t < u;
-  else if constexpr (std::is_signed_v<T>)
-    return t < 0 || std::make_unsigned_t<T>(t) < u;
-  else
-    return u >= 0 && t < std::make_unsigned_t<U>(u);
-}
-
-template<class T, class U>
-SEMVER_CONSTEXPR bool cmp_less_equal(T t, U u) noexcept
-{
-  return !cmp_less(u, t);
-}
-
-template<class T, class U>
-SEMVER_CONSTEXPR bool cmp_greater_equal(T t, U u) noexcept
-{
-  return !cmp_less(t, u);
-}
-
-template<typename R, typename T>
-SEMVER_CONSTEXPR bool number_in_range(T t) noexcept {
-  return cmp_greater_equal(t, std::numeric_limits<R>::min()) && cmp_less_equal(t, std::numeric_limits<R>::max());
 }
 
 SEMVER_CONSTEXPR int compare(std::string_view lhs, std::string_view rhs) noexcept {
@@ -415,7 +428,7 @@ private:
 };
 
 class lexer {
- public:
+public:
   explicit SEMVER_CONSTEXPR lexer(std::string_view text) noexcept : text_{text}, current_pos_{0} {}
 
   SEMVER_CONSTEXPR from_chars_result scan_tokens(token_stream& token_stream) noexcept {
@@ -433,7 +446,7 @@ class lexer {
     return result;
   }
 
- private:
+private:
   std::string_view text_;
   std::size_t current_pos_;
 
@@ -488,8 +501,8 @@ class lexer {
     stream.push({ type, value, lexeme});
   }
 
-  SEMVER_CONSTEXPR char advance() noexcept { 
-    char c = text_[current_pos_]; 
+  SEMVER_CONSTEXPR char advance() noexcept {
+    char c = text_[current_pos_];
     current_pos_ += 1;
     return c;
   }
@@ -498,13 +511,10 @@ class lexer {
     if (is_eol()) {
       return false;
     }
-
     if (text_[current_pos_] != c) {
       return false;
     }
-
     current_pos_ += 1;
-
     return true;
   }
 
@@ -550,15 +560,14 @@ private:
 };
 
 class version_parser {
- public:
-  SEMVER_CONSTEXPR explicit version_parser(token_stream& stream) : stream{stream} {
-  }
+public:
+  SEMVER_CONSTEXPR explicit version_parser(token_stream& stream) : stream{stream} {}
 
   template <typename I1, typename I2, typename I3>
   SEMVER_CONSTEXPR from_chars_result parse(version<I1, I2, I3>& out) noexcept {
     out.clear();
 
-    from_chars_result result = parse_number(out.major_); 
+    from_chars_result result = parse_number(out.major_);
     if (!result) {
       return result;
     }
@@ -599,7 +608,7 @@ class version_parser {
   }
 
 
- private:
+private:
   token_stream& stream;
 
   template <typename Int>
@@ -687,14 +696,8 @@ class version_parser {
       case token_type::digit:
       {
         const auto digit = std::get<std::uint8_t>(token.value);
-
-        // numerical prerelease identifier doesn't allow leading zero 
-        // 1.2.3-1.alpha is valid,
-        // 1.2.3-01b is valid as well, but
-        // 1.2.3-01.alpha is not valid
-
-        // Only check for leading zero when digit is the first character of the
-        // prerelease identifier.
+        // Purely numeric identifiers must not have leading zeros (spec §9).
+        // "1.2.3-01.alpha" → invalid; "1.2.3-01b" → valid (alphanumeric).
         if (result.empty() && is_leading_zero(digit)) {
           return failure(token.lexeme);
         }
@@ -877,7 +880,7 @@ template <typename I1, typename I2, typename I3>
 }
 #endif
 
-template<typename I1, typename I2, typename I3>
+template <typename I1, typename I2, typename I3>
 SEMVER_CONSTEXPR from_chars_result parse(std::string_view str, version<I1, I2, I3>& output) {
   return detail::parse(str, output);
 }
@@ -889,7 +892,42 @@ SEMVER_CONSTEXPR bool valid(std::string_view str) {
 
 template <typename OStream, typename I1, typename I2, typename I3>
 OStream& operator<<(OStream& os, const version<I1, I2, I3>& v) {
-  return os << v.to_string();
+  os << v.to_string();
+  return os;
+}
+
+// Build a version from components; returns nullopt if any component is negative,
+// or if prerelease/build_metadata is syntactically invalid.
+template <typename I1 = int, typename I2 = I1, typename I3 = I1>
+[[nodiscard]] std::optional<version<I1, I2, I3>>
+make_version(I1 major, I2 minor, I3 patch,
+             std::string_view prerelease = {},
+             std::string_view build_metadata = {}) {
+  if (detail::cmp_less(major, I1{}) || detail::cmp_less(minor, I2{}) || detail::cmp_less(patch, I3{})) {
+    return std::nullopt;
+  }
+
+  version<I1, I2, I3> v;
+  v.major_ = major;
+  v.minor_ = minor;
+  v.patch_ = patch;
+
+  if (!prerelease.empty() || !build_metadata.empty()) {
+    // Validate prerelease/build_metadata via a minimal surrogate string;
+    // "0.1.0" is always in-range for any integral type.
+    std::string probe{"0.1.0"};
+    if (!prerelease.empty())     { probe += '-'; probe.append(prerelease); }
+    if (!build_metadata.empty()) { probe += '+'; probe.append(build_metadata); }
+    version<I1, I2, I3> dummy;
+    if (!detail::parse(probe, dummy)) {
+      return std::nullopt;
+    }
+    v.prerelease_tag_        = std::move(dummy.prerelease_tag_);
+    v.prerelease_identifiers = std::move(dummy.prerelease_identifiers);
+    v.build_metadata_        = std::move(dummy.build_metadata_);
+  }
+
+  return v;
 }
 
 namespace detail {
@@ -956,8 +994,16 @@ namespace detail {
   };
 }
 
+#if __cpp_concepts >= 201907L
+template <std::integral I1 = int, std::integral I2 = I1, std::integral I3 = I1>
+#else
 template <typename I1 = int, typename I2 = I1, typename I3 = I1>
+#endif
 class range_set {
+  static_assert(std::is_integral_v<I1>, "semver: I1 must be an integral type");
+  static_assert(std::is_integral_v<I2>, "semver: I2 must be an integral type");
+  static_assert(std::is_integral_v<I3>, "semver: I3 must be an integral type");
+
 public:
   friend class detail::range_parser;
 
@@ -981,7 +1027,6 @@ namespace detail {
       std::vector<range<I1, I2, I3>> ranges;
 
       do {
-
         detail::range<I1, I2, I3> range;
         if (const auto res = parse_range(range); !res) {
           return res;
@@ -1048,7 +1093,7 @@ namespace detail {
 template <typename I1, typename I2, typename I3>
 SEMVER_CONSTEXPR from_chars_result parse(std::string_view str, range_set<I1, I2, I3>& out) {
   detail::token_stream token_stream;
-  const from_chars_result result =  detail::lexer{ str }.scan_tokens(token_stream);
+  const from_chars_result result = detail::lexer{str}.scan_tokens(token_stream);
   if (!result) {
     return result;
   }
@@ -1068,19 +1113,12 @@ namespace std {
   template <typename I1, typename I2, typename I3>
   struct hash<semver::version<I1, I2, I3>> {
     std::size_t operator()(const semver::version<I1, I2, I3>& v) const noexcept {
-      std::size_t seed = 0;
-      // build_metadata is intentionally excluded: semver spec §10 states
-      // "Build metadata MUST be ignored when determining version precedence".
-      // operator== does not compare build_metadata, so to maintain the
-      // required invariant (a == b → hash(a) == hash(b)) we must omit it here.
-      auto hash_combine = [&seed](std::size_t h) noexcept {
-        seed ^= h + 0x9e3779b9u + (seed << 6) + (seed >> 2);
-      };
-      hash_combine(std::hash<I1>{}(v.major()));
-      hash_combine(std::hash<I2>{}(v.minor()));
-      hash_combine(std::hash<I3>{}(v.patch()));
-      hash_combine(std::hash<std::string>{}(v.prerelease_tag()));
-      return seed;
+      // build_metadata excluded per spec §10 (ignored in ==).
+      std::size_t h = std::hash<I1>{}(v.major());
+      h = h * 31 + std::hash<I2>{}(v.minor());
+      h = h * 31 + std::hash<I3>{}(v.patch());
+      h = h * 31 + std::hash<std::string>{}(v.prerelease_tag());
+      return h;
     }
   };
 } // namespace std
