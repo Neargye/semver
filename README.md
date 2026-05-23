@@ -66,22 +66,8 @@ More examples in [example/](example/).
 
 ## Constexpr support
 
-`SEMVER_FULL_CONSTEXPR` is auto-detected at compile time. It is set to `1` when both
-`__cpp_lib_constexpr_string >= 201907L` and `__cpp_lib_constexpr_vector >= 201907L` are
-defined, except for known broken combinations:
-
-| Toolchain | `SEMVER_FULL_CONSTEXPR` | Notes |
-|-----------|-------------------------|-------|
-| GCC + libstdc++ | `1` | All recent versions |
-| Clang + libc++ ≥ 18 | `1` | Full support including `_semver` literal |
-| Clang + libc++ < 18 | `0` | Incomplete constexpr string |
-| Clang + libstdc++ < 14 | `0` | `construct_at` SSO union bug |
-| MSVC 19.29+ | `1` | With `/std:c++20` or later |
-
-When `SEMVER_FULL_CONSTEXPR = 1`, parsing and comparisons work at compile time.
-All constexpr tests use the **transient-lambda pattern** — `version<>` objects live
-only inside the lambda body, so heap allocations (long prerelease/build strings) and
-SSO self-referential pointers are fully contained within the evaluation:
+`SEMVER_FULL_CONSTEXPR` is auto-detected. When `1`, all parsing and accessor functions
+become `constexpr` and compile-time evaluation works via the transient-lambda pattern:
 
 ```cpp
 static_assert([] {
@@ -91,12 +77,15 @@ static_assert([] {
 }());
 ```
 
-The `"..."_semver` consteval literal (C++20, requires `__cpp_consteval`) is available
-when `SEMVER_FULL_CONSTEXPR = 1` and is tested on Clang + libc++ ≥ 18. On GCC +
-libstdc++ the literal compiles but must be called from inside a `consteval` function —
-GCC treats a `consteval` call from a `constexpr` lambda as an "immediate invocation"
-whose result (`version<>` with a self-referential SSO pointer) must itself be a constant
-expression, which libstdc++'s `std::string` cannot satisfy.
+| Toolchain | `SEMVER_FULL_CONSTEXPR` |
+|-----------|-------------------------|
+| GCC + libstdc++ | `1` |
+| Clang + libc++ | `1` |
+| Clang + libstdc++ < 14 | `0` |
+
+The `"..."_semver` consteval literal (C++20) is available when `SEMVER_FULL_CONSTEXPR = 1`
+and the compiler is not GCC + libstdc++ (where a limitation of libstdc++'s `std::string`
+prevents its use outside a `consteval` function).
 
 ## Integration
 

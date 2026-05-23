@@ -188,14 +188,12 @@ TEST_CASE("construct") {
     REQUIRE(v.prerelease_tag().empty());
     REQUIRE(v.build_metadata().empty());
 
-    // equals a parsed version
     semver::version parsed;
     REQUIRE(semver::parse("1.2.3", parsed));
     REQUIRE(v == parsed);
   }
 
   SUBCASE("single-type template version<uint32_t>") {
-    // Issue: version<uint32_t> should work without spelling out all three params
     semver::version<uint32_t> v{1u, 0u, 0u};
     REQUIRE(v.major() == 1u);
     REQUIRE(v.minor() == 0u);
