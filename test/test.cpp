@@ -24,5 +24,31 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest.h>
 #include <semver.hpp>
+#include <iostream>
 
-//static_assert(semver::equal(semver::semver_version, "0.4.0"));
+TEST_CASE("platform constexpr support") {
+  // Always printed — helps verify version thresholds in CI.
+  // Run with `ctest -V` or the test binary directly to see output.
+  std::cout << "\n=== constexpr support ===\n";
+  std::cout << "SEMVER_FULL_CONSTEXPR          = " << SEMVER_FULL_CONSTEXPR << "\n";
+#ifdef __cpp_lib_constexpr_string
+  std::cout << "__cpp_lib_constexpr_string     = " << __cpp_lib_constexpr_string << "\n";
+#else
+  std::cout << "__cpp_lib_constexpr_string     = (not defined)\n";
+#endif
+#ifdef __cpp_lib_constexpr_vector
+  std::cout << "__cpp_lib_constexpr_vector     = " << __cpp_lib_constexpr_vector << "\n";
+#else
+  std::cout << "__cpp_lib_constexpr_vector     = (not defined)\n";
+#endif
+#ifdef _LIBCPP_VERSION
+  std::cout << "_LIBCPP_VERSION                = " << _LIBCPP_VERSION << "\n";
+#endif
+#ifdef _GLIBCXX_RELEASE
+  std::cout << "_GLIBCXX_RELEASE               = " << _GLIBCXX_RELEASE << "\n";
+#endif
+#ifdef _MSC_VER
+  std::cout << "_MSC_VER                       = " << _MSC_VER << "\n";
+#endif
+  std::cout << "=========================\n";
+}
