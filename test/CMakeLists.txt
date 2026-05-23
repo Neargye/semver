@@ -20,6 +20,7 @@ endif()
 
 function(make_test target std)
     add_executable(${target} ${SOURCES})
+    target_compile_definitions(${target} PRIVATE DOCTEST_CONFIG_USE_STD_HEADERS)
     target_compile_options(${target} PRIVATE ${OPTIONS})
     target_include_directories(${target} PRIVATE 3rdparty/doctest)
     target_link_libraries(${target} PRIVATE ${CMAKE_PROJECT_NAME})
