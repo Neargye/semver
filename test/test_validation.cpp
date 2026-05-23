@@ -1,12 +1,13 @@
-#include <semver.hpp>
-#include <catch.hpp>
+﻿#include <semver.hpp>
+#include <doctest.h>
+#include <ostream>
 #include "test_utils.hpp"
 
 using namespace semver;
 
 TEST_CASE("validation") {
 #ifdef SEMVER_CONSTEXPR_SUPPORT
-  SECTION("constexpr valid") {
+  SUBCASE("constexpr valid") {
     constexpr std::string_view v1 = "0.0.1";
     static_assert(valid(v1));
 
@@ -17,7 +18,7 @@ TEST_CASE("validation") {
     static_assert(valid(v3));
   }
 
-  SECTION("constexpr invalid") {
+  SUBCASE("constexpr invalid") {
     constexpr std::string_view v1 = "";
     static_assert(!valid(v1));
 
@@ -29,13 +30,13 @@ TEST_CASE("validation") {
   }
 #endif
 
-  SECTION("runtime valid") {
+  SUBCASE("runtime valid") {
     for (auto version: valid_versions) {
       REQUIRE(valid(version));
     }
   }
 
-  SECTION("runtime invalid") {
+  SUBCASE("runtime invalid") {
     for (auto version: invalid_versions) {
       REQUIRE_FALSE(valid(version));
     }
@@ -45,7 +46,7 @@ TEST_CASE("validation") {
 TEST_CASE("integral type constraint") {
   // version<T> requires integral T; non-integral types are caught at compile time
   // via static_assert. We verify integral types work for a range of widths.
-  SECTION("various integral widths parse correctly") {
+  SUBCASE("various integral widths parse correctly") {
     semver::version<uint8_t>  v8;
     semver::version<uint16_t> v16;
     semver::version<uint32_t> v32;
@@ -61,3 +62,22 @@ TEST_CASE("integral type constraint") {
     // static_assert(false, "version<float> must not compile");  // uncomment to test
   }
 }
+
+TEST_CASE("valid with type-parameterized integer range") {
+  SUBCASE("int8_t: rejects values outside its range") {
+    REQUIRE(semver::valid<int8_t>("127.0.0"));
+    REQUIRE_FALSE(semver::valid<int8_t>("128.0.0"));
+    REQUIRE_FALSE(semver::valid<int8_t>("200.0.0"));
+  }
+
+  SUBCASE("uint8_t: rejects values > 255") {
+    REQUIRE(semver::valid<uint8_t>("255.0.0"));
+    REQUIRE_FALSE(semver::valid<uint8_t>("256.0.0"));
+  }
+
+  SUBCASE("uint64_t: accepts UINT64_MAX, rejects UINT64_MAX + 1") {
+    REQUIRE(semver::valid<uint64_t>("18446744073709551615.0.0"));
+    REQUIRE_FALSE(semver::valid<uint64_t>("18446744073709551616.0.0"));
+  }
+}
+
