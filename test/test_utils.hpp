@@ -2,7 +2,7 @@
 
 #include <array>
 
-#if __cpp_lib_constexpr_string >= 201907L
+#if defined(SEMVER_FULL_CONSTEXPR) && SEMVER_FULL_CONSTEXPR
 #define SEMVER_CONSTEXPR_SUPPORT
 #endif
 

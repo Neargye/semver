@@ -77,10 +77,23 @@
 #include <concepts>
 #endif
 
+// Known broken combinations for constexpr std::string stored in constexpr variables:
+//   - Clang + libstdc++ < 14: construct_at SSO union bug (GCC special-cases its own stdlib)
+//   - Clang + libc++ < 19:    string push_back routes through allocator even for SSO-sized
+//                              strings, leaving non-transient heap pointers in the result
 #if __cpp_lib_constexpr_string >= 201907L && __cpp_lib_constexpr_vector >= 201907L
-#define SEMVER_CONSTEXPR constexpr
+  #if (defined(__clang__) && defined(__GLIBCXX__) \
+       && (!defined(_GLIBCXX_RELEASE) || _GLIBCXX_RELEASE < 14)) \
+   || (defined(_LIBCPP_VERSION) && _LIBCPP_VERSION < 190000)
+    #define SEMVER_FULL_CONSTEXPR 0
+    #define SEMVER_CONSTEXPR inline
+  #else
+    #define SEMVER_FULL_CONSTEXPR 1
+    #define SEMVER_CONSTEXPR constexpr
+  #endif
 #else
-#define SEMVER_CONSTEXPR inline
+  #define SEMVER_FULL_CONSTEXPR 0
+  #define SEMVER_CONSTEXPR inline
 #endif
 
 #ifdef __OpenBSD__
@@ -1057,7 +1070,7 @@ template <typename I1, typename I2, typename I3>
   return detail::success(token_stream.previous().lexeme);
 }
 
-#if __cpp_consteval >= 201811L && __cpp_lib_constexpr_string >= 201907L && __cpp_lib_constexpr_vector >= 201907L
+#if __cpp_consteval >= 201811L && SEMVER_FULL_CONSTEXPR
 namespace literals {
   consteval version<> operator""_semver(const char* str, std::size_t len) {
     version<> v;
