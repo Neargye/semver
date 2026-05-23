@@ -630,7 +630,10 @@ private:
 
   SEMVER_CONSTEXPR from_chars_result parse_prerelease_tag(std::string& out) {
     out.clear();
-    out.reserve(16);
+#if __cpp_lib_is_constant_evaluated >= 201811L
+    if (!std::is_constant_evaluated())
+#endif
+      out.reserve(16);
 
     do {
       if (!out.empty()) out.push_back('.');
@@ -648,7 +651,10 @@ private:
 
   SEMVER_CONSTEXPR from_chars_result parse_build_metadata(std::string& out) {
     out.clear();
-    out.reserve(16);
+#if __cpp_lib_is_constant_evaluated >= 201811L
+    if (!std::is_constant_evaluated())
+#endif
+      out.reserve(16);
 
     do {
       if (!out.empty()) out.push_back('.');
