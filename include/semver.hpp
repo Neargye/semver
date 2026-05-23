@@ -77,14 +77,13 @@
 #include <concepts>
 #endif
 
-// Known broken combinations for constexpr std::string stored in constexpr variables:
+// Known broken combinations for constexpr std::string:
 //   - Clang + libstdc++ < 14: construct_at SSO union bug (GCC special-cases its own stdlib)
-//   - Clang + libc++ < 19:    string push_back routes through allocator even for SSO-sized
-//                              strings, leaving non-transient heap pointers in the result
+//   - Clang + libc++ < 18:    constexpr string support is incomplete or buggy
 #if __cpp_lib_constexpr_string >= 201907L && __cpp_lib_constexpr_vector >= 201907L
   #if (defined(__clang__) && defined(__GLIBCXX__) \
        && (!defined(_GLIBCXX_RELEASE) || _GLIBCXX_RELEASE < 14)) \
-   || (defined(_LIBCPP_VERSION) && _LIBCPP_VERSION < 190000)
+   || (defined(_LIBCPP_VERSION) && _LIBCPP_VERSION < 180000)
     #define SEMVER_FULL_CONSTEXPR 0
     #define SEMVER_CONSTEXPR inline
   #else
