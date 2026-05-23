@@ -325,10 +325,6 @@ TEST_CASE("constexpr version constructor") {
 }
 #endif
 
-// On GCC + libstdc++, a consteval call from a constexpr lambda is an
-// "immediate invocation" whose result (version<> with SSO _M_p→_M_local_buf)
-// can never satisfy the constant-expression requirement.  Skip these tests
-// there; the literal is still available for use inside consteval functions.
 #if __cpp_consteval >= 201811L && defined(SEMVER_FULL_CONSTEXPR) && SEMVER_FULL_CONSTEXPR \
     && !defined(_MSC_VER) && !defined(__GLIBCXX__)
 TEST_CASE("consteval _semver literal") {
