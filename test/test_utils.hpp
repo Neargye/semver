@@ -2,9 +2,7 @@
 
 #include <array>
 
-#if defined(SEMVER_FULL_CONSTEXPR) && SEMVER_FULL_CONSTEXPR
-#define SEMVER_CONSTEXPR_SUPPORT
-#endif
+// SEMVER_HAS_CONSTEXPR is defined as 0 or 1 by semver.hpp
 
 inline constexpr std::array<std::string_view, 37> valid_versions = { {
   {"0.0.4"},

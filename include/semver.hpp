@@ -78,17 +78,18 @@
 #endif
 
 // Known broken combination for constexpr std::string:
-//   - Clang + libstdc++: construct_at SSO union bug (GCC special-cases its own stdlib)
+//   - Clang + libstdc++ < 13: construct_at SSO union bug (GCC special-cases its own stdlib)
 #if __cpp_lib_constexpr_string >= 201907L && __cpp_lib_constexpr_vector >= 201907L
-  #if defined(__clang__) && defined(__GLIBCXX__)
-    #define SEMVER_FULL_CONSTEXPR 1
-    #define SEMVER_CONSTEXPR constexpr
+  #if defined(__clang__) && defined(__GLIBCXX__) \
+       && (!defined(_GLIBCXX_RELEASE) || _GLIBCXX_RELEASE < 13)
+    #define SEMVER_HAS_CONSTEXPR 0
+    #define SEMVER_CONSTEXPR inline
   #else
-    #define SEMVER_FULL_CONSTEXPR 1
+    #define SEMVER_HAS_CONSTEXPR 1
     #define SEMVER_CONSTEXPR constexpr
   #endif
 #else
-  #define SEMVER_FULL_CONSTEXPR 0
+  #define SEMVER_HAS_CONSTEXPR 0
   #define SEMVER_CONSTEXPR inline
 #endif
 
@@ -149,14 +150,14 @@ namespace semver {
   }
 
 #if __cpp_concepts >= 201907L
-  template <std::integral I1 = int, std::integral I2 = I1, std::integral I3 = I1>
+  template <std::unsigned_integral I1 = std::uint32_t, std::unsigned_integral I2 = I1, std::unsigned_integral I3 = I1>
 #else
-  template <typename I1 = int, typename I2 = I1, typename I3 = I1>
+  template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
 #endif
   class version {
-    static_assert(std::is_integral_v<I1>, "semver: I1 must be an integral type");
-    static_assert(std::is_integral_v<I2>, "semver: I2 must be an integral type");
-    static_assert(std::is_integral_v<I3>, "semver: I3 must be an integral type");
+    static_assert(std::is_unsigned_v<I1>, "semver: I1 must be an unsigned integral type");
+    static_assert(std::is_unsigned_v<I2>, "semver: I2 must be an unsigned integral type");
+    static_assert(std::is_unsigned_v<I3>, "semver: I3 must be an unsigned integral type");
 
     friend class detail::version_parser;
 
@@ -235,6 +236,7 @@ namespace semver {
 
     it = detail::to_chars(it, major_);
 
+    assert(it == result.begin() && "semver: to_string length mismatch");
     return result;
   }
 
@@ -287,11 +289,7 @@ constexpr int compare_numerically(std::string_view lhs, std::string_view rhs) no
     int a = lhs[i] - '0';
     int b = rhs[i] - '0';
     if (a != b) {
-      return a - b;
-    }
-  }
-
-  return 0;
+      return a < b ? -1 : 1;
 }
 
 enum class token_type : std::uint8_t {
@@ -373,8 +371,8 @@ private:
   std::vector<token> tokens;
 
   SEMVER_CONSTEXPR token get(std::size_t i) const noexcept {
-    assert(i < tokens.size() && "token_stream: access past end");
-    return tokens[i];
+    // tokens.back() is always token_type::eol after scan_tokens(); used as safe OOB sentinel.
+    return i < tokens.size() ? tokens[i] : tokens.back();
   }
 };
 
@@ -468,7 +466,7 @@ private:
 
   SEMVER_CONSTEXPR char advance() noexcept {
     char c = text_[current_pos_];
-    current_pos_ += 1;
+    ++current_pos_;
     return c;
   }
 
@@ -685,6 +683,10 @@ private:
   template <bool CheckLeadingZeros>
   SEMVER_CONSTEXPR from_chars_result parse_identifier(std::string& out) {
     const auto start = out.size(); // append mode: track where this identifier begins
+    // Peek before consuming: avoids advancing the stream on a non-starter token.
+    if (!is_alphanumeric(stream.peek())) {
+      return failure(stream.peek().lexeme);
+    }
     token tok = stream.advance();
 
     do {
@@ -752,12 +754,12 @@ private:
 };
 
 template <typename L1, typename L2, typename L3, typename R1, typename R2, typename R3>
-SEMVER_CONSTEXPR int compare_prerelease(const version<L1, L2, L3>& lhs, const version<R1, R2, R3>& rhs) noexcept {
+[[nodiscard]] SEMVER_CONSTEXPR int compare_prerelease(const version<L1, L2, L3>& lhs, const version<R1, R2, R3>& rhs) noexcept {
   return prerelease_comparator::compare(lhs, rhs);
 }
 
 template <typename L1, typename L2, typename L3, typename R1, typename R2, typename R3>
-SEMVER_CONSTEXPR int compare_parsed(const version<L1, L2, L3>& lhs, const version<R1, R2, R3>& rhs, version_compare_option compare_option) noexcept {
+[[nodiscard]] SEMVER_CONSTEXPR int compare_parsed(const version<L1, L2, L3>& lhs, const version<R1, R2, R3>& rhs, version_compare_option compare_option) noexcept {
   if (detail::cmp_less(lhs.major(), rhs.major())) return -1;
   if (detail::cmp_less(rhs.major(), lhs.major())) return  1;
 
@@ -775,7 +777,7 @@ SEMVER_CONSTEXPR int compare_parsed(const version<L1, L2, L3>& lhs, const versio
 }
 
 template <typename I1, typename I2, typename I3>
-SEMVER_CONSTEXPR from_chars_result parse_version(std::string_view str, version<I1, I2, I3>& out) {
+[[nodiscard]] SEMVER_CONSTEXPR from_chars_result parse_version(std::string_view str, version<I1, I2, I3>& out) {
   if (str.size() > SEMVER_MAX_INPUT_LENGTH) {
     return failure(str.data(), std::errc::value_too_large);
   }
@@ -845,7 +847,7 @@ template <typename I1, typename I2, typename I3>
   return detail::parse_version(str, output);
 }
 
-template <typename I1 = int, typename I2 = I1, typename I3 = I1>
+template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
 [[nodiscard]] SEMVER_CONSTEXPR bool valid(std::string_view str) {
   version<I1, I2, I3> v{};
   return static_cast<bool>(detail::parse_version(str, v));
@@ -940,14 +942,14 @@ namespace detail {
 }
 
 #if __cpp_concepts >= 201907L
-template <std::integral I1 = int, std::integral I2 = I1, std::integral I3 = I1>
+template <std::unsigned_integral I1 = std::uint32_t, std::unsigned_integral I2 = I1, std::unsigned_integral I3 = I1>
 #else
-template <typename I1 = int, typename I2 = I1, typename I3 = I1>
+template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
 #endif
 class range_set {
-  static_assert(std::is_integral_v<I1>, "semver: I1 must be an integral type");
-  static_assert(std::is_integral_v<I2>, "semver: I2 must be an integral type");
-  static_assert(std::is_integral_v<I3>, "semver: I3 must be an integral type");
+  static_assert(std::is_unsigned_v<I1>, "semver: I1 must be an unsigned integral type");
+  static_assert(std::is_unsigned_v<I2>, "semver: I2 must be an unsigned integral type");
+  static_assert(std::is_unsigned_v<I3>, "semver: I3 must be an unsigned integral type");
 
 public:
   friend class detail::range_parser;
@@ -1066,7 +1068,7 @@ template <typename I1, typename I2, typename I3>
   return detail::success(token_stream.previous().lexeme);
 }
 
-#if __cpp_consteval >= 201811L && SEMVER_FULL_CONSTEXPR
+#if __cpp_consteval >= 201811L && SEMVER_HAS_CONSTEXPR
 namespace literals {
   consteval version<> operator""_semver(const char* str, std::size_t len) {
     version<> v;
@@ -1092,8 +1094,11 @@ namespace std {
   struct hash<semver::version<I1, I2, I3>> {
     std::size_t operator()(const semver::version<I1, I2, I3>& v) const noexcept {
       // build_metadata excluded per spec §10 (ignored in ==).
+      // Width-appropriate Fibonacci-derived hash mixing constant.
+      static constexpr std::size_t kPhiHash =
+          sizeof(std::size_t) >= 8 ? std::size_t{0x9e3779b97f4a7c15ULL} : std::size_t{0x9e3779b9U};
       static constexpr auto hash_combine = [](std::size_t seed, std::size_t value) noexcept -> std::size_t {
-        return seed ^ (value + 0x9e3779b9 + (seed << 6) + (seed >> 2));
+        return seed ^ (value + kPhiHash + (seed << 6) + (seed >> 2));
       };
       std::size_t h = std::hash<I1>{}(v.major());
       h = hash_combine(h, std::hash<I2>{}(v.minor()));
@@ -1107,14 +1112,10 @@ namespace std {
 #if __cpp_lib_format >= 202110L
 #include <format>
 template <typename I1, typename I2, typename I3>
-struct std::formatter<semver::version<I1, I2, I3>> {
-  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+struct std::formatter<semver::version<I1, I2, I3>> : std::formatter<std::string> {
+  // Inherits parse() from std::formatter<std::string>: supports fill/align/width specs.
   auto format(const semver::version<I1, I2, I3>& v, std::format_context& ctx) const {
-    auto out = ctx.out();
-    out = std::format_to(out, "{}.{}.{}", v.major(), v.minor(), v.patch());
-    if (!v.prerelease_tag().empty()) out = std::format_to(out, "-{}", v.prerelease_tag());
-    if (!v.build_metadata().empty()) out = std::format_to(out, "+{}", v.build_metadata());
-    return out;
+    return std::formatter<std::string>::format(v.to_string(), ctx);
   }
 };
 #endif

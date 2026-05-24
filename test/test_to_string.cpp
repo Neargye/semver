@@ -53,8 +53,8 @@ TEST_CASE("to_string with various integer widths") {
     REQUIRE(v.to_string() == "4294967295.0.0");
   }
 
-  SUBCASE("int64_t large patch value") {
-    semver::version<int64_t> v;
+  SUBCASE("uint64_t large patch value") {
+    semver::version<uint64_t> v;
     REQUIRE(semver::parse("999999999999.1.0", v));
     REQUIRE(v.to_string() == "999999999999.1.0");
   }

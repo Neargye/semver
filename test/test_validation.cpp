@@ -7,7 +7,7 @@
 using namespace semver;
 
 TEST_CASE("validation") {
-#ifdef SEMVER_CONSTEXPR_SUPPORT
+#if SEMVER_HAS_CONSTEXPR
   SUBCASE("constexpr valid") {
     constexpr std::string_view v1 = "0.0.1";
     static_assert(valid(v1));
@@ -50,27 +50,20 @@ TEST_CASE("integral type constraint") {
     semver::version<uint16_t> v16;
     semver::version<uint32_t> v32;
     semver::version<uint64_t> v64;
-    semver::version<int64_t>  vi64;
     REQUIRE(semver::parse("1.2.3", v8));
     REQUIRE(semver::parse("1.2.3", v16));
     REQUIRE(semver::parse("1.2.3", v32));
     REQUIRE(semver::parse("1.2.3", v64));
-    REQUIRE(semver::parse("1.2.3", vi64));
     REQUIRE(v8.major() == 1);
     REQUIRE(v64.patch() == 3);
   }
 }
 
 TEST_CASE("valid with type-parameterized integer range") {
-  SUBCASE("int8_t: rejects values outside its range") {
-    REQUIRE(semver::valid<int8_t>("127.0.0"));
-    REQUIRE_FALSE(semver::valid<int8_t>("128.0.0"));
-    REQUIRE_FALSE(semver::valid<int8_t>("200.0.0"));
-  }
-
-  SUBCASE("uint8_t: rejects values > 255") {
+  SUBCASE("uint8_t: rejects values outside its range") {
     REQUIRE(semver::valid<uint8_t>("255.0.0"));
     REQUIRE_FALSE(semver::valid<uint8_t>("256.0.0"));
+    REQUIRE_FALSE(semver::valid<uint8_t>("300.0.0"));
   }
 
   SUBCASE("uint64_t: accepts UINT64_MAX, rejects UINT64_MAX + 1") {
@@ -167,7 +160,7 @@ TEST_CASE("re-parsing into same object resets state") {
   REQUIRE(v.build_metadata().empty());
 }
 
-#ifdef SEMVER_CONSTEXPR_SUPPORT
+#if SEMVER_HAS_CONSTEXPR
 TEST_CASE("constexpr parse and accessors") {
   static_assert([] {
     semver::version<> v;
@@ -325,8 +318,9 @@ TEST_CASE("constexpr version constructor") {
 }
 #endif
 
-#if __cpp_consteval >= 201811L && defined(SEMVER_FULL_CONSTEXPR) && SEMVER_FULL_CONSTEXPR \
-    && !defined(_MSC_VER) && !defined(__GLIBCXX__)
+#if __cpp_consteval >= 201811L && SEMVER_HAS_CONSTEXPR \
+    && !defined(_MSC_VER) \
+    && !(defined(__GLIBCXX__) && !defined(__clang__))
 TEST_CASE("consteval _semver literal") {
   using namespace semver::literals;
 

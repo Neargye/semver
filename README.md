@@ -61,12 +61,12 @@ More examples in [example/](example/).
 |-------|---------|---------|
 | `SEMVER_MAX_INPUT_LENGTH` | `4096` | Max input length; exceeding → `value_too_large` |
 | `SEMVER_CONFIG_FILE` | — | Custom config header included early |
-| `SEMVER_FULL_CONSTEXPR` | auto | `1` when full constexpr parsing is available, `0` otherwise |
-| `SEMVER_CONSTEXPR` | auto | `constexpr` when `SEMVER_FULL_CONSTEXPR=1`, `inline` otherwise |
+| `SEMVER_HAS_CONSTEXPR` | auto | `1` when full constexpr parsing is available, `0` otherwise |
+| `SEMVER_CONSTEXPR` | auto | `constexpr` when `SEMVER_HAS_CONSTEXPR=1`, `inline` otherwise |
 
 ## Constexpr support
 
-`SEMVER_FULL_CONSTEXPR` is auto-detected. When `1`, all parsing and accessor functions
+`SEMVER_HAS_CONSTEXPR` is auto-detected. When `1`, all parsing and accessor functions
 become `constexpr` and compile-time evaluation works via the transient-lambda pattern:
 
 ```cpp
@@ -77,15 +77,15 @@ static_assert([] {
 }());
 ```
 
-| Toolchain | `SEMVER_FULL_CONSTEXPR` |
+| Toolchain | `SEMVER_HAS_CONSTEXPR` |
 |-----------|-------------------------|
 | GCC + libstdc++ | `1` |
 | Clang + libc++ | `1` |
-| Clang + libstdc++ < 14 | `0` |
+| Clang + libstdc++ < 13 | `0` |
 
-The `"..."_semver` consteval literal (C++20) is available when `SEMVER_FULL_CONSTEXPR = 1`
-and the compiler is not GCC + libstdc++ (where a limitation of libstdc++'s `std::string`
-prevents its use outside a `consteval` function).
+The `"..."_semver` consteval literal (C++20) is available when `SEMVER_HAS_CONSTEXPR = 1`
+and not compiled with GCC + libstdc++ (where GCC's strict treatment of `consteval` in
+`constexpr` lambdas prevents its use in that pattern).
 
 ## Integration
 

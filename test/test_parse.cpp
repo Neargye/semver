@@ -75,22 +75,22 @@ TEST_CASE("parse") {
   }
 
   SUBCASE("overflow") {
-    constexpr std::string_view v = "0.0.128";
+    constexpr std::string_view v = "0.0.256";
 
-    semver::version<std::int8_t, std::int8_t, std::int8_t> result;
+    semver::version<std::uint8_t, std::uint8_t, std::uint8_t> result;
     REQUIRE_FALSE(parse(v, result));
 
-    semver::version<std::int16_t, std::int16_t, std::int16_t> result2;
+    semver::version<std::uint16_t, std::uint16_t, std::uint16_t> result2;
     REQUIRE(parse(v, result2));
     REQUIRE(result2.major() == 0);
     REQUIRE(result2.minor() == 0);
-    REQUIRE(result2.patch() == 128);
+    REQUIRE(result2.patch() == 256);
 
     constexpr std::string_view v2 = "0.4294967296.0";
-    semver::version<std::int32_t, std::int32_t, std::int32_t> result3;
+    semver::version<std::uint32_t, std::uint32_t, std::uint32_t> result3;
     REQUIRE_FALSE(parse(v2, result3));
 
-    semver::version<std::int64_t, std::int64_t, std::int64_t> result4;
+    semver::version<std::uint64_t, std::uint64_t, std::uint64_t> result4;
     REQUIRE(parse(v2, result4));
     REQUIRE(result4.major() == 0);
     REQUIRE(result4.minor() == 4294967296);
