@@ -78,12 +78,11 @@
 #endif
 
 // Known broken combination for constexpr std::string:
-//   - Clang + libstdc++ < 14: construct_at SSO union bug (GCC special-cases its own stdlib)
+//   - Clang + libstdc++: construct_at SSO union bug (GCC special-cases its own stdlib)
 #if __cpp_lib_constexpr_string >= 201907L && __cpp_lib_constexpr_vector >= 201907L
-  #if defined(__clang__) && defined(__GLIBCXX__) \
-       && (!defined(_GLIBCXX_RELEASE) || _GLIBCXX_RELEASE < 14)
-    #define SEMVER_FULL_CONSTEXPR 0
-    #define SEMVER_CONSTEXPR inline
+  #if defined(__clang__) && defined(__GLIBCXX__)
+    #define SEMVER_FULL_CONSTEXPR 1
+    #define SEMVER_CONSTEXPR constexpr
   #else
     #define SEMVER_FULL_CONSTEXPR 1
     #define SEMVER_CONSTEXPR constexpr

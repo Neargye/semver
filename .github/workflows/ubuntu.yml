@@ -21,8 +21,11 @@ jobs:
         - { cc: "clang-18", cxx: "clang++-18", os: "ubuntu-24.04", stdlib: "libc++-18-dev" }
         - { cc: "clang-19", cxx: "clang++-19", os: "ubuntu-24.04", stdlib: "libc++-19-dev" }
         - { cc: "clang-20", cxx: "clang++-20", os: "ubuntu-24.04", stdlib: "libc++-20-dev" }
+        - { cc: "clang-16", cxx: "clang++-16", os: "ubuntu-22.04", gcxx: "g++-12", gccdir: "/usr/lib/gcc/x86_64-linux-gnu/12", label: "clang-16+libstdc++-12" }
+        - { cc: "clang-18", cxx: "clang++-18", os: "ubuntu-24.04", gcxx: "g++-13", gccdir: "/usr/lib/gcc/x86_64-linux-gnu/13", label: "clang-18+libstdc++-13" }
+        - { cc: "clang-18", cxx: "clang++-18", os: "ubuntu-24.04", gcxx: "g++-14", gccdir: "/usr/lib/gcc/x86_64-linux-gnu/14", label: "clang-18+libstdc++-14" }
 
-    name: "${{ matrix.compiler.cc }}"
+    name: "${{ matrix.compiler.label || matrix.compiler.cc }}"
     runs-on: ${{ matrix.compiler.os }}
     steps:
     - uses: actions/checkout@v4
@@ -35,7 +38,13 @@ jobs:
           VERSION=$(echo "${{ matrix.compiler.cc }}" | grep -oP '\d+')
           sudo apt-add-repository "deb http://apt.llvm.org/${CODENAME}/ llvm-toolchain-${CODENAME}-${VERSION} main" || true
           sudo apt update
-          sudo apt install ${{ matrix.compiler.cc }} ${{ matrix.compiler.stdlib }} libc++abi-${VERSION}-dev -y
+          if [[ -n "${{ matrix.compiler.stdlib }}" ]]; then
+            sudo apt install ${{ matrix.compiler.cc }} ${{ matrix.compiler.stdlib }} libc++abi-${VERSION}-dev -y
+          else
+            sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+            sudo apt update
+            sudo apt install ${{ matrix.compiler.cc }} ${{ matrix.compiler.gcxx }} -y
+          fi
         else
           sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
           sudo apt update
@@ -48,8 +57,10 @@ jobs:
         mkdir build
         cd build
         CMAKE_EXTRA=""
-        if [[ "${{ matrix.compiler.cc }}" == "clang"* ]]; then
+        if [[ -n "${{ matrix.compiler.stdlib }}" ]]; then
           CMAKE_EXTRA="-DCMAKE_CXX_FLAGS=-stdlib=libc++"
+        elif [[ -n "${{ matrix.compiler.gccdir }}" ]]; then
+          CMAKE_EXTRA="-DCMAKE_CXX_FLAGS=--gcc-install-dir=${{ matrix.compiler.gccdir }}"
         fi
         cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=${{ matrix.compiler.cxx }} $CMAKE_EXTRA
         cmake --build . -j 4 --config Release
@@ -61,8 +72,10 @@ jobs:
         mkdir build
         cd build
         CMAKE_EXTRA=""
-        if [[ "${{ matrix.compiler.cc }}" == "clang"* ]]; then
+        if [[ -n "${{ matrix.compiler.stdlib }}" ]]; then
           CMAKE_EXTRA="-DCMAKE_CXX_FLAGS=-stdlib=libc++"
+        elif [[ -n "${{ matrix.compiler.gccdir }}" ]]; then
+          CMAKE_EXTRA="-DCMAKE_CXX_FLAGS=--gcc-install-dir=${{ matrix.compiler.gccdir }}"
         fi
         cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=${{ matrix.compiler.cxx }} $CMAKE_EXTRA
         cmake --build . -j 4 --config Debug
