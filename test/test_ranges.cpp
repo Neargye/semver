@@ -230,7 +230,7 @@ TEST_CASE("range from_chars_result contract") {
     REQUIRE(ptr == bad.data() + 8);
   }
 
-  SUBCASE("failed parse clears output on early syntax failure") {
+  SUBCASE("failed parse — output left unchanged") {
     semver::range_set rs;
     semver::version v;
     REQUIRE(semver::parse(">=1.0.0", rs));
@@ -240,7 +240,7 @@ TEST_CASE("range from_chars_result contract") {
     const auto result = semver::parse("broken", rs);
     REQUIRE_FALSE(result);
     REQUIRE(result.ec == std::errc::invalid_argument);
-    REQUIRE_FALSE(rs.contains(v));
+    REQUIRE(rs.contains(v)); // rs unchanged — still holds >=1.0.0
   }
 
   SUBCASE("lexer failure preserves the previous range prefix") {
@@ -256,7 +256,7 @@ TEST_CASE("range from_chars_result contract") {
     REQUIRE(rs.contains(v));
   }
 
-  SUBCASE("trailing garbage preserves the parsed range prefix") {
+  SUBCASE("trailing garbage — output not modified") {
     semver::range_set rs;
     semver::version v;
     REQUIRE(semver::parse("1.5.0", v));
@@ -264,7 +264,31 @@ TEST_CASE("range from_chars_result contract") {
     const auto result = semver::parse(">=1.0.0 <2.0.0 tail", rs);
     REQUIRE_FALSE(result);
     REQUIRE(result.ec == std::errc::invalid_argument);
-    REQUIRE(rs.contains(v));
+    REQUIRE_FALSE(rs.contains(v)); // rs stayed empty — not partially filled
+  }
+}
+
+TEST_CASE("parse(range_set) transactional guarantee") {
+  semver::range_set rs;
+  semver::version v;
+  REQUIRE(semver::parse(">=1.0.0 <2.0.0", rs));
+  REQUIRE(semver::parse("1.5.0", v));
+  REQUIRE(rs.contains(v));
+
+  SUBCASE("failure leaves out unchanged — previously valid range_set retained") {
+    REQUIRE_FALSE(semver::parse(">=3.0.0 <4.0.0 !!", rs));
+    REQUIRE(rs.contains(v)); // old value preserved, not corrupted
+  }
+
+  SUBCASE("success overwrites out atomically") {
+    REQUIRE(semver::parse(">=2.0.0", rs));
+    REQUIRE_FALSE(rs.contains(v)); // new range replaces old
+  }
+
+  SUBCASE("trailing garbage does not partially update out") {
+    const auto result = semver::parse(">=3.0.0 <4.0.0 garbage", rs);
+    REQUIRE_FALSE(result);
+    REQUIRE(rs.contains(v)); // old value unchanged
   }
 }
 

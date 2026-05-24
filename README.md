@@ -31,7 +31,7 @@ std::string s = v2.to_string();
 // Compare
 assert(v2 > v);   // 1.0.0 > 1.2.3-alpha (prerelease < release)
 
-// Ranges (npm-style)
+// Ranges
 semver::range_set range;
 if (semver::parse(">=1.0.0 <2.0.0 || >3.2.1", range)) {
   assert(range.contains(v));
@@ -41,19 +41,90 @@ if (semver::parse(">=1.0.0 <2.0.0 || >3.2.1", range)) {
 assert(semver::valid("1.0.0"));
 
 // Wider integer types
-semver::version<int64_t> big;
+semver::version<uint64_t> big;
 semver::parse("0.0.999999999999", big);
 ```
 
 More examples in [example/](example/).
 
-## Notes
+## API Reference
+
+### `version<I1, I2, I3>` *(default `I1 = I2 = I3 = uint32_t`)*
+
+```cpp
+version();                             // default: 0.1.0 (semver FAQ §4)
+version(I1 major, I2 minor, I3 patch); // construct from components
+
+I1          major()          const noexcept; // major number
+I2          minor()          const noexcept; // minor number
+I3          patch()          const noexcept; // patch number
+string_view prerelease_tag() const noexcept; // "alpha.1" or "" if absent
+string_view build_metadata() const noexcept; // "build.42" or "" — ignored in ==
+string      to_string()      const;          // "1.2.3-pre+build"
+
+version bump_major() const noexcept; // 1.2.3 → 2.0.0, clears pre-release and build
+version bump_minor() const noexcept; // 1.2.3 → 1.3.0, clears pre-release and build
+version bump_patch() const noexcept; // 1.2.3 → 1.2.4, clears pre-release and build
+```
+
+Comparison: `==`, `!=`, `<`, `<=`, `>`, `>=` on C++17; `==` + `<=>` → `std::strong_ordering` on C++20.  
+Build metadata is excluded from all comparisons per spec §10.
+
+### `range_set<I1, I2, I3>` *(default `I1 = I2 = I3 = uint32_t`)*
+
+```cpp
+bool contains(version v,
+              version_compare_option = exclude_prerelease) const noexcept;
+```
+
+`exclude_prerelease` (default): a pre-release version only matches if a comparator in the same set explicitly targets the same `[major.minor.patch]` with a pre-release tag.
+
+### Parsing & serialization
+
+```cpp
+// Full-string parse — fails on trailing garbage
+from_chars_result parse(string_view str, version&   v);
+from_chars_result parse(string_view str, range_set& rs);
+
+// Partial parse — stops at first non-version character (std::from_chars convention)
+from_chars_result from_chars(const char* first, const char* last, version& v) noexcept;
+
+// Zero-allocation serialize (std::to_chars convention)
+from_chars_result to_chars(char* first, char* last, const version& v) noexcept;
+
+// Convenience wrappers
+bool              valid(string_view str);       // validate without output
+optional<version> try_parse(string_view str);   // nullopt on failure
+version           from_string(string_view str); // throws std::system_error on failure
+```
+
+### `from_chars_result`
+
+```cpp
+struct from_chars_result {
+    const char* ptr; // success: one past last consumed/written char
+                     // failure: first invalid char
+    std::errc   ec;  // errc{} on success; invalid_argument / value_too_large / result_out_of_range
+    explicit operator bool() const noexcept; // true on success
+};
+```
+
+### C++20 additions (feature-guarded)
+
+| Feature | Guard |
+|---------|-------|
+| `operator<=>` → `std::strong_ordering` | `__cpp_impl_three_way_comparison` |
+| `"1.2.3-rc.1"_semver` consteval literal | `SEMVER_HAS_CONSTEVAL_LITERAL == 1` |
+| `std::format("{}", v)` | `__cpp_lib_format` |
+
+
 
 - Default-constructed `version` is `0.1.0` per [semver FAQ](https://semver.org/#how-should-i-deal-with-revisions-in-the-0yz-initial-development-phase).
 - `parse()` returns `from_chars_result{ptr, ec}` — contextually convertible to `bool`. `ptr` points past consumed input on success or at the bad char on failure. Possible error codes: `invalid_argument`, `value_too_large`, `result_out_of_range`.
-- On parse failure the output object is left in an unspecified state (like `std::from_chars`). Always check the result before using the output.
+- On parse failure the output object may be partially updated. Always check the result before using it.
+- Range syntax is comparator-based (`>=1.0.0 <2.0.0 || 3.0.0`), not the full npm semver grammar.
 - Prerelease versions excluded from range matching by default. Pass `version_compare_option::include_prerelease` to override.
-- `std::hash<semver::version<...>>` and `std::formatter` (C++20) are provided out of the box.
+- `std::hash<semver::version<...>>` and `std::formatter` (C++20, under `__cpp_lib_format`) are provided out of the box. The formatter supports `{}` only — format specs such as `{:>20}` throw `std::format_error`.
 
 ## Configuration
 
@@ -63,6 +134,7 @@ More examples in [example/](example/).
 | `SEMVER_CONFIG_FILE` | — | Custom config header included early |
 | `SEMVER_HAS_CONSTEXPR` | auto | `1` when full constexpr parsing is available, `0` otherwise |
 | `SEMVER_CONSTEXPR` | auto | `constexpr` when `SEMVER_HAS_CONSTEXPR=1`, `inline` otherwise |
+| `SEMVER_HAS_CONSTEVAL_LITERAL` | auto | `1` when `operator""_semver` is available, `0` otherwise |
 
 ## Constexpr support
 
@@ -83,9 +155,10 @@ static_assert([] {
 | Clang + libc++ | `1` |
 | Clang + libstdc++ < 13 | `0` |
 
-The `"..."_semver` consteval literal (C++20) is available when `SEMVER_HAS_CONSTEXPR = 1`
-and not compiled with GCC + libstdc++ (where GCC's strict treatment of `consteval` in
-`constexpr` lambdas prevents its use in that pattern).
+The `"..."_semver` consteval literal is gated by `SEMVER_HAS_CONSTEVAL_LITERAL` (implies
+`SEMVER_HAS_CONSTEXPR=1`, and additionally excludes MSVC and Clang+libstdc++ combinations
+that do not support it reliably). Always check this macro before using the literal in
+portable code.
 
 ## Integration
 

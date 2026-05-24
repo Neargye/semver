@@ -48,8 +48,8 @@ int main() {
   assert(version > version2);
   assert(version2 < version);
 
-  // use 64 bit integer for numbers
-  semver::version<int64_t, int64_t, int64_t> version3;
+  // use 64-bit unsigned integer for large numbers
+  semver::version<std::uint64_t, std::uint64_t, std::uint64_t> version3;
   if (semver::parse("0.0.999999999999", version3)) {
     std::cout << version3.major() << std::endl; // 0
     std::cout << version3.minor() << std::endl; // 0

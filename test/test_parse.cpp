@@ -2,6 +2,8 @@
 #include <doctest.h>
 #include <array>
 #include <ostream>
+#include <optional>
+#include <system_error>
 
 using namespace semver;
 
@@ -181,7 +183,7 @@ TEST_CASE("parse") {
 
 TEST_CASE("construct") {
   SUBCASE("version(major, minor, patch) constructor") {
-    const semver::version v{1, 2, 3};
+    const semver::version v{1u, 2u, 3u};
     REQUIRE(v.major() == 1);
     REQUIRE(v.minor() == 2);
     REQUIRE(v.patch() == 3);
@@ -255,8 +257,8 @@ TEST_CASE("from_chars_result contract") {
   }
 
   SUBCASE("errc::result_out_of_range for typed component overflow") {
-    semver::version<int8_t> v;
-    auto result = semver::parse("128.0.0", v); // int8_t max is 127
+    semver::version<std::uint8_t> v;
+    auto result = semver::parse("256.0.0", v); // uint8_t max is 255
     REQUIRE_FALSE(result);
     REQUIRE(result.ec == std::errc::result_out_of_range);
   }
@@ -385,6 +387,219 @@ TEST_CASE("prerelease precedence \u2014 semver spec \u00a711") {
       REQUIRE(lo < hi);
       REQUIRE(hi > lo);
     }
+  }
+}
+
+TEST_CASE("from_chars — partial parse semantics") {
+  SUBCASE("exact version string consumes entire input") {
+    const char buf[] = "1.2.3";
+    version<> v;
+    const auto r = semver::from_chars(buf, buf + 5, v);
+    REQUIRE(r);
+    REQUIRE(v.major() == 1);
+    REQUIRE(v.minor() == 2);
+    REQUIRE(v.patch() == 3);
+    REQUIRE(r.ptr == buf + 5);
+  }
+
+  SUBCASE("stops at space — ptr points to first trailing char") {
+    const char buf[] = "1.2.3 extra";
+    version<> v;
+    const auto r = semver::from_chars(buf, buf + sizeof(buf) - 1, v);
+    REQUIRE(r);
+    REQUIRE(r.ptr == buf + 5);
+    REQUIRE(*r.ptr == ' ');
+    REQUIRE(v.major() == 1);
+    REQUIRE(v.minor() == 2);
+    REQUIRE(v.patch() == 3);
+  }
+
+  SUBCASE("stops at newline — ptr points to newline") {
+    const char buf[] = "1.2.3\nmore";
+    version<> v;
+    const auto r = semver::from_chars(buf, buf + sizeof(buf) - 1, v);
+    REQUIRE(r);
+    REQUIRE(r.ptr == buf + 5);
+    REQUIRE(*r.ptr == '\n');
+  }
+
+  SUBCASE("stops at comma") {
+    const char buf[] = "2.0.0,other";
+    version<> v;
+    const auto r = semver::from_chars(buf, buf + sizeof(buf) - 1, v);
+    REQUIRE(r);
+    REQUIRE(*r.ptr == ',');
+    REQUIRE(v.major() == 2);
+    REQUIRE(v.minor() == 0);
+    REQUIRE(v.patch() == 0);
+  }
+
+  SUBCASE("stops at @") {
+    const char buf[] = "0.1.0@tag";
+    version<> v;
+    const auto r = semver::from_chars(buf, buf + sizeof(buf) - 1, v);
+    REQUIRE(r);
+    REQUIRE(*r.ptr == '@');
+  }
+
+  SUBCASE("stops at semicolon") {
+    const char buf[] = "3.4.5;6.7.8";
+    version<> v;
+    const auto r = semver::from_chars(buf, buf + sizeof(buf) - 1, v);
+    REQUIRE(r);
+    REQUIRE(v.major() == 3);
+    REQUIRE(v.minor() == 4);
+    REQUIRE(v.patch() == 5);
+    REQUIRE(*r.ptr == ';');
+  }
+
+  SUBCASE("prerelease tag parsed, stops at comma") {
+    const char buf[] = "1.2.3-alpha.1,next";
+    version<> v;
+    const auto r = semver::from_chars(buf, buf + sizeof(buf) - 1, v);
+    REQUIRE(r);
+    REQUIRE(v.prerelease_tag() == "alpha.1");
+    REQUIRE(*r.ptr == ',');
+  }
+
+  SUBCASE("build metadata parsed, stops at newline") {
+    const char buf[] = "1.2.3+build.42\n";
+    version<> v;
+    const auto r = semver::from_chars(buf, buf + sizeof(buf) - 1, v);
+    REQUIRE(r);
+    REQUIRE(v.build_metadata() == "build.42");
+    REQUIRE(*r.ptr == '\n');
+  }
+
+  SUBCASE("full prerelease+build, stops at tab") {
+    const char buf[] = "1.0.0-rc.1+sha.abc\t";
+    version<> v;
+    const auto r = semver::from_chars(buf, buf + sizeof(buf) - 1, v);
+    REQUIRE(r);
+    REQUIRE(v.prerelease_tag() == "rc.1");
+    REQUIRE(v.build_metadata() == "sha.abc");
+    REQUIRE(*r.ptr == '\t');
+  }
+
+  SUBCASE("zero-length range returns failure") {
+    const char buf[] = "";
+    version<> v;
+    REQUIRE_FALSE(semver::from_chars(buf, buf, v));
+  }
+
+  SUBCASE("invalid input (no dots) returns failure") {
+    const char buf[] = "garbage";
+    version<> v;
+    REQUIRE_FALSE(semver::from_chars(buf, buf + sizeof(buf) - 1, v));
+  }
+
+  SUBCASE("uint8_t overflow returns result_out_of_range") {
+    const char buf[] = "256.0.0";
+    version<uint8_t> v;
+    const auto r = semver::from_chars(buf, buf + sizeof(buf) - 1, v);
+    REQUIRE_FALSE(r);
+    REQUIRE(r.ec == std::errc::result_out_of_range);
+  }
+
+  SUBCASE("leading zero in component returns failure") {
+    const char buf[] = "01.0.0 rest";
+    version<> v;
+    REQUIRE_FALSE(semver::from_chars(buf, buf + sizeof(buf) - 1, v));
+  }
+
+  SUBCASE("result is same as parse() for clean version string") {
+    const char buf[] = "5.6.7-pre.1+meta";
+    version<> vfc, vp;
+    const auto rfc = semver::from_chars(buf, buf + sizeof(buf) - 1, vfc);
+    REQUIRE(rfc);
+    REQUIRE(semver::parse(std::string_view{buf, sizeof(buf) - 1}, vp));
+    REQUIRE(vfc == vp);
+  }
+}
+
+TEST_CASE("try_parse") {
+  SUBCASE("valid string returns engaged optional with correct values") {
+    const auto v = semver::try_parse("1.2.3");
+    REQUIRE(v.has_value());
+    REQUIRE(v->major() == 1);
+    REQUIRE(v->minor() == 2);
+    REQUIRE(v->patch() == 3);
+  }
+
+  SUBCASE("invalid strings return nullopt") {
+    REQUIRE_FALSE(semver::try_parse("not-valid").has_value());
+    REQUIRE_FALSE(semver::try_parse("").has_value());
+    REQUIRE_FALSE(semver::try_parse("1.2").has_value());
+    REQUIRE_FALSE(semver::try_parse("1.2.3garbage").has_value());
+    REQUIRE_FALSE(semver::try_parse("01.0.0").has_value());
+  }
+
+  SUBCASE("prerelease and build metadata are preserved") {
+    const auto v = semver::try_parse("1.0.0-rc.1+build.42");
+    REQUIRE(v.has_value());
+    REQUIRE(v->prerelease_tag() == "rc.1");
+    REQUIRE(v->build_metadata() == "build.42");
+  }
+
+  SUBCASE("type parameter is forwarded") {
+    const auto v8 = semver::try_parse<uint8_t>("255.255.255");
+    REQUIRE(v8.has_value());
+    REQUIRE(v8->patch() == 255);
+    REQUIRE_FALSE(semver::try_parse<uint8_t>("256.0.0").has_value());
+  }
+
+  SUBCASE("try_parse result equals parse() result") {
+    const auto opt = semver::try_parse("2.3.4-beta+meta");
+    version<> parsed;
+    REQUIRE(parse("2.3.4-beta+meta", parsed));
+    REQUIRE(opt.has_value());
+    REQUIRE(*opt == parsed);
+  }
+}
+
+TEST_CASE("from_string") {
+  SUBCASE("valid string returns version with correct values") {
+    const auto v = semver::from_string("1.2.3-alpha+build");
+    REQUIRE(v.major() == 1);
+    REQUIRE(v.minor() == 2);
+    REQUIRE(v.patch() == 3);
+    REQUIRE(v.prerelease_tag() == "alpha");
+    REQUIRE(v.build_metadata() == "build");
+  }
+
+  SUBCASE("invalid strings throw std::system_error") {
+    REQUIRE_THROWS_AS((void)semver::from_string("not-a-version"), std::system_error);
+    REQUIRE_THROWS_AS((void)semver::from_string(""),              std::system_error);
+    REQUIRE_THROWS_AS((void)semver::from_string("1.2.3garbage"),  std::system_error);
+  }
+
+  SUBCASE("error code is invalid_argument for malformed input") {
+    bool caught = false;
+    try {
+      (void)semver::from_string("garbage");
+    } catch (const std::system_error& e) {
+      caught = true;
+      REQUIRE(e.code() == std::make_error_code(std::errc::invalid_argument));
+    }
+    REQUIRE(caught);
+  }
+
+  SUBCASE("error code is result_out_of_range on overflow") {
+    bool caught = false;
+    try {
+      (void)semver::from_string<uint8_t>("256.0.0");
+    } catch (const std::system_error& e) {
+      caught = true;
+      REQUIRE(e.code() == std::make_error_code(std::errc::result_out_of_range));
+    }
+    REQUIRE(caught);
+  }
+
+  SUBCASE("from_string result equals parse() result") {
+    const auto v = semver::from_string("3.4.5-rc.2+sha.abc");
+    version<> parsed;
+    REQUIRE(parse("3.4.5-rc.2+sha.abc", parsed));
+    REQUIRE(v == parsed);
   }
 }
 

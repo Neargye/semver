@@ -318,9 +318,7 @@ TEST_CASE("constexpr version constructor") {
 }
 #endif
 
-#if __cpp_consteval >= 201811L && SEMVER_HAS_CONSTEXPR \
-    && !defined(_MSC_VER) \
-    && !(defined(__GLIBCXX__) && !defined(__clang__))
+#if SEMVER_HAS_CONSTEVAL_LITERAL
 TEST_CASE("consteval _semver literal") {
   using namespace semver::literals;
 

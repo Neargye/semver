@@ -7,6 +7,8 @@
 #include <unordered_map>
 #include <vector>
 
+using namespace semver;
+
 template <typename Operator>
 static void test_parse_and_compare_reverse(const std::string_view v1, const std::string_view v2, Operator op) {
   semver::version parsed_v1;
@@ -238,11 +240,10 @@ TEST_CASE("hash") {
 }
 
 TEST_CASE("mixed-type comparisons") {
-  // version<int,int,int> and version<unsigned,unsigned,unsigned> with the same
-  // numeric values must be equal, and ordering must be consistent.
-  semver::version<int, int, int>           a;
-  semver::version<unsigned, unsigned, unsigned> b;
-  semver::version<int64_t, int64_t, int64_t>    c;
+  // versions with the same numeric values but different unsigned widths must compare equal.
+  semver::version<std::uint32_t, std::uint32_t, std::uint32_t> a;
+  semver::version<unsigned, unsigned, unsigned>                 b;
+  semver::version<std::uint64_t, std::uint64_t, std::uint64_t> c;
 
   REQUIRE(semver::parse("1.2.3", a));
   REQUIRE(semver::parse("1.2.3", b));
@@ -255,8 +256,8 @@ TEST_CASE("mixed-type comparisons") {
   }
 
   SUBCASE("ordering across types") {
-    semver::version<int>      lo;
-    semver::version<unsigned> hi;
+    semver::version<std::uint8_t>  lo;
+    semver::version<unsigned>      hi;
     REQUIRE(semver::parse("1.2.2", lo));
     REQUIRE(semver::parse("1.2.3", hi));
     REQUIRE(lo < hi);
@@ -266,8 +267,8 @@ TEST_CASE("mixed-type comparisons") {
   }
 
   SUBCASE("prerelease ordering across types") {
-    semver::version<int>      pre;
-    semver::version<unsigned> rel;
+    semver::version<std::uint16_t> pre;
+    semver::version<unsigned>      rel;
     REQUIRE(semver::parse("1.0.0-alpha", pre));
     REQUIRE(semver::parse("1.0.0",       rel));
     REQUIRE(pre < rel);
@@ -364,4 +365,121 @@ TEST_CASE("std::set deduplication") {
   s.insert(v4); // treated as equal to v1 \u2192 not inserted
   REQUIRE(s.size() == 2);
 }
+TEST_CASE("bump versions") {
+  SUBCASE("bump_major increments major, resets minor and patch to 0") {
+    version<> v;
+    REQUIRE(parse("1.2.3", v));
+    const auto b = v.bump_major();
+    REQUIRE(b.major() == 2);
+    REQUIRE(b.minor() == 0);
+    REQUIRE(b.patch() == 0);
+  }
 
+  SUBCASE("bump_minor increments minor, resets patch to 0, keeps major") {
+    version<> v;
+    REQUIRE(parse("1.2.3", v));
+    const auto b = v.bump_minor();
+    REQUIRE(b.major() == 1);
+    REQUIRE(b.minor() == 3);
+    REQUIRE(b.patch() == 0);
+  }
+
+  SUBCASE("bump_patch increments patch only") {
+    version<> v;
+    REQUIRE(parse("1.2.3", v));
+    const auto b = v.bump_patch();
+    REQUIRE(b.major() == 1);
+    REQUIRE(b.minor() == 2);
+    REQUIRE(b.patch() == 4);
+  }
+
+  SUBCASE("bump_major clears pre-release tag") {
+    version<> v;
+    REQUIRE(parse("1.2.3-alpha.1", v));
+    REQUIRE(v.bump_major().prerelease_tag().empty());
+  }
+
+  SUBCASE("bump_minor clears pre-release tag and resets patch") {
+    version<> v;
+    REQUIRE(parse("1.2.3-rc.2", v));
+    const auto b = v.bump_minor();
+    REQUIRE(b.prerelease_tag().empty());
+    REQUIRE(b.minor() == 3);
+    REQUIRE(b.patch() == 0);
+  }
+
+  SUBCASE("bump_patch clears pre-release tag") {
+    version<> v;
+    REQUIRE(parse("1.2.3-beta", v));
+    const auto b = v.bump_patch();
+    REQUIRE(b.prerelease_tag().empty());
+    REQUIRE(b.patch() == 4);
+  }
+
+  SUBCASE("bump_major clears build metadata") {
+    version<> v;
+    REQUIRE(parse("1.2.3+build.42", v));
+    REQUIRE(v.bump_major().build_metadata().empty());
+  }
+
+  SUBCASE("bump_patch clears both prerelease and build metadata") {
+    version<> v;
+    REQUIRE(parse("1.2.3-alpha+build", v));
+    const auto b = v.bump_patch();
+    REQUIRE(b.prerelease_tag().empty());
+    REQUIRE(b.build_metadata().empty());
+    REQUIRE(b.patch() == 4);
+  }
+
+  SUBCASE("original version is not modified (bump is const)") {
+    version<> v;
+    REQUIRE(parse("1.2.3-alpha", v));
+    (void)v.bump_major();
+    REQUIRE(v.major() == 1);
+    REQUIRE(v.prerelease_tag() == "alpha");
+  }
+
+  SUBCASE("bump from default version 0.1.0") {
+    const version<> v;
+    REQUIRE(v.bump_major().major() == 1);
+    REQUIRE(v.bump_major().minor() == 0);
+    REQUIRE(v.bump_minor().minor() == 2);
+    REQUIRE(v.bump_patch().patch() == 1);
+  }
+
+  SUBCASE("chaining: bump_major then bump_minor") {
+    version<> v;
+    REQUIRE(parse("1.2.3", v));
+    const auto chain = v.bump_major().bump_minor();
+    REQUIRE(chain.major() == 2);
+    REQUIRE(chain.minor() == 1);
+    REQUIRE(chain.patch() == 0);
+  }
+
+  SUBCASE("chaining: bump_minor then bump_patch") {
+    version<> v;
+    REQUIRE(parse("1.2.3", v));
+    const auto chain = v.bump_minor().bump_patch();
+    REQUIRE(chain.major() == 1);
+    REQUIRE(chain.minor() == 3);
+    REQUIRE(chain.patch() == 1);
+  }
+
+  SUBCASE("uint8_t type parameter works with bump") {
+    version<uint8_t> v;
+    REQUIRE(parse("1.2.3", v));
+    const auto bm = v.bump_major();
+    REQUIRE(bm.major() == 2);
+    REQUIRE(bm.minor() == 0);
+    REQUIRE(bm.patch() == 0);
+  }
+
+  SUBCASE("bump_major on 0.x.x") {
+    version<> v;
+    REQUIRE(parse("0.9.0", v));
+    const auto b = v.bump_major();
+    REQUIRE(b.major() == 1);
+    REQUIRE(b.minor() == 0);
+    REQUIRE(b.patch() == 0);
+  }
+}
