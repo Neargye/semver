@@ -1012,10 +1012,12 @@ template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
 //   on failure (buffer too small): ptr == last, ec == std::errc::value_too_large
 template <typename I1, typename I2, typename I3>
 [[nodiscard]] constexpr to_chars_result to_chars(char* first, char* last, const version<I1, I2, I3>& v) noexcept {
+  const std::string_view pre  = v.prerelease_tag();
+  const std::string_view meta = v.build_metadata();
   const std::size_t needed =
       detail::length(v.major()) + detail::length(v.minor()) + detail::length(v.patch()) + 2
-      + (v.prerelease_tag().empty() ? std::size_t{0} : v.prerelease_tag().size() + 1)
-      + (v.build_metadata().empty() ? std::size_t{0} : v.build_metadata().size() + 1);
+      + (pre.empty()  ? std::size_t{0} : pre.size()  + 1)
+      + (meta.empty() ? std::size_t{0} : meta.size() + 1);
   if (!first || !last || last < first)
     return detail::failure(last, std::errc::value_too_large);
   const auto avail = static_cast<std::size_t>(last - first);
@@ -1033,13 +1035,13 @@ template <typename I1, typename I2, typename I3>
   p = write_num(p, v.major()); *p++ = '.';
   p = write_num(p, v.minor()); *p++ = '.';
   p = write_num(p, v.patch());
-  if (!v.prerelease_tag().empty()) {
+  if (!pre.empty()) {
     *p++ = '-';
-    for (char c : std::string_view{v.prerelease_tag()}) *p++ = c;
+    for (char c : pre) *p++ = c;
   }
-  if (!v.build_metadata().empty()) {
+  if (!meta.empty()) {
     *p++ = '+';
-    for (char c : std::string_view{v.build_metadata()}) *p++ = c;
+    for (char c : meta) *p++ = c;
   }
   return detail::success(p);
 }
