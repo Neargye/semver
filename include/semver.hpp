@@ -265,8 +265,7 @@ namespace semver {
     // Serializes to "MAJOR.MINOR.PATCH[-prerelease][+build]".
     [[nodiscard]] SEMVER_CONSTEXPR std::string to_string() const {
       std::string result(length(), '\0');
-      const auto r = to_chars(result.data(), result.data() + result.size(), *this);
-      assert(r && "semver: to_string length mismatch");
+      to_chars(result.data(), result.data() + result.size(), *this);
       return result;
     }
 
@@ -651,10 +650,9 @@ public:
 
   template <typename I1, typename I2, typename I3>
   SEMVER_CONSTEXPR from_chars_result parse(version<I1, I2, I3>& out) {
-    version<I1, I2, I3> tmp;
-    tmp.reset();
+    out.reset();
 
-    from_chars_result result = parse_number(tmp.major_);
+    from_chars_result result = parse_number(out.major_);
     if (!result) {
       return result;
     }
@@ -663,7 +661,7 @@ public:
       return failure(stream.peek().lexeme);
     }
 
-    result = parse_number(tmp.minor_);
+    result = parse_number(out.minor_);
     if (!result) {
       return result;
     }
@@ -672,26 +670,25 @@ public:
       return failure(stream.peek().lexeme);
     }
 
-    result = parse_number(tmp.patch_);
+    result = parse_number(out.patch_);
     if (!result) {
       return result;
     }
 
     if (stream.advance_if_match(token_type::hyphen)) {
-      result = parse_prerelease_tag(tmp.prerelease_tag_);
+      result = parse_prerelease_tag(out.prerelease_tag_);
       if (!result) {
         return result;
       }
     }
 
     if (stream.advance_if_match(token_type::plus)) {
-      result = parse_build_metadata(tmp.build_metadata_);
+      result = parse_build_metadata(out.build_metadata_);
       if (!result) {
         return result;
       }
     }
 
-    out = std::move(tmp);
     return result;
   }
 

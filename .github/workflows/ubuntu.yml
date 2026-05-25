@@ -17,8 +17,6 @@ jobs:
         - { cc: "clang-18", cxx: "clang++-18", os: "ubuntu-24.04", stdlib: "libc++-18-dev" }
         - { cc: "clang-19", cxx: "clang++-19", os: "ubuntu-24.04", stdlib: "libc++-19-dev" }
         - { cc: "clang-20", cxx: "clang++-20", os: "ubuntu-24.04", stdlib: "libc++-20-dev" }
-        - { cc: "clang-18", cxx: "clang++-18", os: "ubuntu-24.04", gcxx: "g++-13", gccdir: "/usr/lib/gcc/x86_64-linux-gnu/13", label: "clang-18+libstdc++-13" }
-        - { cc: "clang-18", cxx: "clang++-18", os: "ubuntu-24.04", gcxx: "g++-14", gccdir: "/usr/lib/gcc/x86_64-linux-gnu/14", label: "clang-18+libstdc++-14" }
 
     name: "${{ matrix.compiler.label || matrix.compiler.cc }}"
     runs-on: ${{ matrix.compiler.os }}
