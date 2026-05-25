@@ -1,6 +1,6 @@
 ﻿cmake_minimum_required(VERSION 3.8)
 
-project(semver VERSION "0.3.1" LANGUAGES CXX)
+project(semver VERSION "1.0.0" LANGUAGES CXX)
 
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     set(IS_TOPLEVEL_PROJECT TRUE)
@@ -30,6 +30,7 @@ target_include_directories(${PROJECT_NAME}
         INTERFACE
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
             $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_17)
 
 write_basic_package_version_file(${PROJECT_NAME}ConfigVersion.cmake
         VERSION ${PROJECT_VERSION}

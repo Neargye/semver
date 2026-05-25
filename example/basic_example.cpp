@@ -1,6 +1,6 @@
 // Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018 - 2025 Daniil Goncharov <neargye@gmail.com>.
+// Copyright (c) 2018 - 2026 Daniil Goncharov <neargye@gmail.com>.
 // Copyright (c) 2020 - 2025 Alexander Gorbunov <naratzul@gmail.com>.
 //
 // Permission is hereby  granted, free of charge, to any  person obtaining a copy
@@ -48,8 +48,8 @@ int main() {
   assert(version > version2);
   assert(version2 < version);
 
-  // use 64 bit integer for numbers
-  semver::version<int64_t, int64_t, int64_t> version3;
+  // use 64-bit unsigned integer for large numbers
+  semver::version<std::uint64_t, std::uint64_t, std::uint64_t> version3;
   if (semver::parse("0.0.999999999999", version3)) {
     std::cout << version3.major() << std::endl; // 0
     std::cout << version3.minor() << std::endl; // 0

@@ -10,45 +10,35 @@ jobs:
       fail-fast: false
       matrix:
         compiler:
-        - { cc: "gcc-10",   cxx: "g++-10",     os: "ubuntu-22.04" }
-        - { cc: "gcc-11",   cxx: "g++-11",     os: "ubuntu-22.04" }
-        - { cc: "gcc-12",   cxx: "g++-12",     os: "ubuntu-22.04" }
-        - { cc: "gcc-13",   cxx: "g++-13",     os: "ubuntu-22.04" }
+        - { cc: "gcc-13",   cxx: "g++-13",     os: "ubuntu-24.04" }
         - { cc: "gcc-14",   cxx: "g++-14",     os: "ubuntu-24.04" }
-        - { cc: "clang-13", cxx: "clang++-13", os: "ubuntu-22.04" }
-        - { cc: "clang-14", cxx: "clang++-14", os: "ubuntu-22.04" }
-        - { cc: "clang-15", cxx: "clang++-15", os: "ubuntu-22.04" }
-        - { cc: "clang-16", cxx: "clang++-16", os: "ubuntu-22.04" }
-        - { cc: "clang-17", cxx: "clang++-17", os: "ubuntu-22.04" }
-        - { cc: "clang-18", cxx: "clang++-18", os: "ubuntu-22.04" }
-        - { cc: "clang-19", cxx: "clang++-19", os: "ubuntu-22.04" }
-        - { cc: "clang-20", cxx: "clang++-20", os: "ubuntu-22.04" }
+        - { cc: "gcc-15",   cxx: "g++-15",     os: "ubuntu-24.04" }
+        - { cc: "clang-17", cxx: "clang++-17", os: "ubuntu-24.04", stdlib: "libc++-17-dev" }
+        - { cc: "clang-18", cxx: "clang++-18", os: "ubuntu-24.04", stdlib: "libc++-18-dev" }
+        - { cc: "clang-19", cxx: "clang++-19", os: "ubuntu-24.04", stdlib: "libc++-19-dev" }
+        - { cc: "clang-20", cxx: "clang++-20", os: "ubuntu-24.04", stdlib: "libc++-20-dev" }
 
-    name: "${{ matrix.compiler.cc }}"
+    name: "${{ matrix.compiler.label || matrix.compiler.cc }}"
     runs-on: ${{ matrix.compiler.os }}
     steps:
     - uses: actions/checkout@v4
 
-    - name: Configure clang
+    - name: Install compiler
       run: |
         if [[ "${{ matrix.compiler.cc }}" == "clang"* ]]; then
-          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key|sudo apt-key add -
-          sudo apt-add-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-13 main"
-          sudo apt-add-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-14 main"
-          sudo apt-add-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-15 main"
-          sudo apt-add-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-16 main"
-          sudo apt-add-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main"
-          sudo apt-add-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-18 main"
-          sudo apt-add-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-19 main"
-          sudo apt-add-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-20 main"
-          sudo apt-add-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy main"
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          CODENAME=$(lsb_release -cs)
+          VERSION=$(echo "${{ matrix.compiler.cc }}" | grep -oP '\d+')
+          sudo apt-add-repository "deb http://apt.llvm.org/${CODENAME}/ llvm-toolchain-${CODENAME}-${VERSION} main" || true
           sudo apt update
-          sudo apt install ${{ matrix.compiler.cc }} -y
-        fi
-
-    - name: Configure gcc
-      run: |
-        if [[ "${{ matrix.compiler.cc }}" == "gcc"* ]]; then
+          if [[ -n "${{ matrix.compiler.stdlib }}" ]]; then
+            sudo apt install ${{ matrix.compiler.cc }} ${{ matrix.compiler.stdlib }} libc++abi-${VERSION}-dev -y
+          else
+            sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+            sudo apt update
+            sudo apt install ${{ matrix.compiler.cc }} ${{ matrix.compiler.gcxx }} -y
+          fi
+        else
           sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
           sudo apt update
           sudo apt install ${{ matrix.compiler.cxx }} -y
@@ -59,15 +49,27 @@ jobs:
         rm -rf build
         mkdir build
         cd build
-        cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=${{ matrix.compiler.cxx }}
+        CMAKE_EXTRA=""
+        if [[ -n "${{ matrix.compiler.stdlib }}" ]]; then
+          CMAKE_EXTRA="-DCMAKE_CXX_FLAGS=-stdlib=libc++"
+        elif [[ -n "${{ matrix.compiler.gccdir }}" ]]; then
+          CMAKE_EXTRA="-DCMAKE_CXX_FLAGS=--gcc-install-dir=${{ matrix.compiler.gccdir }}"
+        fi
+        cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=${{ matrix.compiler.cxx }} $CMAKE_EXTRA
         cmake --build . -j 4 --config Release
-        ctest --output-on-failure -C Release
+        ctest -V --output-on-failure -C Release
 
     - name: Build Debug
       run: |
         rm -rf build
         mkdir build
         cd build
-        cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=${{ matrix.compiler.cxx }}
+        CMAKE_EXTRA=""
+        if [[ -n "${{ matrix.compiler.stdlib }}" ]]; then
+          CMAKE_EXTRA="-DCMAKE_CXX_FLAGS=-stdlib=libc++"
+        elif [[ -n "${{ matrix.compiler.gccdir }}" ]]; then
+          CMAKE_EXTRA="-DCMAKE_CXX_FLAGS=--gcc-install-dir=${{ matrix.compiler.gccdir }}"
+        fi
+        cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=${{ matrix.compiler.cxx }} $CMAKE_EXTRA
         cmake --build . -j 4 --config Debug
-        ctest --output-on-failure -C Debug
+        ctest -V --output-on-failure -C Debug
