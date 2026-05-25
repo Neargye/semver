@@ -603,4 +603,66 @@ TEST_CASE("from_string") {
   }
 }
 
+TEST_CASE("coerce") {
+  SUBCASE("full version is unchanged") {
+    const auto v = semver::coerce("1.2.3");
+    REQUIRE(v.has_value());
+    REQUIRE(v->major() == 1);
+    REQUIRE(v->minor() == 2);
+    REQUIRE(v->patch() == 3);
+  }
+
+  SUBCASE("missing patch filled with 0") {
+    const auto v = semver::coerce("1.2");
+    REQUIRE(v.has_value());
+    REQUIRE(v->major() == 1);
+    REQUIRE(v->minor() == 2);
+    REQUIRE(v->patch() == 0);
+  }
+
+  SUBCASE("missing minor and patch filled with 0") {
+    const auto v = semver::coerce("1");
+    REQUIRE(v.has_value());
+    REQUIRE(v->major() == 1);
+    REQUIRE(v->minor() == 0);
+    REQUIRE(v->patch() == 0);
+  }
+
+  SUBCASE("v prefix is stripped") {
+    const auto v = semver::coerce("v1.2.3");
+    REQUIRE(v.has_value());
+    REQUIRE(v->major() == 1);
+    REQUIRE(v->minor() == 2);
+    REQUIRE(v->patch() == 3);
+  }
+
+  SUBCASE("V prefix is stripped") {
+    const auto v = semver::coerce("V2.0");
+    REQUIRE(v.has_value());
+    REQUIRE(v->major() == 2);
+    REQUIRE(v->minor() == 0);
+    REQUIRE(v->patch() == 0);
+  }
+
+  SUBCASE("pre-release tag is preserved") {
+    const auto v = semver::coerce("1.2.3-beta.1");
+    REQUIRE(v.has_value());
+    REQUIRE(v->prerelease_tag() == "beta.1");
+  }
+
+  SUBCASE("build metadata is preserved") {
+    const auto v = semver::coerce("1.2.3+build.42");
+    REQUIRE(v.has_value());
+    REQUIRE(v->build_metadata() == "build.42");
+  }
+
+  SUBCASE("no leading digits returns nullopt") {
+    REQUIRE_FALSE(semver::coerce("not-a-version").has_value());
+  }
+
+  SUBCASE("empty string returns nullopt") {
+    REQUIRE_FALSE(semver::coerce("").has_value());
+  }
+}
+
 

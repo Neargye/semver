@@ -351,3 +351,61 @@ TEST_CASE("range prerelease behavior in unions") {
   }
 }
 
+TEST_CASE("satisfies") {
+  semver::version v;
+
+  SUBCASE("version in range returns true") {
+    REQUIRE(semver::parse("1.5.0", v));
+    REQUIRE(semver::satisfies(v, ">=1.0.0 <2.0.0"));
+  }
+
+  SUBCASE("version outside range returns false") {
+    REQUIRE(semver::parse("2.0.0", v));
+    REQUIRE_FALSE(semver::satisfies(v, ">=1.0.0 <2.0.0"));
+  }
+
+  SUBCASE("prerelease excluded by default") {
+    REQUIRE(semver::parse("1.5.0-alpha", v));
+    REQUIRE_FALSE(semver::satisfies(v, ">=1.0.0 <2.0.0"));
+  }
+
+  SUBCASE("prerelease included with include_prerelease option") {
+    REQUIRE(semver::parse("1.5.0-alpha", v));
+    REQUIRE(semver::satisfies(v, ">=1.0.0-alpha <2.0.0", semver::include_prerelease));
+  }
+
+  SUBCASE("invalid range string returns false") {
+    REQUIRE(semver::parse("1.0.0", v));
+    REQUIRE_FALSE(semver::satisfies(v, "not a range"));
+  }
+
+  SUBCASE("OR-separated ranges") {
+    REQUIRE(semver::parse("2.5.0", v));
+    REQUIRE(semver::satisfies(v, "<1.0.0 || >=2.0.0"));
+  }
+}
+
+TEST_CASE("version_compare_option aliases") {
+  // Range has no prerelease tag in comparators, so pre-release versions are
+  // excluded by default (semver spec §11).
+  semver::range_set<> rs;
+  REQUIRE(semver::parse(">=1.0.0 <2.0.0", rs));
+
+  semver::version v_pre, v_rel;
+  REQUIRE(semver::parse("1.5.0-alpha", v_pre));
+  REQUIRE(semver::parse("1.5.0", v_rel));
+
+  SUBCASE("exclude_prerelease alias excludes prerelease versions") {
+    REQUIRE_FALSE(rs.contains(v_pre, semver::exclude_prerelease));
+    REQUIRE(rs.contains(v_rel, semver::exclude_prerelease));
+  }
+
+  SUBCASE("include_prerelease alias allows prerelease versions") {
+    REQUIRE(rs.contains(v_pre, semver::include_prerelease));
+    REQUIRE(rs.contains(v_rel, semver::include_prerelease));
+  }
+
+  // include_build_metadata was removed in the breaking-change refactor;
+  // use include_prerelease to allow pre-release versions through.
+}
+

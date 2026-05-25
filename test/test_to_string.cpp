@@ -195,4 +195,21 @@ TEST_CASE("to_chars — zero-allocation serialization") {
     const auto written = static_cast<std::size_t>(r.ptr - buf);
     REQUIRE(written == std::string_view("10.200.3000").size());
   }
+
+  SUBCASE("null first pointer returns value_too_large") {
+    version<> v;
+    REQUIRE(parse("1.2.3", v));
+    const auto r = semver::to_chars(nullptr, nullptr, v);
+    REQUIRE_FALSE(r);
+    REQUIRE(r.ec == std::errc::value_too_large);
+  }
+
+  SUBCASE("reversed pointers (last < first) returns value_too_large") {
+    version<> v;
+    REQUIRE(parse("1.2.3", v));
+    char buf[32];
+    const auto r = semver::to_chars(buf + 10, buf, v);
+    REQUIRE_FALSE(r);
+    REQUIRE(r.ec == std::errc::value_too_large);
+  }
 }

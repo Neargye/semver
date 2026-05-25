@@ -483,3 +483,221 @@ TEST_CASE("bump versions") {
     REQUIRE(b.patch() == 0);
   }
 }
+
+TEST_CASE("is_prerelease and has_build_metadata") {
+  SUBCASE("plain version has neither") {
+    version<> v;
+    REQUIRE(parse("1.2.3", v));
+    REQUIRE_FALSE(v.is_prerelease());
+    REQUIRE_FALSE(v.has_build_metadata());
+  }
+
+  SUBCASE("version with prerelease tag") {
+    version<> v;
+    REQUIRE(parse("1.2.3-alpha.1", v));
+    REQUIRE(v.is_prerelease());
+    REQUIRE_FALSE(v.has_build_metadata());
+  }
+
+  SUBCASE("version with build metadata") {
+    version<> v;
+    REQUIRE(parse("1.2.3+build.1", v));
+    REQUIRE_FALSE(v.is_prerelease());
+    REQUIRE(v.has_build_metadata());
+  }
+
+  SUBCASE("version with both") {
+    version<> v;
+    REQUIRE(parse("1.2.3-rc.1+sha.abc", v));
+    REQUIRE(v.is_prerelease());
+    REQUIRE(v.has_build_metadata());
+  }
+}
+
+TEST_CASE("compare_build") {
+  SUBCASE("identical versions with same build return 0") {
+    version<> a, b;
+    REQUIRE(parse("1.0.0+build.1", a));
+    REQUIRE(parse("1.0.0+build.1", b));
+    REQUIRE(compare_build(a, b) == 0);
+  }
+
+  SUBCASE("identical versions with different build are not equal") {
+    version<> a, b;
+    REQUIRE(parse("1.0.0+build.1", a));
+    REQUIRE(parse("1.0.0+build.2", b));
+    REQUIRE(compare_build(a, b) != 0);
+  }
+
+  SUBCASE("lower version is less even with large build metadata") {
+    version<> a, b;
+    REQUIRE(parse("1.0.0+build.99", a));
+    REQUIRE(parse("2.0.0+build.1", b));
+    REQUIRE(compare_build(a, b) < 0);
+  }
+
+  SUBCASE("no build metadata sorts before build metadata") {
+    version<> a, b;
+    REQUIRE(parse("1.0.0", a));
+    REQUIRE(parse("1.0.0+build", b));
+    REQUIRE(compare_build(a, b) < 0);
+  }
+}
+
+TEST_CASE("diff") {
+  SUBCASE("same version returns none") {
+    version<> a, b;
+    REQUIRE(parse("1.2.3", a));
+    REQUIRE(parse("1.2.3", b));
+    REQUIRE(diff(a, b) == version_diff::none);
+  }
+
+  SUBCASE("major differs") {
+    version<> a, b;
+    REQUIRE(parse("1.0.0", a));
+    REQUIRE(parse("2.0.0", b));
+    REQUIRE(diff(a, b) == version_diff::major);
+    REQUIRE(diff(b, a) == version_diff::major);
+  }
+
+  SUBCASE("minor differs") {
+    version<> a, b;
+    REQUIRE(parse("1.1.0", a));
+    REQUIRE(parse("1.2.0", b));
+    REQUIRE(diff(a, b) == version_diff::minor);
+  }
+
+  SUBCASE("patch differs") {
+    version<> a, b;
+    REQUIRE(parse("1.0.0", a));
+    REQUIRE(parse("1.0.1", b));
+    REQUIRE(diff(a, b) == version_diff::patch);
+  }
+
+  SUBCASE("major differs, newer has prerelease yields premajor") {
+    version<> a, b;
+    REQUIRE(parse("1.0.0", a));
+    REQUIRE(parse("2.0.0-alpha", b));
+    REQUIRE(diff(a, b) == version_diff::premajor);
+  }
+
+  SUBCASE("minor differs, newer has prerelease yields preminor") {
+    version<> a, b;
+    REQUIRE(parse("1.0.0", a));
+    REQUIRE(parse("1.1.0-beta", b));
+    REQUIRE(diff(a, b) == version_diff::preminor);
+  }
+
+  SUBCASE("patch differs, newer has prerelease yields prepatch") {
+    version<> a, b;
+    REQUIRE(parse("1.0.0", a));
+    REQUIRE(parse("1.0.1-rc.1", b));
+    REQUIRE(diff(a, b) == version_diff::prepatch);
+  }
+
+  SUBCASE("same release, only prerelease differs yields prerelease") {
+    version<> a, b;
+    REQUIRE(parse("1.0.0-alpha", a));
+    REQUIRE(parse("1.0.0-beta", b));
+    REQUIRE(diff(a, b) == version_diff::prerelease);
+  }
+
+  SUBCASE("same version including prerelease returns none") {
+    version<> a, b;
+    REQUIRE(parse("1.0.0-alpha.1", a));
+    REQUIRE(parse("1.0.0-alpha.1", b));
+    REQUIRE(diff(a, b) == version_diff::none);
+  }
+}
+
+TEST_CASE("inc") {
+  SUBCASE("none returns nullopt") {
+    version<> v;
+    REQUIRE(parse("1.2.3", v));
+    REQUIRE_FALSE(inc(v, version_diff::none).has_value());
+  }
+
+  SUBCASE("major bumps major, resets minor and patch") {
+    version<> v;
+    REQUIRE(parse("1.2.3", v));
+    const auto r = inc(v, version_diff::major);
+    REQUIRE(r.has_value());
+    REQUIRE(r->major() == 2);
+    REQUIRE(r->minor() == 0);
+    REQUIRE(r->patch() == 0);
+    REQUIRE(r->prerelease_tag().empty());
+  }
+
+  SUBCASE("minor bumps minor, resets patch") {
+    version<> v;
+    REQUIRE(parse("1.2.3", v));
+    const auto r = inc(v, version_diff::minor);
+    REQUIRE(r.has_value());
+    REQUIRE(r->major() == 1);
+    REQUIRE(r->minor() == 3);
+    REQUIRE(r->patch() == 0);
+  }
+
+  SUBCASE("patch bumps patch") {
+    version<> v;
+    REQUIRE(parse("1.2.3", v));
+    const auto r = inc(v, version_diff::patch);
+    REQUIRE(r.has_value());
+    REQUIRE(r->major() == 1);
+    REQUIRE(r->minor() == 2);
+    REQUIRE(r->patch() == 4);
+  }
+
+  SUBCASE("premajor with explicit pre tag") {
+    version<> v;
+    REQUIRE(parse("1.2.3", v));
+    const auto r = inc(v, version_diff::premajor, "alpha");
+    REQUIRE(r.has_value());
+    REQUIRE(r->major() == 2);
+    REQUIRE(r->minor() == 0);
+    REQUIRE(r->patch() == 0);
+    REQUIRE(r->prerelease_tag() == "alpha");
+  }
+
+  SUBCASE("premajor default pre is 0") {
+    version<> v;
+    REQUIRE(parse("1.2.3", v));
+    const auto r = inc(v, version_diff::premajor);
+    REQUIRE(r.has_value());
+    REQUIRE(r->prerelease_tag() == "0");
+  }
+
+  SUBCASE("prerelease bumps last numeric identifier") {
+    version<> v;
+    REQUIRE(parse("1.2.3-alpha.1", v));
+    const auto r = inc(v, version_diff::prerelease);
+    REQUIRE(r.has_value());
+    REQUIRE(r->major() == 1);
+    REQUIRE(r->minor() == 2);
+    REQUIRE(r->patch() == 3);
+    REQUIRE(r->prerelease_tag() == "alpha.2");
+  }
+
+  SUBCASE("prerelease: non-numeric last identifier appends .0") {
+    version<> v;
+    REQUIRE(parse("1.2.3-beta", v));
+    const auto r = inc(v, version_diff::prerelease);
+    REQUIRE(r.has_value());
+    REQUIRE(r->prerelease_tag() == "beta.0");
+  }
+
+  SUBCASE("prerelease on release version bumps patch and sets -0") {
+    version<> v;
+    REQUIRE(parse("1.2.3", v));
+    const auto r = inc(v, version_diff::prerelease);
+    REQUIRE(r.has_value());
+    REQUIRE(r->patch() == 4);
+    REQUIRE(r->prerelease_tag() == "0");
+  }
+
+  SUBCASE("invalid pre tag returns nullopt") {
+    version<> v;
+    REQUIRE(parse("1.2.3", v));
+    REQUIRE_FALSE(inc(v, version_diff::premajor, "bad pre!").has_value());
+  }
+}
