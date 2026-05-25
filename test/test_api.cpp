@@ -1,4 +1,4 @@
-// Tests for node-semver-inspired APIs: compare, rcompare, compare_build,
+// Tests for node-semver-inspired APIs: compare, rcompare, compare_with_build,
 // coerce (leading-zero stripping), inc (numeric increment), max_satisfying,
 // min_satisfying, clean.
 
@@ -61,25 +61,25 @@ TEST_CASE("rcompare is the reverse of compare") {
 }
 
 // ---------------------------------------------------------------------------
-// compare_build
+// compare_with_build
 // ---------------------------------------------------------------------------
 
-TEST_CASE("compare_build includes build metadata") {
+TEST_CASE("compare_with_build includes build metadata") {
   SUBCASE("same base, different build metadata") {
-    REQUIRE(compare_build(V("1.0.0+build.1"), V("1.0.0+build.2")) == -1);
-    REQUIRE(compare_build(V("1.0.0+build.2"), V("1.0.0+build.1")) ==  1);
-    REQUIRE(compare_build(V("1.0.0+build.1"), V("1.0.0+build.1")) ==  0);
+    REQUIRE(compare_with_build(V("1.0.0+build.1"), V("1.0.0+build.2")) == -1);
+    REQUIRE(compare_with_build(V("1.0.0+build.2"), V("1.0.0+build.1")) ==  1);
+    REQUIRE(compare_with_build(V("1.0.0+build.1"), V("1.0.0+build.1")) ==  0);
   }
 
   SUBCASE("different versions override build metadata ordering") {
-    REQUIRE(compare_build(V("2.0.0+zzz"), V("1.0.0+aaa")) == 1);
-    REQUIRE(compare_build(V("1.0.0+zzz"), V("2.0.0+aaa")) == -1);
+    REQUIRE(compare_with_build(V("2.0.0+zzz"), V("1.0.0+aaa")) == 1);
+    REQUIRE(compare_with_build(V("1.0.0+zzz"), V("2.0.0+aaa")) == -1);
   }
 
   SUBCASE("no build metadata equals empty build metadata") {
-    REQUIRE(compare_build(V("1.0.0"), V("1.0.0")) == 0);
-    REQUIRE(compare_build(V("1.0.0+build"), V("1.0.0")) == 1);
-    REQUIRE(compare_build(V("1.0.0"), V("1.0.0+build")) == -1);
+    REQUIRE(compare_with_build(V("1.0.0"), V("1.0.0")) == 0);
+    REQUIRE(compare_with_build(V("1.0.0+build"), V("1.0.0")) == 1);
+    REQUIRE(compare_with_build(V("1.0.0"), V("1.0.0+build")) == -1);
   }
 }
 
@@ -302,5 +302,72 @@ TEST_CASE("clean strips prefix/suffix whitespace, = and v") {
     const auto v = clean("1.2.3-alpha.1+build");
     REQUIRE(v.has_value());
     REQUIRE(v->to_string() == "1.2.3-alpha.1+build");
+  }
+}
+
+// ---------------------------------------------------------------------------
+// coerce: = prefix stripping (P2-4 fix — node-semver alignment)
+// node-semver coerce() accepts "=1.2.3", "= v1.2.3" etc. We now match that.
+// ---------------------------------------------------------------------------
+TEST_CASE("coerce strips = prefix (P2-4 fix)") {
+  SUBCASE("bare = prefix") {
+    const auto v = coerce("=1.2.3");
+    REQUIRE(v.has_value());
+    CHECK(v->to_string() == "1.2.3");
+  }
+
+  SUBCASE("= with space before version number") {
+    const auto v = coerce("= 1.2.3");
+    REQUIRE(v.has_value());
+    CHECK(v->to_string() == "1.2.3");
+  }
+
+  SUBCASE("= followed by v prefix") {
+    const auto v = coerce("=v1.2.3");
+    REQUIRE(v.has_value());
+    CHECK(v->to_string() == "1.2.3");
+  }
+
+  SUBCASE("= with space then v") {
+    const auto v = coerce("= v1.2.3");
+    REQUIRE(v.has_value());
+    CHECK(v->to_string() == "1.2.3");
+  }
+
+  SUBCASE("leading whitespace before =") {
+    const auto v = coerce("  =1.2.3");
+    REQUIRE(v.has_value());
+    CHECK(v->to_string() == "1.2.3");
+  }
+
+  SUBCASE("= combined with leading-zero stripping") {
+    const auto v = coerce("=01.02.03");
+    REQUIRE(v.has_value());
+    CHECK(v->to_string() == "1.2.3");
+  }
+
+  SUBCASE("= with missing minor/patch fills with 0") {
+    const auto v1 = coerce("=1");
+    REQUIRE(v1.has_value());
+    CHECK(v1->to_string() == "1.0.0");
+
+    const auto v2 = coerce("=1.2");
+    REQUIRE(v2.has_value());
+    CHECK(v2->to_string() == "1.2.0");
+  }
+
+  SUBCASE("= with prerelease suffix") {
+    const auto v = coerce("=1.2.3-alpha.1");
+    REQUIRE(v.has_value());
+    CHECK(v->to_string() == "1.2.3-alpha.1");
+  }
+
+  SUBCASE("== is not stripped: only one = removed, second = is not a digit/v") {
+    CHECK_FALSE(coerce("==1.2.3").has_value());
+  }
+
+  SUBCASE("bare = with no number returns nullopt") {
+    CHECK_FALSE(coerce("=").has_value());
+    CHECK_FALSE(coerce("=abc").has_value());
   }
 }

@@ -10,18 +10,13 @@ jobs:
       fail-fast: false
       matrix:
         compiler:
-        - { cc: "gcc-11",   cxx: "g++-11",     os: "ubuntu-22.04" }
-        - { cc: "gcc-12",   cxx: "g++-12",     os: "ubuntu-22.04" }
         - { cc: "gcc-13",   cxx: "g++-13",     os: "ubuntu-24.04" }
         - { cc: "gcc-14",   cxx: "g++-14",     os: "ubuntu-24.04" }
         - { cc: "gcc-15",   cxx: "g++-15",     os: "ubuntu-24.04" }
-        - { cc: "clang-15", cxx: "clang++-15", os: "ubuntu-22.04", stdlib: "libc++-15-dev" }
-        - { cc: "clang-16", cxx: "clang++-16", os: "ubuntu-22.04", stdlib: "libc++-16-dev" }
         - { cc: "clang-17", cxx: "clang++-17", os: "ubuntu-24.04", stdlib: "libc++-17-dev" }
         - { cc: "clang-18", cxx: "clang++-18", os: "ubuntu-24.04", stdlib: "libc++-18-dev" }
         - { cc: "clang-19", cxx: "clang++-19", os: "ubuntu-24.04", stdlib: "libc++-19-dev" }
         - { cc: "clang-20", cxx: "clang++-20", os: "ubuntu-24.04", stdlib: "libc++-20-dev" }
-        - { cc: "clang-16", cxx: "clang++-16", os: "ubuntu-22.04", gcxx: "g++-12", gccdir: "/usr/lib/gcc/x86_64-linux-gnu/12", label: "clang-16+libstdc++-12" }
         - { cc: "clang-18", cxx: "clang++-18", os: "ubuntu-24.04", gcxx: "g++-13", gccdir: "/usr/lib/gcc/x86_64-linux-gnu/13", label: "clang-18+libstdc++-13" }
         - { cc: "clang-18", cxx: "clang++-18", os: "ubuntu-24.04", gcxx: "g++-14", gccdir: "/usr/lib/gcc/x86_64-linux-gnu/14", label: "clang-18+libstdc++-14" }
 

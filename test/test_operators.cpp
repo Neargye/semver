@@ -514,33 +514,33 @@ TEST_CASE("is_prerelease and has_build_metadata") {
   }
 }
 
-TEST_CASE("compare_build") {
+TEST_CASE("compare_with_build") {
   SUBCASE("identical versions with same build return 0") {
     version<> a, b;
     REQUIRE(parse("1.0.0+build.1", a));
     REQUIRE(parse("1.0.0+build.1", b));
-    REQUIRE(compare_build(a, b) == 0);
+    REQUIRE(compare_with_build(a, b) == 0);
   }
 
   SUBCASE("identical versions with different build are not equal") {
     version<> a, b;
     REQUIRE(parse("1.0.0+build.1", a));
     REQUIRE(parse("1.0.0+build.2", b));
-    REQUIRE(compare_build(a, b) != 0);
+    REQUIRE(compare_with_build(a, b) != 0);
   }
 
   SUBCASE("lower version is less even with large build metadata") {
     version<> a, b;
     REQUIRE(parse("1.0.0+build.99", a));
     REQUIRE(parse("2.0.0+build.1", b));
-    REQUIRE(compare_build(a, b) < 0);
+    REQUIRE(compare_with_build(a, b) < 0);
   }
 
   SUBCASE("no build metadata sorts before build metadata") {
     version<> a, b;
     REQUIRE(parse("1.0.0", a));
     REQUIRE(parse("1.0.0+build", b));
-    REQUIRE(compare_build(a, b) < 0);
+    REQUIRE(compare_with_build(a, b) < 0);
   }
 }
 

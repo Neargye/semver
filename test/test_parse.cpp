@@ -271,15 +271,15 @@ TEST_CASE("from_chars_result contract") {
     REQUIRE(ptr == bad.data() + 4);
   }
 
-  SUBCASE("failed parse resets output object") {
+  SUBCASE("failed parse preserves the previous output object") {
     semver::version v;
     REQUIRE(semver::parse("2.3.4-alpha+meta", v));
     REQUIRE_FALSE(semver::parse("broken", v));
-    REQUIRE(v.major() == 0);
-    REQUIRE(v.minor() == 1);
-    REQUIRE(v.patch() == 0);
-    REQUIRE(v.prerelease_tag().empty());
-    REQUIRE(v.build_metadata().empty());
+    REQUIRE(v.major() == 2);
+    REQUIRE(v.minor() == 3);
+    REQUIRE(v.patch() == 4);
+    REQUIRE(v.prerelease_tag() == "alpha");
+    REQUIRE(v.build_metadata() == "meta");
   }
 
   SUBCASE("lexer failure preserves the previous output object") {
@@ -296,16 +296,15 @@ TEST_CASE("from_chars_result contract") {
     REQUIRE(v.build_metadata() == "meta");
   }
 
-  SUBCASE("trailing garbage preserves parsed prefix like from_chars") {
+  SUBCASE("trailing garbage leaves output unchanged") {
     semver::version v;
-    const auto result = semver::parse("2.3.4tail", v);
-    REQUIRE_FALSE(result);
-    REQUIRE(result.ec == std::errc::invalid_argument);
+    REQUIRE(semver::parse("2.3.4-alpha+meta", v));
+    REQUIRE_FALSE(semver::parse("2.3.4tail", v));
     REQUIRE(v.major() == 2);
     REQUIRE(v.minor() == 3);
     REQUIRE(v.patch() == 4);
-    REQUIRE(v.prerelease_tag().empty());
-    REQUIRE(v.build_metadata().empty());
+    REQUIRE(v.prerelease_tag() == "alpha");
+    REQUIRE(v.build_metadata() == "meta");
   }
 }
 
