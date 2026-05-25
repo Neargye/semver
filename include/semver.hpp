@@ -1005,7 +1005,11 @@ template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
   // Ignore lexer errors: unrecognized chars act as stop markers.
   // scan_tokens() always pushes an eol sentinel, so the parser stops cleanly.
   detail::lexer{std::string_view{first, len}}.scan_tokens(ts);
-  return detail::version_parser{ts}.parse(v);
+  version<I1, I2, I3> tmp;
+  const auto res = detail::version_parser{ts}.parse(tmp);
+  if (!res) return res;
+  v = std::move(tmp);
+  return res;
 }
 
 // Returns true if str is a valid semver string.

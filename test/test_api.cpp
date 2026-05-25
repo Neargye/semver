@@ -371,3 +371,86 @@ TEST_CASE("coerce strips = prefix (P2-4 fix)") {
     CHECK_FALSE(coerce("=abc").has_value());
   }
 }
+
+// ---------------------------------------------------------------------------
+// inc() returns nullopt on integer overflow (P1-2 contract)
+// ---------------------------------------------------------------------------
+TEST_CASE("inc() returns nullopt on integer overflow") {
+  SUBCASE("major overflow with uint8_t") {
+    const version<uint8_t> v{uint8_t{255}, uint8_t{0}, uint8_t{0}};
+    CHECK_FALSE(inc(v, version_diff::major).has_value());
+    CHECK_FALSE(inc(v, version_diff::premajor).has_value());
+  }
+
+  SUBCASE("minor overflow with uint8_t") {
+    const version<uint8_t> v{uint8_t{1}, uint8_t{255}, uint8_t{0}};
+    CHECK_FALSE(inc(v, version_diff::minor).has_value());
+    CHECK_FALSE(inc(v, version_diff::preminor).has_value());
+  }
+
+  SUBCASE("patch overflow with uint8_t") {
+    const version<uint8_t> v{uint8_t{1}, uint8_t{2}, uint8_t{255}};
+    CHECK_FALSE(inc(v, version_diff::patch).has_value());
+    CHECK_FALSE(inc(v, version_diff::prepatch).has_value());
+  }
+
+  SUBCASE("patch overflow for prerelease bump without existing tag") {
+    const version<uint8_t> v{uint8_t{1}, uint8_t{2}, uint8_t{255}};
+    CHECK_FALSE(inc(v, version_diff::prerelease).has_value());
+  }
+
+  SUBCASE("prerelease with existing tag does not bump patch — succeeds") {
+    // patch == 255 but we never call bump_patch: the base is {1,2,255}, pre stays.
+    const version<uint8_t> v{uint8_t{1}, uint8_t{2}, uint8_t{255}, "alpha.1"};
+    const auto r = inc(v, version_diff::prerelease);
+    REQUIRE(r.has_value());
+    CHECK(r->to_string() == "1.2.255-alpha.2");
+  }
+
+  SUBCASE("uint64_t max major returns nullopt") {
+    const version<uint64_t> v{std::numeric_limits<uint64_t>::max(), uint64_t{0}, uint64_t{0}};
+    CHECK_FALSE(inc(v, version_diff::major).has_value());
+    CHECK_FALSE(inc(v, version_diff::premajor).has_value());
+  }
+}
+
+// ---------------------------------------------------------------------------
+// coerce() falls back to M.m.p when the prerelease/build suffix is invalid
+// ---------------------------------------------------------------------------
+TEST_CASE("coerce() falls back to M.m.p on invalid suffix") {
+  SUBCASE("purely-numeric leading-zero prerelease identifier falls back") {
+    const auto v = coerce("1.0.0-01");
+    REQUIRE(v.has_value());
+    CHECK(v->to_string() == "1.0.0");
+  }
+
+  SUBCASE("multi-digit leading-zero numeric prerelease falls back") {
+    const auto v = coerce("1.2.3-0123");
+    REQUIRE(v.has_value());
+    CHECK(v->to_string() == "1.2.3");
+  }
+
+  SUBCASE("trailing dot in prerelease falls back") {
+    const auto v = coerce("1.2.3-alpha.");
+    REQUIRE(v.has_value());
+    CHECK(v->to_string() == "1.2.3");
+  }
+
+  SUBCASE("double dot in prerelease falls back") {
+    const auto v = coerce("1.2.3-alpha..1");
+    REQUIRE(v.has_value());
+    CHECK(v->to_string() == "1.2.3");
+  }
+
+  SUBCASE("valid prerelease is still preserved — no regression") {
+    const auto v = coerce("1.2.3-alpha.1");
+    REQUIRE(v.has_value());
+    CHECK(v->prerelease_tag() == "alpha.1");
+  }
+
+  SUBCASE("valid build metadata is still preserved — no regression") {
+    const auto v = coerce("1.2.3+build.42");
+    REQUIRE(v.has_value());
+    CHECK(v->build_metadata() == "build.42");
+  }
+}

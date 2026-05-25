@@ -712,4 +712,35 @@ TEST_CASE("clean") {
   }
 }
 
+// ---------------------------------------------------------------------------
+// parse() transactional behavior — output unchanged on failure
+// ---------------------------------------------------------------------------
+TEST_CASE("parse() leaves output unchanged on failure") {
+  SUBCASE("failed parse after valid parse does not corrupt output") {
+    version<> v;
+    REQUIRE(parse("1.2.3-alpha", v));
+    REQUIRE_FALSE(parse("not-a-version", v));
+    REQUIRE(v.major() == 1);
+    REQUIRE(v.minor() == 2);
+    REQUIRE(v.patch() == 3);
+    REQUIRE(v.prerelease_tag() == "alpha");
+  }
+
+  SUBCASE("default-constructed version (0.1.0) unchanged after failure") {
+    version<> v; // 0.1.0 per default constructor
+    REQUIRE_FALSE(parse("", v));
+    REQUIRE(v.major() == 0);
+    REQUIRE(v.minor() == 1); // default is 0.1.0, not 0.0.0
+    REQUIRE(v.patch() == 0);
+  }
+
+  SUBCASE("integer overflow failure leaves previous value unchanged") {
+    version<uint8_t> v;
+    REQUIRE(parse("1.2.3", v));
+    REQUIRE_FALSE(parse("256.0.0", v));
+    REQUIRE(v.major() == 1);
+    REQUIRE(v.minor() == 2);
+    REQUIRE(v.patch() == 3);
+  }
+}
 
