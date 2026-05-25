@@ -71,6 +71,14 @@
 #  pragma clang diagnostic ignored "-Wmissing-braces" // "suggest braces around subobject initializer" false positives
 #endif
 
+// GCC's -Wstringop-overflow fires as a false positive when to_chars is inlined
+// into undersized-buffer call sites: the write_num helper opaquifies p's offset,
+// so GCC loses the avail<needed guard and believes the loops may overflow.
+#if defined(__GNUC__) && !defined(__clang__)
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wstringop-overflow"
+#endif
+
 #if __cpp_impl_three_way_comparison >= 201907L
 #include <compare>
 #endif
@@ -1795,6 +1803,10 @@ namespace literals {
 
 #if defined(__clang__)
 #  pragma clang diagnostic pop
+#endif
+
+#if defined(__GNUC__) && !defined(__clang__)
+#  pragma GCC diagnostic pop
 #endif
 
 namespace std {
