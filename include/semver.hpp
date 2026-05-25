@@ -1035,11 +1035,11 @@ template <typename I1, typename I2, typename I3>
   p = write_num(p, v.patch());
   if (!v.prerelease_tag().empty()) {
     *p++ = '-';
-    for (char c : v.prerelease_tag()) *p++ = c;
+    for (char c : std::string_view{v.prerelease_tag()}) *p++ = c;
   }
   if (!v.build_metadata().empty()) {
     *p++ = '+';
-    for (char c : v.build_metadata()) *p++ = c;
+    for (char c : std::string_view{v.build_metadata()}) *p++ = c;
   }
   return detail::success(p);
 }
@@ -1801,8 +1801,11 @@ namespace std {
     std::size_t operator()(const semver::version<I1, I2, I3>& v) const noexcept {
       // build_metadata excluded per §10.
       // Fibonacci-derived mixing constant, width-appropriate.
-      static constexpr std::size_t kPhiHash =
-          sizeof(std::size_t) >= 8 ? std::size_t{0x9e3779b97f4a7c15ULL} : std::size_t{0x9e3779b9U};
+#if SIZE_MAX > 0xFFFFFFFFU
+      static constexpr std::size_t kPhiHash = std::size_t{0x9e3779b97f4a7c15ULL};
+#else
+      static constexpr std::size_t kPhiHash = std::size_t{0x9e3779b9U};
+#endif
       static constexpr auto hash_combine = [](std::size_t seed, std::size_t value) noexcept -> std::size_t {
         return seed ^ (value + kPhiHash + (seed << 6) + (seed >> 2));
       };
