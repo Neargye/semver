@@ -265,7 +265,7 @@ namespace semver {
     // Serializes to "MAJOR.MINOR.PATCH[-prerelease][+build]".
     [[nodiscard]] SEMVER_CONSTEXPR std::string to_string() const {
       std::string result(length(), '\0');
-      to_chars(result.data(), result.data() + result.size(), *this);
+      (void)to_chars(result.data(), result.data() + result.size(), *this);
       return result;
     }
 
@@ -785,14 +785,13 @@ private:
   }
 
   // Dot-separated tag parser used by both parse_prerelease_tag and parse_build_metadata.
-  // CheckLeadingZeros=true enforces spec §9 (no leading zeros in numeric identifiers).
-  template <bool CheckLeadingZeros>
-  SEMVER_CONSTEXPR from_chars_result parse_tag(std::string& out) {
+  // check_leading_zeros=true enforces spec §9 (no leading zeros in numeric identifiers).
+  SEMVER_CONSTEXPR from_chars_result parse_tag(std::string& out, bool check_leading_zeros) {
     out.clear();
     do {
       if (!out.empty()) out.push_back('.');
       const auto id_start = out.size();
-      if (const auto res = parse_identifier<CheckLeadingZeros>(out); !res) {
+      if (const auto res = parse_identifier(out, check_leading_zeros); !res) {
         if (id_start > 0) out.resize(id_start - 1); // roll back '.'
         return res;
       }
@@ -800,8 +799,8 @@ private:
     return success(stream.peek().lexeme);
   }
 
-  SEMVER_CONSTEXPR from_chars_result parse_prerelease_tag(std::string& out) { return parse_tag<true>(out); }
-  SEMVER_CONSTEXPR from_chars_result parse_build_metadata(std::string& out) { return parse_tag<false>(out); }
+  SEMVER_CONSTEXPR from_chars_result parse_prerelease_tag(std::string& out) { return parse_tag(out, true); }
+  SEMVER_CONSTEXPR from_chars_result parse_build_metadata(std::string& out) { return parse_tag(out, false); }
 
   // Skips a dot-separated tag (prerelease or build metadata) without building a string.
   // Used in parse_partial to discard build metadata with zero allocation.
@@ -813,10 +812,9 @@ private:
   }
 
   // Unified dot-separated identifier parser.
-  // CheckLeadingZeros=true: prerelease identifiers obey spec §9 (no leading zeros in numeric IDs).
-  // CheckLeadingZeros=false: build-metadata identifiers have no such restriction.
-  template <bool CheckLeadingZeros>
-  SEMVER_CONSTEXPR from_chars_result parse_identifier(std::string& out) {
+  // check_leading_zeros=true: prerelease identifiers obey spec §9 (no leading zeros in numeric IDs).
+  // check_leading_zeros=false: build-metadata identifiers have no such restriction.
+  SEMVER_CONSTEXPR from_chars_result parse_identifier(std::string& out, bool check_leading_zeros) {
     const auto start = out.size(); // append mode: track where this identifier begins
     // Peek before consuming: avoids advancing the stream on a non-starter token.
     if (!is_alphanumeric(stream.peek())) {
@@ -834,7 +832,7 @@ private:
         break;
       case token_type::digit: {
         const auto digit = t.value.digit;
-        if constexpr (CheckLeadingZeros) {
+        if (check_leading_zeros) {
           // Purely numeric identifiers must not have leading zeros (spec §9).
           // "1.2.3-01.alpha" → invalid; "1.2.3-01b" → valid (alphanumeric).
           if (out.size() == start && is_leading_zero(digit)) {
