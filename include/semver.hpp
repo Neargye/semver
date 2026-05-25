@@ -182,6 +182,14 @@ namespace semver {
 
     SEMVER_CONSTEXPR version(I1 major, I2 minor, I3 patch) noexcept : major_(major), minor_(minor), patch_(patch) {}
 
+    // Constructs a version with an explicit prerelease tag.
+    // Precondition: `prerelease` must be a valid semver §9 pre-release identifier
+    // (e.g. "alpha.1", "rc.2", "0") or empty. No validation is performed; passing
+    // an invalid string produces an object whose to_string() is not a valid semver string.
+    // Use try_parse()/from_string() when the prerelease string is not controlled by the caller.
+    SEMVER_CONSTEXPR version(I1 major, I2 minor, I3 patch, std::string_view prerelease)
+        : major_(major), minor_(minor), patch_(patch), prerelease_tag_(prerelease) {}
+
     version& operator=(const version&) = default;
     version& operator=(version&&) = default;
 
@@ -341,7 +349,10 @@ enum class token_type : std::uint8_t {
   letter,
   digit,
   range_operator,
-  logical_or
+  logical_or,
+  tilde,   // '~'
+  caret,   // '^'
+  wildcard // '*'  (x/X are lexed as letter but treated as wildcards in range context)
 };
 
 enum class range_operator : std::uint8_t {
@@ -475,6 +486,15 @@ private:
     case '=':
       add_range_operator_token(stream, range_operator::equal);
       break;
+    case '~':
+      add_token(stream, token_type::tilde);
+      break;
+    case '^':
+      add_token(stream, token_type::caret);
+      break;
+    case '*':
+      add_token(stream, token_type::wildcard);
+      break;
     default:
       if (is_digit(c)) {
         add_digit_token(stream, to_digit(c));
@@ -580,6 +600,23 @@ SEMVER_CONSTEXPR int compare_prerelease_tags(std::string_view lhs, std::string_v
   return lhs.empty() ? -1 : 1;
 }
 
+// Returns true for tokens that represent a wildcard version component: *, x, X.
+constexpr bool is_wildcard_token(const token& t) noexcept {
+  return t.type == token_type::wildcard ||
+         (t.type == token_type::letter && (t.value.letter == 'x' || t.value.letter == 'X'));
+}
+
+// A version with optional/wildcard components, used for range desugaring (~, ^, x-ranges, hyphen).
+// A nullopt component means "wildcard" — desugar functions fill it with 0 for lower bounds.
+struct partial_version {
+  std::optional<std::uint64_t> major, minor, patch;
+  std::string prerelease; // empty if absent
+
+  SEMVER_CONSTEXPR bool has_wildcard() const noexcept {
+    return !major.has_value() || !minor.has_value() || !patch.has_value();
+  }
+};
+
 class version_parser {
 public:
   SEMVER_CONSTEXPR explicit version_parser(token_stream& stream) : stream{stream} {}
@@ -626,6 +663,61 @@ public:
     }
 
     return result;
+  }
+
+  // Parses M[.m[.p]][-prerelease][+build] where any of M/m/p may be a wildcard (*, x, X).
+  // Used by range desugaring. Sets out.major/minor/patch to nullopt for wildcard components.
+  SEMVER_CONSTEXPR from_chars_result parse_partial(partial_version& out) {
+    out = {};
+
+    // Full wildcard (* / x / X) — all components unconstrained.
+    if (is_wildcard_token(stream.peek())) {
+      stream.advance();
+      return success(stream.peek().lexeme);
+    }
+
+    if (!stream.check(token_type::digit))
+      return failure(stream.peek().lexeme);
+
+    std::uint64_t n = 0;
+    if (auto r = parse_number(n); !r) return r;
+    out.major = n;
+
+    if (!stream.advance_if_match(token_type::dot))
+      return success(stream.peek().lexeme); // bare M
+
+    if (is_wildcard_token(stream.peek())) {
+      stream.advance();
+      return success(stream.peek().lexeme); // M.*  M.x
+    }
+    if (!stream.check(token_type::digit))
+      return success(stream.peek().lexeme);
+    if (auto r = parse_number(n); !r) return r;
+    out.minor = n;
+
+    if (!stream.advance_if_match(token_type::dot))
+      return success(stream.peek().lexeme); // M.m
+
+    if (is_wildcard_token(stream.peek())) {
+      stream.advance();
+      return success(stream.peek().lexeme); // M.m.*  M.m.x
+    }
+    if (!stream.check(token_type::digit))
+      return success(stream.peek().lexeme);
+    if (auto r = parse_number(n); !r) return r;
+    out.patch = n;
+
+    // Optional prerelease (validated by parse_tag<true>).
+    if (stream.advance_if_match(token_type::hyphen))
+      parse_prerelease_tag(out.prerelease); // best-effort in range context
+
+    // Build metadata is irrelevant for range matching — parse and discard.
+    if (stream.advance_if_match(token_type::plus)) {
+      std::string ignored;
+      parse_build_metadata(ignored);
+    }
+
+    return success(stream.peek().lexeme);
   }
 
 private:
@@ -1001,7 +1093,11 @@ template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
 }
 
 // Writes "MAJOR.MINOR.PATCH[-prerelease][+build]" to os.
-template <typename OStream, typename I1, typename I2, typename I3>
+template <typename OStream, typename I1, typename I2, typename I3,
+          typename = std::void_t<
+            decltype(std::declval<OStream&>() << std::declval<I1>()),
+            decltype(std::declval<OStream&>() << std::declval<char>()),
+            decltype(std::declval<OStream&>() << std::declval<std::string_view>())>>
 OStream& operator<<(OStream& os, const version<I1, I2, I3>& v) {
   os << v.major() << '.' << v.minor() << '.' << v.patch();
   if (!v.prerelease_tag().empty()) os << '-' << v.prerelease_tag();
@@ -1010,7 +1106,7 @@ OStream& operator<<(OStream& os, const version<I1, I2, I3>& v) {
 }
 
 // Three-way compare including build metadata. Non-standard — spec §10 says build SHOULD be ignored.
-// Sorts by M.m.p, then pre-release (spec §11), then build metadata (lexicographic, non-standard).
+// Compares by M.m.p, then pre-release (spec §11), then build metadata (lexicographic, non-standard).
 template <typename L1, typename L2, typename L3, typename R1, typename R2, typename R3>
 [[nodiscard]] SEMVER_CONSTEXPR int compare_build(const version<L1, L2, L3>& lhs, const version<R1, R2, R3>& rhs) noexcept {
   const int c = detail::compare_parsed(lhs, rhs, version_compare_option::include_prerelease);
@@ -1085,6 +1181,182 @@ namespace detail {
     version<I1, I2, I3> v;
     range_operator op;
   };
+
+  // -----------------------------------------------------------------------
+  // Range desugaring helpers
+  // -----------------------------------------------------------------------
+
+  // Constructs version M.m.p with prerelease "0" — the exclusive upper bound
+  // for range desugaring (<M.m.p-0 excludes M.m.p and all its pre-releases).
+  // Returns nullopt if any component overflows the target integer type.
+  template <typename I1, typename I2, typename I3>
+  SEMVER_CONSTEXPR std::optional<version<I1, I2, I3>>
+  make_upper_bound(std::uint64_t maj, std::uint64_t min_, std::uint64_t pat) {
+    if (!number_in_range<I1>(maj) || !number_in_range<I2>(min_) || !number_in_range<I3>(pat))
+      return std::nullopt;
+    return version<I1, I2, I3>{
+        static_cast<I1>(maj), static_cast<I2>(min_), static_cast<I3>(pat),
+        std::string_view{"0"}};
+  }
+
+  // Pushes a lower-bound comparator (>=) for the given partial_version.
+  template <typename I1, typename I2, typename I3>
+  SEMVER_CONSTEXPR bool push_lower(
+      const partial_version& pv,
+      std::uint64_t maj, std::uint64_t min_, std::uint64_t pat,
+      std::vector<range_comparator<I1, I2, I3>>& out) {
+    if (!number_in_range<I1>(maj) || !number_in_range<I2>(min_) || !number_in_range<I3>(pat))
+      return false;
+    if (!pv.prerelease.empty()) {
+      out.emplace_back(
+          version<I1, I2, I3>{static_cast<I1>(maj), static_cast<I2>(min_), static_cast<I3>(pat),
+                               std::string_view{pv.prerelease}},
+          range_operator::greater_or_equal);
+    } else {
+      out.emplace_back(
+          version<I1, I2, I3>{static_cast<I1>(maj), static_cast<I2>(min_), static_cast<I3>(pat)},
+          range_operator::greater_or_equal);
+    }
+    return true;
+  }
+
+  // X-range: *  →  >=0.0.0
+  //          M.* →  >=M.0.0 <(M+1).0.0-0
+  //          M.m.* → >=M.m.0 <M.(m+1).0-0
+  template <typename I1, typename I2, typename I3>
+  SEMVER_CONSTEXPR bool desugar_xrange(
+      const partial_version& pv,
+      std::vector<range_comparator<I1, I2, I3>>& out) {
+    const std::uint64_t maj  = pv.major.value_or(0);
+    const std::uint64_t min_ = pv.minor.value_or(0);
+    const std::uint64_t pat  = pv.patch.value_or(0);
+    if (!push_lower(pv, maj, min_, pat, out)) return false;
+    if (!pv.major.has_value()) return true; // * → >=0.0.0, no upper bound
+    if (!pv.minor.has_value()) {
+      if (maj == std::numeric_limits<std::uint64_t>::max()) return false;
+      auto ub = make_upper_bound<I1, I2, I3>(maj + 1, 0, 0);
+      if (!ub) return false;
+      out.emplace_back(*ub, range_operator::less);
+      return true;
+    }
+    // M.m.* or bare M.m — lock minor
+    if (min_ == std::numeric_limits<std::uint64_t>::max()) return false;
+    auto ub = make_upper_bound<I1, I2, I3>(maj, min_ + 1, 0);
+    if (!ub) return false;
+    out.emplace_back(*ub, range_operator::less);
+    return true;
+  }
+
+  // Tilde: ~M.m[.p] → >=M.m.p  <M.(m+1).0-0
+  //        ~M       → >=M.0.0   <(M+1).0.0-0
+  template <typename I1, typename I2, typename I3>
+  SEMVER_CONSTEXPR bool desugar_tilde(
+      const partial_version& pv,
+      std::vector<range_comparator<I1, I2, I3>>& out) {
+    const std::uint64_t maj  = pv.major.value_or(0);
+    const std::uint64_t min_ = pv.minor.value_or(0);
+    const std::uint64_t pat  = pv.patch.value_or(0);
+    if (!push_lower(pv, maj, min_, pat, out)) return false;
+    if (!pv.major.has_value()) return true; // ~* — no upper bound
+    if (pv.minor.has_value()) {
+      // ~M.m[.p] — lock minor
+      if (min_ == std::numeric_limits<std::uint64_t>::max()) return false;
+      auto ub = make_upper_bound<I1, I2, I3>(maj, min_ + 1, 0);
+      if (!ub) return false;
+      out.emplace_back(*ub, range_operator::less);
+    } else {
+      // ~M — lock major
+      if (maj == std::numeric_limits<std::uint64_t>::max()) return false;
+      auto ub = make_upper_bound<I1, I2, I3>(maj + 1, 0, 0);
+      if (!ub) return false;
+      out.emplace_back(*ub, range_operator::less);
+    }
+    return true;
+  }
+
+  // Caret: locks the leftmost non-zero component (or follows the node-semver
+  // rules for zero-prefixed and wildcard versions).
+  //   ^M.m.p (M>0)            → >=M.m.p  <(M+1).0.0-0
+  //   ^0.m.p (m>0)            → >=0.m.p  <0.(m+1).0-0
+  //   ^0.0.p                  → >=0.0.p  <0.0.(p+1)-0
+  //   ^M     / ^M.m (missing) → same as M>0 rule
+  //   ^0.m   (missing patch)  → >=0.m.0  <0.(m+1).0-0
+  //   ^0.0   (missing patch)  → >=0.0.0  <0.1.0-0
+  template <typename I1, typename I2, typename I3>
+  SEMVER_CONSTEXPR bool desugar_caret(
+      const partial_version& pv,
+      std::vector<range_comparator<I1, I2, I3>>& out) {
+    const std::uint64_t maj  = pv.major.value_or(0);
+    const std::uint64_t min_ = pv.minor.value_or(0);
+    const std::uint64_t pat  = pv.patch.value_or(0);
+    if (!push_lower(pv, maj, min_, pat, out)) return false;
+    if (maj > 0 || !pv.minor.has_value()) {
+      // Lock major: <(M+1).0.0-0
+      if (maj == std::numeric_limits<std::uint64_t>::max()) return false;
+      auto ub = make_upper_bound<I1, I2, I3>(maj + 1, 0, 0);
+      if (!ub) return false;
+      out.emplace_back(*ub, range_operator::less);
+    } else if (!pv.patch.has_value() || min_ > 0) {
+      // Lock minor: <0.(m+1).0-0
+      if (min_ == std::numeric_limits<std::uint64_t>::max()) return false;
+      auto ub = make_upper_bound<I1, I2, I3>(0, min_ + 1, 0);
+      if (!ub) return false;
+      out.emplace_back(*ub, range_operator::less);
+    } else {
+      // M=0, m=0, patch explicitly specified: lock patch <0.0.(p+1)-0
+      if (pat == std::numeric_limits<std::uint64_t>::max()) return false;
+      auto ub = make_upper_bound<I1, I2, I3>(0, 0, pat + 1);
+      if (!ub) return false;
+      out.emplace_back(*ub, range_operator::less);
+    }
+    return true;
+  }
+
+  // Hyphen range: lo - hi
+  //   lower: >=lo (missing components filled with 0)
+  //   upper: <=hi if hi.patch specified; <hi.M.(hi.m+1).0-0 if only M.m; <(hi.M+1).0.0-0 if only M
+  template <typename I1, typename I2, typename I3>
+  SEMVER_CONSTEXPR bool desugar_hyphen(
+      const partial_version& lo, const partial_version& hi,
+      std::vector<range_comparator<I1, I2, I3>>& out) {
+    const std::uint64_t lo_maj = lo.major.value_or(0);
+    const std::uint64_t lo_min = lo.minor.value_or(0);
+    const std::uint64_t lo_pat = lo.patch.value_or(0);
+    if (!push_lower(lo, lo_maj, lo_min, lo_pat, out)) return false;
+
+    const std::uint64_t hi_maj = hi.major.value_or(0);
+    const std::uint64_t hi_min = hi.minor.value_or(0);
+    const std::uint64_t hi_pat = hi.patch.value_or(0);
+    if (!number_in_range<I1>(hi_maj) || !number_in_range<I2>(hi_min) || !number_in_range<I3>(hi_pat))
+      return false;
+
+    if (hi.patch.has_value()) {
+      // Full upper: <=hi
+      if (!hi.prerelease.empty()) {
+        out.emplace_back(
+            version<I1, I2, I3>{static_cast<I1>(hi_maj), static_cast<I2>(hi_min), static_cast<I3>(hi_pat),
+                                 std::string_view{hi.prerelease}},
+            range_operator::less_or_equal);
+      } else {
+        out.emplace_back(
+            version<I1, I2, I3>{static_cast<I1>(hi_maj), static_cast<I2>(hi_min), static_cast<I3>(hi_pat)},
+            range_operator::less_or_equal);
+      }
+    } else if (hi.minor.has_value()) {
+      // M.m: <M.(m+1).0-0
+      if (hi_min == std::numeric_limits<std::uint64_t>::max()) return false;
+      auto ub = make_upper_bound<I1, I2, I3>(hi_maj, hi_min + 1, 0);
+      if (!ub) return false;
+      out.emplace_back(*ub, range_operator::less);
+    } else {
+      // M: <(M+1).0.0-0
+      if (hi_maj == std::numeric_limits<std::uint64_t>::max()) return false;
+      auto ub = make_upper_bound<I1, I2, I3>(hi_maj + 1, 0, 0);
+      if (!ub) return false;
+      out.emplace_back(*ub, range_operator::less);
+    }
+    return true;
+  }
 
   class range_parser;
 
@@ -1175,23 +1447,104 @@ namespace detail {
   private:
     token_stream& stream;
 
+    // Returns true if token t can begin a new comparator (operator, digit, *, ~, ^, x, X).
+    SEMVER_CONSTEXPR bool can_start_comparator(const token& t) const noexcept {
+      return t.type == token_type::range_operator
+          || t.type == token_type::digit
+          || t.type == token_type::tilde
+          || t.type == token_type::caret
+          || detail::is_wildcard_token(t); // covers *, x, X
+    }
+
     template <typename I1, typename I2, typename I3>
     SEMVER_CONSTEXPR from_chars_result parse_range(detail::range<I1, I2, I3>& out) {
       do {
         skip_whitespaces();
+        const token first = stream.peek();
 
-        if (const auto res = parse_range_comparator(out.ranges_comparators); !res) {
-          return res;
+        if (first.type == token_type::tilde) {
+          stream.advance();
+          skip_whitespaces();
+          detail::partial_version pv;
+          version_parser vp{stream};
+          if (auto r = vp.parse_partial(pv); !r) return r;
+          if (!detail::desugar_tilde<I1, I2, I3>(pv, out.ranges_comparators))
+            return failure(first.lexeme, std::errc::result_out_of_range);
+        }
+        else if (first.type == token_type::caret) {
+          stream.advance();
+          skip_whitespaces();
+          detail::partial_version pv;
+          version_parser vp{stream};
+          if (auto r = vp.parse_partial(pv); !r) return r;
+          if (!detail::desugar_caret<I1, I2, I3>(pv, out.ranges_comparators))
+            return failure(first.lexeme, std::errc::result_out_of_range);
+        }
+        else if (first.type == token_type::range_operator) {
+          // Explicit operator (>=, <=, <, >, =): existing strict-version logic.
+          if (auto res = parse_range_comparator(out.ranges_comparators); !res) return res;
+        }
+        else {
+          // No operator: bare version, X-range, or the left side of a hyphen range.
+          detail::partial_version pv;
+          version_parser vp{stream};
+          if (auto r = vp.parse_partial(pv); !r) return r;
+
+          skip_whitespaces(); // consume space before potential hyphen
+
+          // Hyphen range detection: next is '-', then ' ', then digit or wildcard.
+          // (The space before '-' was already consumed by skip_whitespaces above.)
+          if (stream.peek(0).type == token_type::hyphen
+              && stream.peek(1).type == token_type::space
+              && (stream.peek(2).type == token_type::digit
+                  || detail::is_wildcard_token(stream.peek(2)))) {
+            stream.advance(); // hyphen
+            stream.advance(); // space
+            detail::partial_version pv2;
+            version_parser vp2{stream};
+            if (auto r = vp2.parse_partial(pv2); !r) return r;
+            if (!detail::desugar_hyphen<I1, I2, I3>(pv, pv2, out.ranges_comparators))
+              return failure(first.lexeme, std::errc::result_out_of_range);
+          }
+          else if (pv.has_wildcard()) {
+            // X-range (any component is wildcard / unspecified).
+            if (!detail::desugar_xrange<I1, I2, I3>(pv, out.ranges_comparators))
+              return failure(first.lexeme, std::errc::result_out_of_range);
+          }
+          else {
+            // Plain bare version with all three components — treat as implicit '='.
+            if (!pv.major.has_value())
+              return failure(first.lexeme);
+            const std::uint64_t maj  = *pv.major;
+            const std::uint64_t min_ = pv.minor.value_or(0);
+            const std::uint64_t pat  = pv.patch.value_or(0);
+            if (!detail::number_in_range<I1>(maj) ||
+                !detail::number_in_range<I2>(min_) ||
+                !detail::number_in_range<I3>(pat))
+              return failure(first.lexeme, std::errc::result_out_of_range);
+            if (!pv.prerelease.empty()) {
+              out.ranges_comparators.emplace_back(
+                  version<I1, I2, I3>{static_cast<I1>(maj), static_cast<I2>(min_), static_cast<I3>(pat),
+                                      std::string_view{pv.prerelease}},
+                  range_operator::equal);
+            } else {
+              out.ranges_comparators.emplace_back(
+                  version<I1, I2, I3>{static_cast<I1>(maj), static_cast<I2>(min_), static_cast<I3>(pat)},
+                  range_operator::equal);
+            }
+          }
         }
 
         skip_whitespaces();
-
-      // bare version (no operator) counts as implicit '=': e.g. ">=1.0.0 2.0.0" ≡ ">=1.0.0 =2.0.0"
-      } while (stream.check(token_type::range_operator) || stream.check(token_type::digit));
+      } while (can_start_comparator(stream.peek()));
 
       return success(stream.peek().lexeme);
     }
 
+    // Parses an explicit-operator comparator (>=, <=, <, >, =) followed by a full M.m.p version.
+    // Known limitation: partial/wildcard versions combined with explicit operators (e.g. ">=1.x",
+    // "<=1.2") are not supported and will cause parse() to fail. Use tilde (~), caret (^), or
+    // bare X-range syntax ("1.x", "1.2") for partial-version ranges.
     template <typename I1, typename I2, typename I3>
     SEMVER_CONSTEXPR from_chars_result parse_range_comparator(std::vector<detail::range_comparator<I1, I2, I3>>& out) {
       range_operator op = range_operator::equal;

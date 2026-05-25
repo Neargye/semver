@@ -665,4 +665,52 @@ TEST_CASE("coerce") {
   }
 }
 
+TEST_CASE("clean") {
+  SUBCASE("plain version passes through") {
+    const auto v = semver::clean("1.2.3");
+    REQUIRE(v.has_value());
+    REQUIRE(v->major() == 1);
+    REQUIRE(v->minor() == 2);
+    REQUIRE(v->patch() == 3);
+  }
+
+  SUBCASE("leading = stripped") {
+    const auto v = semver::clean("=1.2.3");
+    REQUIRE(v.has_value());
+    REQUIRE(v->major() == 1);
+  }
+
+  SUBCASE("leading =v stripped") {
+    const auto v = semver::clean("=v1.2.3");
+    REQUIRE(v.has_value());
+    REQUIRE(v->major() == 1);
+    REQUIRE(v->minor() == 2);
+    REQUIRE(v->patch() == 3);
+  }
+
+  SUBCASE("leading v stripped") {
+    const auto v = semver::clean("v1.2.3-alpha");
+    REQUIRE(v.has_value());
+    REQUIRE(v->prerelease_tag() == "alpha");
+  }
+
+  SUBCASE("surrounding whitespace stripped") {
+    const auto v = semver::clean("  1.2.3  ");
+    REQUIRE(v.has_value());
+    REQUIRE(v->patch() == 3);
+  }
+
+  SUBCASE("incomplete version returns nullopt") {
+    REQUIRE_FALSE(semver::clean("1.2").has_value());
+  }
+
+  SUBCASE("tilde range returns nullopt") {
+    REQUIRE_FALSE(semver::clean("~1.2.3").has_value());
+  }
+
+  SUBCASE("double equals returns nullopt") {
+    REQUIRE_FALSE(semver::clean("==1.2.3").has_value());
+  }
+}
+
 

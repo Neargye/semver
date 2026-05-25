@@ -701,3 +701,46 @@ TEST_CASE("inc") {
     REQUIRE_FALSE(inc(v, version_diff::premajor, "bad pre!").has_value());
   }
 }
+
+TEST_CASE("compare and rcompare") {
+  version<> v100, v110, v200, v100pre;
+  REQUIRE(parse("1.0.0",       v100));
+  REQUIRE(parse("1.1.0",       v110));
+  REQUIRE(parse("2.0.0",       v200));
+  REQUIRE(parse("1.0.0-alpha", v100pre));
+
+  SUBCASE("compare: equal returns 0") {
+    REQUIRE(compare(v100, v100) == 0);
+  }
+
+  SUBCASE("compare: lower < higher returns -1") {
+    REQUIRE(compare(v100, v110) == -1);
+    REQUIRE(compare(v110, v200) == -1);
+  }
+
+  SUBCASE("compare: higher > lower returns 1") {
+    REQUIRE(compare(v200, v100) == 1);
+  }
+
+  SUBCASE("compare: pre-release < release") {
+    REQUIRE(compare(v100pre, v100) == -1);
+    REQUIRE(compare(v100, v100pre) == 1);
+  }
+
+  SUBCASE("rcompare is the reverse of compare") {
+    REQUIRE(rcompare(v100, v110) == 1);
+    REQUIRE(rcompare(v110, v100) == -1);
+    REQUIRE(rcompare(v100, v100) == 0);
+  }
+
+  SUBCASE("rcompare sorts descending via std::sort") {
+    std::vector<version<>> vs = {v100, v200, v110, v100pre};
+    std::sort(vs.begin(), vs.end(), [](const auto& a, const auto& b) {
+      return rcompare(a, b) < 0;
+    });
+    REQUIRE(vs[0] == v200);
+    REQUIRE(vs[1] == v110);
+    REQUIRE(vs[2] == v100);
+    REQUIRE(vs[3] == v100pre);
+  }
+}

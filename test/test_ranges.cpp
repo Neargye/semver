@@ -204,6 +204,19 @@ TEST_CASE("range parse failures") {
   SUBCASE("trailing garbage after valid union") {
     REQUIRE_FALSE(semver::parse(">=1.0.0 || <2.0.0 tail", rs));
   }
+
+  SUBCASE("tilde or caret without a following version") {
+    REQUIRE_FALSE(semver::parse("~",  rs));
+    REQUIRE_FALSE(semver::parse("^",  rs));
+    REQUIRE_FALSE(semver::parse("~ ", rs)); // leading space rejected before parser
+    REQUIRE_FALSE(semver::parse("^ ", rs));
+  }
+
+  SUBCASE("leading zeros rejected in advanced range versions") {
+    REQUIRE_FALSE(semver::parse("~01.2.3", rs));
+    REQUIRE_FALSE(semver::parse("~1.02.3", rs));
+    REQUIRE_FALSE(semver::parse("^01.0.0", rs));
+  }
 }
 
 TEST_CASE("range from_chars_result contract") {
@@ -407,5 +420,51 @@ TEST_CASE("version_compare_option aliases") {
 
   // include_build_metadata was removed in the breaking-change refactor;
   // use include_prerelease to allow pre-release versions through.
+}
+
+TEST_CASE("max_satisfying and min_satisfying") {
+  using V = semver::version<>;
+  std::vector<V> vs;
+  for (auto s : {"1.0.0", "1.2.0", "1.5.0", "2.0.0", "2.1.0"}) {
+    V v;
+    REQUIRE(semver::parse(s, v));
+    vs.push_back(v);
+  }
+
+  semver::range_set<> rs;
+  REQUIRE(semver::parse(">=1.0.0 <2.0.0", rs));
+
+  SUBCASE("max_satisfying returns iterator to highest matching version") {
+    const auto it = semver::max_satisfying(vs.begin(), vs.end(), rs);
+    REQUIRE(it != vs.end());
+    V expected;
+    REQUIRE(semver::parse("1.5.0", expected));
+    REQUIRE(*it == expected);
+  }
+
+  SUBCASE("min_satisfying returns iterator to lowest matching version") {
+    const auto it = semver::min_satisfying(vs.begin(), vs.end(), rs);
+    REQUIRE(it != vs.end());
+    V expected;
+    REQUIRE(semver::parse("1.0.0", expected));
+    REQUIRE(*it == expected);
+  }
+
+  SUBCASE("max_satisfying returns last when nothing satisfies") {
+    semver::range_set<> empty_match;
+    REQUIRE(semver::parse(">9.0.0", empty_match));
+    REQUIRE(semver::max_satisfying(vs.begin(), vs.end(), empty_match) == vs.end());
+  }
+
+  SUBCASE("min_satisfying returns last when nothing satisfies") {
+    semver::range_set<> empty_match;
+    REQUIRE(semver::parse(">9.0.0", empty_match));
+    REQUIRE(semver::min_satisfying(vs.begin(), vs.end(), empty_match) == vs.end());
+  }
+
+  SUBCASE("empty range returns last") {
+    REQUIRE(semver::max_satisfying(vs.end(), vs.end(), rs) == vs.end());
+    REQUIRE(semver::min_satisfying(vs.end(), vs.end(), rs) == vs.end());
+  }
 }
 
