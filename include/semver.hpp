@@ -58,6 +58,12 @@
 #include <utility>
 #include <vector>
 
+#if defined(__has_include)
+#  if __has_include(<format>)
+#    include <format>
+#  endif
+#endif
+
 #ifndef SEMVER_MAX_INPUT_LENGTH
 #define SEMVER_MAX_INPUT_LENGTH 512
 #endif
@@ -1836,8 +1842,7 @@ namespace std {
   };
 } // namespace std
 
-#if __cpp_lib_format >= 202110L
-#include <format>
+#if defined(__cpp_lib_format) && __cpp_lib_format >= 202110L
 namespace std {
   template <typename I1, typename I2, typename I3>
   struct formatter<semver::version<I1, I2, I3>> {
