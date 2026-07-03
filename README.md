@@ -16,13 +16,14 @@ if (semver::parse("1.2.3-alpha+build", v)) {
   v.prerelease_tag();  // "alpha"
 }
 
-semver::version v2{1, 0, 0};
-std::cout << v2;  // "1.0.0"
-assert(v2 > v);   // 1.0.0 > 1.2.3-alpha
+semver::version v2{2, 0, 0};
+std::cout << v2;  // "2.0.0"
+assert(v2 > v);   // 2.0.0 > 1.2.3-alpha
 
 semver::range_set rs;
 semver::parse(">=1.0.0 <2.0.0 || >3.2.1", rs);
-rs.contains(v);   // true
+rs.contains(v);                              // false: pre-releases excluded by default
+rs.contains(v, semver::include_prerelease);  // true
 ```
 
 More examples in [example/](example/).
@@ -77,19 +78,18 @@ range_set rs;
 semver::parse(">=1.0.0 <2.0.0 || 3.0.0", rs);
 rs.contains(v);                               // pre-releases excluded by default
 rs.contains(v, semver::include_prerelease);   // opt in explicitly
-rs.contains(v, semver::include_build_metadata); // non-standard, spec §10
 ```
 
-`include_prerelease`, `exclude_prerelease`, and `include_build_metadata` are predefined constants in `namespace semver` (aliases for the corresponding `version_compare_option` values).
+`include_prerelease` and `exclude_prerelease` are predefined constants in `namespace semver` (aliases for the corresponding `version_compare_option` values).
 
-Range syntax is comparator-based (`<`, `<=`, `>`, `>=`, `=`) with `||`. No tilde/caret/wildcard.
+Range syntax supports primitive comparators (`<`, `<=`, `>`, `>=`, `=`), OR sets with `||`, X-ranges (`*`, `x`, `X`), tilde ranges (`~1.2`), caret ranges (`^1.2.3`), and hyphen ranges (`1.2.3 - 2.0.0`).
 
 ### Utilities
 
 ```cpp
 version_diff diff(v1, v2);              // major/minor/patch/premajor/preminor/prepatch/prerelease/none
 optional<version> inc(v, kind, pre={}); // inverse of diff(); bumps v by kind, sets pre-release to pre
-int compare_build(v1, v2);              // -1/0/1, includes build metadata (non-standard extension)
+int compare_with_build(v1, v2);         // -1/0/1, includes build metadata (non-standard extension)
 bool satisfies(v, range_str);           // shorthand for parse(range_str) + contains(v)
 ```
 
@@ -99,7 +99,7 @@ bool satisfies(v, range_str);           // shorthand for parse(range_str) + cont
 |---------|-------|
 | `operator<=>` -> `std::strong_ordering` | `__cpp_impl_three_way_comparison` |
 | `"1.2.3-rc.1"_semver` consteval literal | `SEMVER_HAS_CONSTEVAL_LITERAL == 1` |
-| `std::format("{}", v)` | `__cpp_lib_format` |
+| `std::format("{}", v)` | `defined(__cpp_lib_format) && __cpp_lib_format >= 202110L` |
 | `std::hash<version>` | always |
 
 ## Constexpr
@@ -127,7 +127,7 @@ The `_semver` literal requires `__cpp_consteval` and additionally excludes MSVC 
 
 | Macro | Default | Purpose |
 |-------|---------|---------|
-| `SEMVER_MAX_INPUT_LENGTH` | `4096` | Inputs longer than this fail with `value_too_large` |
+| `SEMVER_MAX_INPUT_LENGTH` | `512` | Inputs longer than this fail with `value_too_large` |
 | `SEMVER_CONFIG_FILE` | -- | Custom config header, included before anything else |
 
 `SEMVER_HAS_CONSTEXPR`, `SEMVER_CONSTEXPR`, and `SEMVER_HAS_CONSTEVAL_LITERAL` are auto-detected -- don't define them yourself.
@@ -142,7 +142,12 @@ Drop [`semver.hpp`](include/semver.hpp) into your project, or use a package mana
   ```cmake
   CPMAddPackage(GITHUB_REPOSITORY Neargye/semver GIT_TAG x.y.z)
   ```
+- **CMake package**:
+  ```cmake
+  find_package(semver CONFIG REQUIRED)
+  target_link_libraries(your_target PRIVATE semver::semver)
+  ```
 
-Requires C++17. Tested on GCC >= 7, Clang >= 5, MSVC >= 14.20 (VS 2019).
+Requires C++17. CMake integration requires CMake >= 3.22. Tested on GCC >= 7, Clang >= 5, MSVC >= 14.20 (VS 2019).
 
 ## [MIT License](LICENSE)
