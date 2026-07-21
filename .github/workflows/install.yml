@@ -1,0 +1,31 @@
+name: install
+
+on: [push, pull_request]
+
+permissions: read-all
+
+jobs:
+  build:
+    name: CMake package
+    runs-on: ubuntu-24.04
+
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Install semver
+      run: |
+        cmake -S . -B build-install \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" \
+          -DSEMVER_OPT_BUILD_EXAMPLES=OFF \
+          -DSEMVER_OPT_BUILD_TESTS=OFF \
+          -DSEMVER_OPT_INSTALL=ON
+        cmake --install build-install --config Release
+
+    - name: Test installed package
+      run: |
+        cmake -S test/cmake-consumer -B build-consumer \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_PREFIX_PATH="${{ github.workspace }}/install"
+        cmake --build build-consumer --parallel
+        ctest --test-dir build-consumer --output-on-failure

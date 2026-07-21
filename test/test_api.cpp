@@ -1,7 +1,3 @@
-// Tests for node-semver-inspired APIs: compare, rcompare, compare_with_build,
-// coerce (leading-zero stripping), inc (numeric increment), max_satisfying,
-// min_satisfying, clean.
-
 #include <semver.hpp>
 #include <doctest.h>
 #include <array>
@@ -9,15 +5,7 @@
 
 using namespace semver;
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 static version<> V(std::string_view s) { return from_string(s); }
-
-// ---------------------------------------------------------------------------
-// compare / rcompare
-// ---------------------------------------------------------------------------
 
 TEST_CASE("compare returns -1, 0, or 1") {
   SUBCASE("less than") {
@@ -60,10 +48,6 @@ TEST_CASE("rcompare is the reverse of compare") {
   }
 }
 
-// ---------------------------------------------------------------------------
-// compare_with_build
-// ---------------------------------------------------------------------------
-
 TEST_CASE("compare_with_build includes build metadata") {
   SUBCASE("same base, different build metadata") {
     REQUIRE(compare_with_build(V("1.0.0+build.1"), V("1.0.0+build.2")) == -1);
@@ -82,10 +66,6 @@ TEST_CASE("compare_with_build includes build metadata") {
     REQUIRE(compare_with_build(V("1.0.0"), V("1.0.0+build")) == -1);
   }
 }
-
-// ---------------------------------------------------------------------------
-// coerce — tolerant parsing with leading-zero stripping
-// ---------------------------------------------------------------------------
 
 TEST_CASE("coerce strips leading zeros and fills missing components") {
   SUBCASE("leading zero on major") {
@@ -130,6 +110,18 @@ TEST_CASE("coerce strips leading zeros and fills missing components") {
     REQUIRE(v->to_string() == "1.2.3");
   }
 
+  SUBCASE("extra component is ignored after patch") {
+    const auto v = coerce("1.2.3.4");
+    REQUIRE(v.has_value());
+    REQUIRE(v->to_string() == "1.2.3");
+  }
+
+  SUBCASE("trailing text is ignored after patch") {
+    const auto v = coerce("1.2.3garbage");
+    REQUIRE(v.has_value());
+    REQUIRE(v->to_string() == "1.2.3");
+  }
+
   SUBCASE("non-numeric returns nullopt") {
     REQUIRE_FALSE(coerce("abc").has_value());
   }
@@ -140,10 +132,6 @@ TEST_CASE("coerce strips leading zeros and fills missing components") {
     REQUIRE(v->to_string() == "1.2.3-alpha.1");
   }
 }
-
-// ---------------------------------------------------------------------------
-// inc — bump version by diff type
-// ---------------------------------------------------------------------------
 
 TEST_CASE("inc with prerelease diff increments numeric identifier") {
   SUBCASE("last identifier is numeric: increments it") {
@@ -162,6 +150,18 @@ TEST_CASE("inc with prerelease diff increments numeric identifier") {
     const auto v = inc(V("1.0.0-alpha"), version_diff::prerelease);
     REQUIRE(v.has_value());
     REQUIRE(v->to_string() == "1.0.0-alpha.0");
+  }
+
+  SUBCASE("numeric identifier larger than uint64_t increments exactly") {
+    const auto v = inc(V("1.0.0-18446744073709551616"), version_diff::prerelease);
+    REQUIRE(v.has_value());
+    REQUIRE(v->to_string() == "1.0.0-18446744073709551617");
+  }
+
+  SUBCASE("arbitrarily long all-nines identifier grows by one digit") {
+    const auto v = inc(V("1.0.0-alpha.999999999999999999999999999999"), version_diff::prerelease);
+    REQUIRE(v.has_value());
+    REQUIRE(v->to_string() == "1.0.0-alpha.1000000000000000000000000000000");
   }
 
   SUBCASE("no prerelease: bumps patch and adds -0") {
@@ -186,10 +186,6 @@ TEST_CASE("inc with prerelease diff increments numeric identifier") {
     REQUIRE(v->to_string() == "1.3.0-0");
   }
 }
-
-// ---------------------------------------------------------------------------
-// max_satisfying / min_satisfying
-// ---------------------------------------------------------------------------
 
 TEST_CASE("max_satisfying returns highest matching version") {
   std::array<version<>, 4> vs = {V("1.0.0"), V("1.2.3"), V("2.0.0"), V("0.9.0")};
@@ -259,10 +255,6 @@ TEST_CASE("max_satisfying and min_satisfying with prerelease option") {
   }
 }
 
-// ---------------------------------------------------------------------------
-// clean
-// ---------------------------------------------------------------------------
-
 TEST_CASE("clean strips prefix/suffix whitespace, = and v") {
   SUBCASE("leading spaces and = and v") {
     const auto v = clean("  =v1.2.3  ");
@@ -303,13 +295,15 @@ TEST_CASE("clean strips prefix/suffix whitespace, = and v") {
     REQUIRE(v.has_value());
     REQUIRE(v->to_string() == "1.2.3-alpha.1+build");
   }
+
+  SUBCASE("input over configured maximum is rejected before trimming") {
+    std::string input(SEMVER_MAX_INPUT_LENGTH + 1, ' ');
+    input.replace(input.size() - 5, 5, "1.2.3");
+    REQUIRE_FALSE(clean(input).has_value());
+  }
 }
 
-// ---------------------------------------------------------------------------
-// coerce: = prefix stripping (P2-4 fix — node-semver alignment)
-// node-semver coerce() accepts "=1.2.3", "= v1.2.3" etc. We now match that.
-// ---------------------------------------------------------------------------
-TEST_CASE("coerce strips = prefix (P2-4 fix)") {
+TEST_CASE("coerce strips = prefix") {
   SUBCASE("bare = prefix") {
     const auto v = coerce("=1.2.3");
     REQUIRE(v.has_value());
@@ -372,9 +366,6 @@ TEST_CASE("coerce strips = prefix (P2-4 fix)") {
   }
 }
 
-// ---------------------------------------------------------------------------
-// inc() returns nullopt on integer overflow (P1-2 contract)
-// ---------------------------------------------------------------------------
 TEST_CASE("inc() returns nullopt on integer overflow") {
   SUBCASE("major overflow with uint8_t") {
     const version<uint8_t> v{uint8_t{255}, uint8_t{0}, uint8_t{0}};
@@ -399,8 +390,7 @@ TEST_CASE("inc() returns nullopt on integer overflow") {
     CHECK_FALSE(inc(v, version_diff::prerelease).has_value());
   }
 
-  SUBCASE("prerelease with existing tag does not bump patch — succeeds") {
-    // patch == 255 but we never call bump_patch: the base is {1,2,255}, pre stays.
+  SUBCASE("prerelease with existing tag does not bump patch") {
     const version<uint8_t> v{uint8_t{1}, uint8_t{2}, uint8_t{255}, "alpha.1"};
     const auto r = inc(v, version_diff::prerelease);
     REQUIRE(r.has_value());
@@ -414,9 +404,6 @@ TEST_CASE("inc() returns nullopt on integer overflow") {
   }
 }
 
-// ---------------------------------------------------------------------------
-// coerce() falls back to M.m.p when the prerelease/build suffix is invalid
-// ---------------------------------------------------------------------------
 TEST_CASE("coerce() falls back to M.m.p on invalid suffix") {
   SUBCASE("purely-numeric leading-zero prerelease identifier falls back") {
     const auto v = coerce("1.0.0-01");
@@ -442,13 +429,13 @@ TEST_CASE("coerce() falls back to M.m.p on invalid suffix") {
     CHECK(v->to_string() == "1.2.3");
   }
 
-  SUBCASE("valid prerelease is still preserved — no regression") {
+  SUBCASE("valid prerelease is preserved") {
     const auto v = coerce("1.2.3-alpha.1");
     REQUIRE(v.has_value());
     CHECK(v->prerelease_tag() == "alpha.1");
   }
 
-  SUBCASE("valid build metadata is still preserved — no regression") {
+  SUBCASE("valid build metadata is preserved") {
     const auto v = coerce("1.2.3+build.42");
     REQUIRE(v.has_value());
     CHECK(v->build_metadata() == "build.42");

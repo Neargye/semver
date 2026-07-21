@@ -167,8 +167,8 @@ TEST_CASE("operators") {
     constexpr std::string_view v7 = "1.0.0-rc.1";
     constexpr std::string_view v8 = "1.0.0";
 
-    auto lt = [](const semver::version<>& a, const semver::version<>& b) { return a < b; };
-    auto gt = [](const semver::version<>& a, const semver::version<>& b) { return a > b; };
+    const auto lt = [](const semver::version<>& a, const semver::version<>& b) { return a < b; };
+    const auto gt = [](const semver::version<>& a, const semver::version<>& b) { return a > b; };
 
     test_parse_and_compare_reverse_false(v1, v2, lt);
     test_parse_and_compare_reverse_false(v2, v3, lt);
@@ -472,6 +472,16 @@ TEST_CASE("bump versions") {
     REQUIRE(bm.major() == 2);
     REQUIRE(bm.minor() == 0);
     REQUIRE(bm.patch() == 0);
+  }
+
+  SUBCASE("overflow throws instead of wrapping in release builds") {
+    const version<uint8_t> max_major{uint8_t{255}, uint8_t{0}, uint8_t{0}};
+    const version<uint8_t> max_minor{uint8_t{1}, uint8_t{255}, uint8_t{0}};
+    const version<uint8_t> max_patch{uint8_t{1}, uint8_t{2}, uint8_t{255}};
+
+    CHECK_THROWS_AS((void)max_major.bump_major(), std::overflow_error);
+    CHECK_THROWS_AS((void)max_minor.bump_minor(), std::overflow_error);
+    CHECK_THROWS_AS((void)max_patch.bump_patch(), std::overflow_error);
   }
 
   SUBCASE("bump_major on 0.x.x") {

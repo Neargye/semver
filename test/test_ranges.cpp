@@ -217,6 +217,26 @@ TEST_CASE("range parse failures") {
     REQUIRE_FALSE(semver::parse("~1.02.3", rs));
     REQUIRE_FALSE(semver::parse("^01.0.0", rs));
   }
+
+  SUBCASE("invalid prerelease qualifiers are rejected in all range forms") {
+    REQUIRE_FALSE(semver::parse("^1.2.3-01", rs));
+    REQUIRE_FALSE(semver::parse("~1.2.3-alpha.", rs));
+    REQUIRE_FALSE(semver::parse("1.2.3-01", rs));
+    REQUIRE_FALSE(semver::parse("1.2.3 - 2.0.0-01", rs));
+  }
+
+  SUBCASE("invalid build metadata is rejected even though ranges ignore it") {
+    REQUIRE_FALSE(semver::parse("^1.2.3+", rs));
+    REQUIRE_FALSE(semver::parse("^1.2.3+build.", rs));
+    REQUIRE_FALSE(semver::parse("1.2.3+", rs));
+    REQUIRE_FALSE(semver::parse("1.2.3 - 2.0.0+build.", rs));
+  }
+
+  SUBCASE("explicit comparators require a complete version") {
+    REQUIRE_FALSE(semver::parse(">=1", rs));
+    REQUIRE_FALSE(semver::parse(">=1.2", rs));
+    REQUIRE_FALSE(semver::parse(">=1.x", rs));
+  }
 }
 
 TEST_CASE("range from_chars_result contract") {
@@ -243,7 +263,7 @@ TEST_CASE("range from_chars_result contract") {
     REQUIRE(ptr == bad.data() + 8);
   }
 
-  SUBCASE("failed parse — output left unchanged") {
+  SUBCASE("failed parse leaves output unchanged") {
     semver::range_set rs;
     semver::version v;
     REQUIRE(semver::parse(">=1.0.0", rs));
@@ -253,7 +273,7 @@ TEST_CASE("range from_chars_result contract") {
     const auto result = semver::parse("broken", rs);
     REQUIRE_FALSE(result);
     REQUIRE(result.ec == std::errc::invalid_argument);
-    REQUIRE(rs.contains(v)); // rs unchanged — still holds >=1.0.0
+    REQUIRE(rs.contains(v)); // rs still holds >=1.0.0.
   }
 
   SUBCASE("lexer failure preserves the previous range prefix") {
@@ -269,7 +289,7 @@ TEST_CASE("range from_chars_result contract") {
     REQUIRE(rs.contains(v));
   }
 
-  SUBCASE("trailing garbage — output not modified") {
+  SUBCASE("trailing garbage does not modify output") {
     semver::range_set rs;
     semver::version v;
     REQUIRE(semver::parse("1.5.0", v));
@@ -277,7 +297,7 @@ TEST_CASE("range from_chars_result contract") {
     const auto result = semver::parse(">=1.0.0 <2.0.0 tail", rs);
     REQUIRE_FALSE(result);
     REQUIRE(result.ec == std::errc::invalid_argument);
-    REQUIRE_FALSE(rs.contains(v)); // rs stayed empty — not partially filled
+    REQUIRE_FALSE(rs.contains(v)); // rs remains empty.
   }
 }
 
@@ -288,7 +308,7 @@ TEST_CASE("parse(range_set) transactional guarantee") {
   REQUIRE(semver::parse("1.5.0", v));
   REQUIRE(rs.contains(v));
 
-  SUBCASE("failure leaves out unchanged — previously valid range_set retained") {
+  SUBCASE("failure retains a previously valid range_set") {
     REQUIRE_FALSE(semver::parse(">=3.0.0 <4.0.0 !!", rs));
     REQUIRE(rs.contains(v)); // old value preserved, not corrupted
   }

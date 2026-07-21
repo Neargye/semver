@@ -1,14 +1,3 @@
-// Edge-case and regression tests covering issues found in the production readiness review.
-// P0-1: is_leading_zero loop bound
-// P0-2: validate_prerelease_tag + constructor assert contract
-// P0-3: uint_write_backward rename (verified via correct output)
-// P1-2: hyphen range with multiple spaces after '-'
-// P1-3: inc() direct construction (no string round-trip)
-// P1-4: parse_partial skip_tag (no allocation for discarded build metadata)
-// P1-5: operator<< (no SFINAE regressions)
-// P2-2: satisfies() range_set overload
-// P2-3: constexpr library version constants
-
 #include <semver.hpp>
 #include <doctest.h>
 #include <string>
@@ -17,12 +6,7 @@
 
 using namespace semver;
 
-// ---------------------------------------------------------------------------
-// P0-2: validate_prerelease_tag — indirectly via parse and compare
-// The 4-arg constructor now asserts that the tag is valid.
-// We test that correctly-formatted tags compare as the spec requires.
-// ---------------------------------------------------------------------------
-TEST_CASE("prerelease tag comparison correctness (P0-2)") {
+TEST_CASE("prerelease tag comparison correctness") {
   // Parsed versions: the parser guarantees no leading zeros in numeric identifiers.
   // These must compare correctly regardless of string length.
   SUBCASE("numeric identifiers compared by value, not length") {
@@ -72,10 +56,7 @@ TEST_CASE("prerelease tag comparison correctness (P0-2)") {
   }
 }
 
-// ---------------------------------------------------------------------------
-// P0-3: uint_write_backward (renamed from detail::to_chars) — verify output
-// ---------------------------------------------------------------------------
-TEST_CASE("to_chars serialization correctness (P0-3 regression)") {
+TEST_CASE("to_chars serialization correctness") {
   SUBCASE("single-digit components") {
     char buf[32];
     const auto v = *try_parse("1.2.3");
@@ -119,12 +100,7 @@ TEST_CASE("to_chars serialization correctness (P0-3 regression)") {
   }
 }
 
-// ---------------------------------------------------------------------------
-// P0-1: is_leading_zero boundary — parse prerelease with exactly the
-// right number of tokens (validates the loop exits before going OOB).
-// We test both valid single-char "0" and invalid "00".
-// ---------------------------------------------------------------------------
-TEST_CASE("leading zero detection boundary (P0-1)") {
+TEST_CASE("leading zero detection boundary") {
   SUBCASE("'0' alone is valid (single zero numeric identifier)") {
     CHECK(valid("1.0.0-0"));
     CHECK(valid("1.0.0-0.alpha.0"));
@@ -164,10 +140,7 @@ TEST_CASE("leading zero detection boundary (P0-1)") {
   }
 }
 
-// ---------------------------------------------------------------------------
-// P1-2: Hyphen range with multiple spaces around '-'
-// ---------------------------------------------------------------------------
-TEST_CASE("hyphen range with multiple spaces (P1-2)") {
+TEST_CASE("hyphen range with multiple spaces") {
   SUBCASE("two spaces after hyphen") {
     range_set<> rs;
     REQUIRE(parse("1.2.3 -  2.3.4", rs));
@@ -185,20 +158,19 @@ TEST_CASE("hyphen range with multiple spaces (P1-2)") {
     CHECK_FALSE(rs.contains(*try_parse("2.0.1"), include_prerelease));
   }
 
-  SUBCASE("single space still works (regression)") {
+  SUBCASE("single space works") {
     range_set<> rs;
     REQUIRE(parse("1.0.0 - 2.0.0", rs));
     CHECK(rs.contains(*try_parse("1.5.0"), include_prerelease));
   }
 
   SUBCASE("no space after hyphen is NOT a hyphen range") {
-    // "1.0.0 -2.0.0" is ambiguous/invalid — not treated as hyphen range
+    // "1.0.0 -2.0.0" is ambiguous and must not be treated as a hyphen range.
     range_set<> rs;
     const auto result = parse("1.0.0 -2.0.0", rs);
-    // Either fails to parse, or parses differently — just verify it doesn't
-    // silently match as a hyphen range.
+    // If it parses differently, it still must not silently match as a hyphen range.
     if (result) {
-      // If it parsed, it should NOT match 1.5.0 as a hyphen range would
+      // A hyphen range would match 1.5.0.
       CHECK_FALSE(rs.contains(*try_parse("1.5.0"), include_prerelease));
     }
   }
@@ -212,10 +184,7 @@ TEST_CASE("hyphen range with multiple spaces (P1-2)") {
   }
 }
 
-// ---------------------------------------------------------------------------
-// P1-3: inc() direct construction — no string round-trip
-// ---------------------------------------------------------------------------
-TEST_CASE("inc() direct construction correctness (P1-3)") {
+TEST_CASE("inc() direct construction correctness") {
   SUBCASE("premajor with explicit pre tag") {
     const auto v = inc(from_string("1.2.3"), version_diff::premajor, "beta");
     REQUIRE(v.has_value());
@@ -266,11 +235,7 @@ TEST_CASE("inc() direct construction correctness (P1-3)") {
   }
 }
 
-// ---------------------------------------------------------------------------
-// P1-4: parse_partial skips build metadata without allocating
-// (verified via successful parse of range strings with build metadata)
-// ---------------------------------------------------------------------------
-TEST_CASE("range parse with build metadata in range boundary (P1-4)") {
+TEST_CASE("range parse with build metadata in range boundary") {
   SUBCASE("caret range: build metadata on lower bound is discarded") {
     // ^1.2.3+build parses and the '+build' is stripped for range matching
     range_set<> rs;
@@ -294,10 +259,7 @@ TEST_CASE("range parse with build metadata in range boundary (P1-4)") {
   }
 }
 
-// ---------------------------------------------------------------------------
-// P1-5: operator<< — no SFINAE regressions
-// ---------------------------------------------------------------------------
-TEST_CASE("operator<< writes correct output (P1-5)") {
+TEST_CASE("operator<< writes correct output") {
   SUBCASE("release version") {
     std::ostringstream oss;
     oss << version<>{1, 2, 3};
@@ -323,10 +285,7 @@ TEST_CASE("operator<< writes correct output (P1-5)") {
   }
 }
 
-// ---------------------------------------------------------------------------
-// P2-2: satisfies() overload taking pre-parsed range_set
-// ---------------------------------------------------------------------------
-TEST_CASE("satisfies() range_set overload (P2-2)") {
+TEST_CASE("satisfies() range_set overload") {
   range_set<> rs;
   REQUIRE(parse("^1.2.0", rs));
 
@@ -368,10 +327,7 @@ TEST_CASE("satisfies() range_set overload (P2-2)") {
   }
 }
 
-// ---------------------------------------------------------------------------
-// P2-3: constexpr library version integer constants
-// ---------------------------------------------------------------------------
-TEST_CASE("constexpr library version constants (P2-3)") {
+TEST_CASE("constexpr library version constants") {
   static_assert(library_version_major == SEMVER_VERSION_MAJOR, "major mismatch");
   static_assert(library_version_minor == SEMVER_VERSION_MINOR, "minor mismatch");
   static_assert(library_version_patch == SEMVER_VERSION_PATCH, "patch mismatch");
@@ -386,9 +342,6 @@ TEST_CASE("constexpr library version constants (P2-3)") {
   CHECK(library_version.patch() == library_version_patch);
 }
 
-// ---------------------------------------------------------------------------
-// Additional edge cases: validate_prerelease_tag rules
-// ---------------------------------------------------------------------------
 TEST_CASE("validate_prerelease_tag contract via parse") {
   SUBCASE("empty dot-separated identifiers are invalid") {
     CHECK_FALSE(valid("1.0.0-.1"));       // leading dot
@@ -416,9 +369,6 @@ TEST_CASE("validate_prerelease_tag contract via parse") {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Regression: operator== / operator<=> (via <=> under C++20) correctness
-// ---------------------------------------------------------------------------
 TEST_CASE("operator== excludes build metadata (spec §10)") {
   const auto a = *try_parse("1.2.3+build.1");
   const auto b = *try_parse("1.2.3+build.2");
@@ -436,13 +386,10 @@ TEST_CASE("operator== includes prerelease") {
   CHECK(compare(a, b) == -1);
 }
 
-// ---------------------------------------------------------------------------
-// P0-2 fix: swap(version&, version&) is now SEMVER_CONSTEXPR
-// ---------------------------------------------------------------------------
-TEST_CASE("swap(version&, version&) correctness (P0-2 fix)") {
+TEST_CASE("swap(version&, version&) correctness") {
   SUBCASE("exchanges all fields including prerelease and build metadata") {
-    version<> a = *try_parse("1.2.3-alpha.1+build.1");
-    version<> b = *try_parse("4.5.6-beta.2+build.2");
+    auto a = *try_parse("1.2.3-alpha.1+build.1");
+    auto b = *try_parse("4.5.6-beta.2+build.2");
     using std::swap;
     swap(a, b);
     CHECK(a.major() == 4);
@@ -469,10 +416,10 @@ TEST_CASE("swap(version&, version&) correctness (P0-2 fix)") {
   }
 
   SUBCASE("swap is its own inverse (double-swap = identity)") {
-    version<> a = *try_parse("1.2.3-alpha");
-    const version<> a_orig = a;
-    version<> b = *try_parse("9.9.9");
-    const version<> b_orig = b;
+    auto a = *try_parse("1.2.3-alpha");
+    const auto a_orig = a;
+    auto b = *try_parse("9.9.9");
+    const auto b_orig = b;
     using std::swap;
     swap(a, b);
     swap(a, b);
@@ -492,11 +439,7 @@ TEST_CASE("swap(version&, version&) correctness (P0-2 fix)") {
 #endif
 }
 
-// ---------------------------------------------------------------------------
-// P0-1 fix: to_chars uses range-for instead of std::copy — now truly
-// constexpr in C++17/20 for versions with prerelease and/or build metadata.
-// ---------------------------------------------------------------------------
-TEST_CASE("to_chars: range-for covers all tag paths (P0-1 fix)") {
+TEST_CASE("to_chars covers all tag paths") {
   // Helper: parse s, serialize via to_chars, compare with original.
   const auto round_trip = [](std::string_view s) -> bool {
     const auto v = try_parse(std::string{s});
@@ -506,7 +449,7 @@ TEST_CASE("to_chars: range-for covers all tag paths (P0-1 fix)") {
     return r && std::string_view{buf, static_cast<std::size_t>(r.ptr - buf)} == s;
   };
 
-  SUBCASE("prerelease only — first range-for loop") {
+  SUBCASE("prerelease only") {
     CHECK(round_trip("1.2.3-alpha"));
     CHECK(round_trip("1.2.3-alpha.1"));
     CHECK(round_trip("1.2.3-0.3.7"));
@@ -514,13 +457,13 @@ TEST_CASE("to_chars: range-for covers all tag paths (P0-1 fix)") {
     CHECK(round_trip("1.0.0-x.7.z.92"));
   }
 
-  SUBCASE("build metadata only — second range-for loop") {
+  SUBCASE("build metadata only") {
     CHECK(round_trip("1.2.3+build.42"));
     CHECK(round_trip("1.0.0+20130313144700"));
     CHECK(round_trip("1.0.0+exp.sha.5114f85"));
   }
 
-  SUBCASE("both prerelease and build metadata — both loops") {
+  SUBCASE("both prerelease and build metadata") {
     CHECK(round_trip("1.2.3-beta.1+sha.1234"));
     CHECK(round_trip("1.0.0-alpha.1+build.99"));
     CHECK(round_trip("1.2.3----RC-SNAPSHOT.12.9.1--.12+788"));
@@ -535,8 +478,7 @@ TEST_CASE("to_chars: range-for covers all tag paths (P0-1 fix)") {
   }
 
 #if SEMVER_HAS_CONSTEXPR
-  // C++20 + constexpr std::string: to_chars must be evaluable at compile time
-  // for versions with prerelease — validates the range-for replacement.
+  // C++20 with constexpr std::string must evaluate prerelease serialization at compile time.
   static_assert([]() constexpr {
     const version<> v{1, 2, 3, "rc.1"};
     std::array<char, 32> buf = {};
@@ -548,11 +490,7 @@ TEST_CASE("to_chars: range-for covers all tag paths (P0-1 fix)") {
 #endif
 }
 
-// ---------------------------------------------------------------------------
-// P0-3 fix: operator<< has enable_if SFINAE guard in C++17 —
-// constrains overload to types derived from std::ios_base.
-// ---------------------------------------------------------------------------
-TEST_CASE("operator<< routes correctly to stream types (P0-3 fix)") {
+TEST_CASE("operator<< routes correctly to stream types") {
   SUBCASE("std::ostringstream (ios_base-derived): release version") {
     std::ostringstream oss;
     oss << version<>{2, 1, 0};
@@ -573,12 +511,7 @@ TEST_CASE("operator<< routes correctly to stream types (P0-3 fix)") {
   }
 }
 
-// ---------------------------------------------------------------------------
-// P3-1: SEMVER_MAX_INPUT_LENGTH reduced to 512 — boundary behaviour.
-// The existing test_validation.cpp tests use the macro dynamically so they
-// automatically cover the new limit. These subcases add targeted checks.
-// ---------------------------------------------------------------------------
-TEST_CASE("SEMVER_MAX_INPUT_LENGTH=512 boundary (P3-1)") {
+TEST_CASE("SEMVER_MAX_INPUT_LENGTH boundary") {
   static_assert(semver::max_input_length == SEMVER_MAX_INPUT_LENGTH,
       "max_input_length constant must match the macro");
 
@@ -595,7 +528,7 @@ TEST_CASE("SEMVER_MAX_INPUT_LENGTH=512 boundary (P3-1)") {
     s.append(SEMVER_MAX_INPUT_LENGTH - s.size() + 1, 'a');
     REQUIRE(s.size() == SEMVER_MAX_INPUT_LENGTH + 1);
     version<> v;
-    auto r = parse(s, v);
+    const auto r = parse(s, v);
     CHECK(!r);
     CHECK(r.ec == std::errc::value_too_large);
   }

@@ -3,7 +3,9 @@
 #include <array>
 #include <ostream>
 #include <optional>
+#include <string>
 #include <system_error>
+#include <type_traits>
 
 using namespace semver;
 
@@ -183,7 +185,9 @@ TEST_CASE("parse") {
 
 TEST_CASE("construct") {
   SUBCASE("version(major, minor, patch) constructor") {
-    const semver::version v{1u, 2u, 3u};
+    const semver::version v{1, 2, 3};
+    static_assert(std::is_same_v<std::remove_cv_t<decltype(v)>, semver::version<>>, "CTAD with integer literals must use the default component types");
+    static_assert(std::is_same_v<decltype(v.major()), std::uint32_t> && std::is_same_v<decltype(v.minor()), std::uint32_t> && std::is_same_v<decltype(v.patch()), std::uint32_t>, "version<> components must default to uint32_t");
     REQUIRE(v.major() == 1);
     REQUIRE(v.minor() == 2);
     REQUIRE(v.patch() == 3);
@@ -193,6 +197,12 @@ TEST_CASE("construct") {
     semver::version parsed;
     REQUIRE(semver::parse("1.2.3", parsed));
     REQUIRE(v == parsed);
+  }
+
+  SUBCASE("four-argument constructor uses default component types with CTAD") {
+    const semver::version v{1, 2, 3, "alpha.1"};
+    static_assert(std::is_same_v<std::remove_cv_t<decltype(v)>, semver::version<>>, "four-argument CTAD must use the default component types");
+    REQUIRE(v.to_string() == "1.2.3-alpha.1");
   }
 
   SUBCASE("single-type template version<uint32_t>") {
@@ -208,25 +218,21 @@ TEST_CASE("construct") {
 }
 
 TEST_CASE("parse number overflow") {
-  // Regression: a 20+-digit component must NOT silently wrap around.
-  // Before the fix, uint64_t overflow produced a valid-looking but wrong value.
   semver::version<> v;
 
-  SUBCASE("20-digit major wraps uint64_t — must be rejected") {
-    // 18446744073709551616 == 2^64, overflows uint64_t to 0
-    auto result = semver::parse("18446744073709551616.0.0", v);
+  SUBCASE("20-digit major wraps uint64_t and must be rejected") {
+    const auto result = semver::parse("18446744073709551616.0.0", v);
     REQUIRE_FALSE(result);
     REQUIRE(result.ec == std::errc::result_out_of_range);
   }
 
   SUBCASE("all-nines 20-digit component") {
-    auto result = semver::parse("99999999999999999999.0.0", v);
+    const auto result = semver::parse("99999999999999999999.0.0", v);
     REQUIRE_FALSE(result);
     REQUIRE(result.ec == std::errc::result_out_of_range);
   }
 
   SUBCASE("uint64_t max is still accepted for uint64_t version") {
-    // 18446744073709551615 == UINT64_MAX — valid for uint64_t components
     semver::version<uint64_t> big;
     REQUIRE(semver::parse("18446744073709551615.0.0", big));
     REQUIRE(big.major() == std::numeric_limits<uint64_t>::max());
@@ -251,14 +257,14 @@ TEST_CASE("from_chars_result contract") {
 
   SUBCASE("errc::invalid_argument for structurally malformed input") {
     semver::version v;
-    auto result = semver::parse("not-a-version", v);
+    const auto result = semver::parse("not-a-version", v);
     REQUIRE_FALSE(result);
     REQUIRE(result.ec == std::errc::invalid_argument);
   }
 
   SUBCASE("errc::result_out_of_range for typed component overflow") {
     semver::version<std::uint8_t> v;
-    auto result = semver::parse("256.0.0", v); // uint8_t max is 255
+    const auto result = semver::parse("256.0.0", v);
     REQUIRE_FALSE(result);
     REQUIRE(result.ec == std::errc::result_out_of_range);
   }
@@ -327,7 +333,7 @@ TEST_CASE("parse malformed identifiers") {
   }
 }
 
-TEST_CASE("prerelease precedence \u2014 semver spec \u00a711") {
+TEST_CASE("prerelease precedence from semver spec \u00a711") {
   // \u00a711.4: numeric-only identifiers compared as integers; alphanumeric compared
   // lexically; numeric always has lower precedence than alphanumeric;
   // more fields > fewer fields when the prefix is equal.
@@ -389,7 +395,7 @@ TEST_CASE("prerelease precedence \u2014 semver spec \u00a711") {
   }
 }
 
-TEST_CASE("from_chars — partial parse semantics") {
+TEST_CASE("from_chars partial parse semantics") {
   SUBCASE("exact version string consumes entire input") {
     const char buf[] = "1.2.3";
     version<> v;
@@ -401,7 +407,7 @@ TEST_CASE("from_chars — partial parse semantics") {
     REQUIRE(r.ptr == buf + 5);
   }
 
-  SUBCASE("stops at space — ptr points to first trailing char") {
+  SUBCASE("stops at space and ptr points to first trailing char") {
     const char buf[] = "1.2.3 extra";
     version<> v;
     const auto r = semver::from_chars(buf, buf + sizeof(buf) - 1, v);
@@ -413,7 +419,7 @@ TEST_CASE("from_chars — partial parse semantics") {
     REQUIRE(v.patch() == 3);
   }
 
-  SUBCASE("stops at newline — ptr points to newline") {
+  SUBCASE("stops at newline and ptr points to newline") {
     const char buf[] = "1.2.3\nmore";
     version<> v;
     const auto r = semver::from_chars(buf, buf + sizeof(buf) - 1, v);
@@ -513,6 +519,30 @@ TEST_CASE("from_chars — partial parse semantics") {
     REQUIRE(rfc);
     REQUIRE(semver::parse(std::string_view{buf, sizeof(buf) - 1}, vp));
     REQUIRE(vfc == vp);
+  }
+
+  SUBCASE("failed parse leaves output unchanged") {
+    const char buf[] = "garbage";
+    version<> v;
+    REQUIRE(semver::parse("2.3.4-alpha+meta", v));
+    const auto r = semver::from_chars(buf, buf + sizeof(buf) - 1, v);
+    REQUIRE_FALSE(r);
+    REQUIRE(r.ec == std::errc::invalid_argument);
+    REQUIRE(v.to_string() == "2.3.4-alpha+meta");
+  }
+
+  SUBCASE("input exceeding max length leaves output unchanged") {
+    std::string input = "1.0.0+";
+    input.append(SEMVER_MAX_INPUT_LENGTH - input.size() + 1, 'a');
+    REQUIRE(input.size() == SEMVER_MAX_INPUT_LENGTH + 1);
+
+    version<> v;
+    REQUIRE(semver::parse("2.3.4", v));
+    const auto r = semver::from_chars(input.data(), input.data() + input.size(), v);
+    REQUIRE_FALSE(r);
+    REQUIRE(r.ec == std::errc::value_too_large);
+    REQUIRE(r.ptr == input.data());
+    REQUIRE(v.to_string() == "2.3.4");
   }
 }
 
@@ -662,6 +692,11 @@ TEST_CASE("coerce") {
   SUBCASE("empty string returns nullopt") {
     REQUIRE_FALSE(semver::coerce("").has_value());
   }
+
+  SUBCASE("input over configured maximum returns nullopt") {
+    const std::string input(SEMVER_MAX_INPUT_LENGTH + 1, '1');
+    REQUIRE_FALSE(semver::coerce(input).has_value());
+  }
 }
 
 TEST_CASE("clean") {
@@ -712,9 +747,6 @@ TEST_CASE("clean") {
   }
 }
 
-// ---------------------------------------------------------------------------
-// parse() transactional behavior — output unchanged on failure
-// ---------------------------------------------------------------------------
 TEST_CASE("parse() leaves output unchanged on failure") {
   SUBCASE("failed parse after valid parse does not corrupt output") {
     version<> v;

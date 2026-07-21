@@ -2,6 +2,8 @@
 #include <doctest.h>
 #include <ostream>
 #include <string>
+#include <type_traits>
+#include <utility>
 #include "test_utils.hpp"
 
 using namespace semver;
@@ -88,7 +90,7 @@ TEST_CASE("SEMVER_MAX_INPUT_LENGTH") {
     input.append(SEMVER_MAX_INPUT_LENGTH - input.size() + 1, 'b');
     REQUIRE(input.size() == SEMVER_MAX_INPUT_LENGTH + 1);
     semver::version<> v;
-    auto result = semver::parse(input, v);
+    const auto result = semver::parse(input, v);
     REQUIRE_FALSE(result);
     REQUIRE(result.ec == std::errc::value_too_large);
   }
@@ -97,7 +99,7 @@ TEST_CASE("SEMVER_MAX_INPUT_LENGTH") {
     std::string input = ">=1.0.0+";
     input.append(SEMVER_MAX_INPUT_LENGTH - input.size() + 1, 'c');
     semver::range_set<> rs;
-    auto result = semver::parse(input, rs);
+    const auto result = semver::parse(input, rs);
     REQUIRE_FALSE(result);
     REQUIRE(result.ec == std::errc::value_too_large);
   }
@@ -107,7 +109,7 @@ TEST_CASE("from_chars_result pointer semantics") {
   SUBCASE("successful parse: ptr points past last consumed char") {
     const char input[] = "1.2.3";
     semver::version<> v;
-    auto result = semver::parse(std::string_view{input, 5}, v);
+    const auto result = semver::parse(std::string_view{input, 5}, v);
     REQUIRE(result);
     REQUIRE(result.ptr == input + 5);
   }
@@ -115,7 +117,7 @@ TEST_CASE("from_chars_result pointer semantics") {
   SUBCASE("partial input: ptr shows where parsing ended") {
     const char input[] = "1.2.3-alpha";
     semver::version<> v;
-    auto result = semver::parse(std::string_view{input, 11}, v);
+    const auto result = semver::parse(std::string_view{input, 11}, v);
     REQUIRE(result);
     REQUIRE(result.ptr == input + 11);
   }
@@ -123,7 +125,7 @@ TEST_CASE("from_chars_result pointer semantics") {
   SUBCASE("failed parse: ptr points at the offending character") {
     semver::version<> v;
     const char input[] = "1.2.x";
-    auto result = semver::parse(std::string_view{input, 5}, v);
+    const auto result = semver::parse(std::string_view{input, 5}, v);
     REQUIRE_FALSE(result);
     REQUIRE(*result.ptr == 'x');
   }
@@ -145,13 +147,48 @@ TEST_CASE("default constructor produces 0.1.0") {
   REQUIRE(v.to_string() == "0.1.0");
 }
 
+TEST_CASE("version copy and move preserve public state") {
+  static_assert(std::is_copy_constructible_v<semver::version<>>);
+  static_assert(std::is_copy_assignable_v<semver::version<>>);
+  static_assert(std::is_move_constructible_v<semver::version<>>);
+  static_assert(std::is_move_assignable_v<semver::version<>>);
+
+  const auto source = semver::from_string("1.2.3-alpha.1+build.42");
+
+  SUBCASE("copy constructor") {
+    const auto copy = source;
+    REQUIRE(copy.to_string() == "1.2.3-alpha.1+build.42");
+    REQUIRE(copy == source);
+  }
+
+  SUBCASE("copy assignment") {
+    semver::version<> assigned;
+    assigned = source;
+    REQUIRE(assigned.to_string() == "1.2.3-alpha.1+build.42");
+    REQUIRE(assigned == source);
+  }
+
+  SUBCASE("move constructor") {
+    auto move_source = semver::from_string("4.5.6-beta+build");
+    const auto moved = std::move(move_source);
+    REQUIRE(moved.to_string() == "4.5.6-beta+build");
+  }
+
+  SUBCASE("move assignment") {
+    auto move_source = semver::from_string("7.8.9-rc.1+sha");
+    semver::version<> moved;
+    moved = std::move(move_source);
+    REQUIRE(moved.to_string() == "7.8.9-rc.1+sha");
+  }
+}
+
 TEST_CASE("re-parsing into same object resets state") {
   semver::version<> v;
   REQUIRE(semver::parse("1.2.3-alpha+build", v));
   REQUIRE(v.prerelease_tag() == "alpha");
   REQUIRE(v.build_metadata() == "build");
 
-  // Parse a simple version — prerelease and build must be cleared
+  // Parsing a release version must clear prerelease and build metadata.
   REQUIRE(semver::parse("4.5.6", v));
   REQUIRE(v.major() == 4);
   REQUIRE(v.minor() == 5);

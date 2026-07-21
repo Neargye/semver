@@ -5,6 +5,7 @@
 #include <ostream>
 #include <sstream>
 #include <string>
+#include <type_traits>
 #include "test_utils.hpp"
 
 using namespace semver;
@@ -34,6 +35,12 @@ TEST_CASE("operator<<") {
     REQUIRE(parse("1.0.0-alpha.1+build.42", v));
     os << v;
     REQUIRE(os.str() == "1.0.0-alpha.1+build.42");
+  }
+
+  SUBCASE("uint8_t components are rendered as numbers") {
+    const version<std::uint8_t> v{std::uint8_t{255}, std::uint8_t{2}, std::uint8_t{3}};
+    os << v;
+    REQUIRE(os.str() == "255.2.3");
   }
 }
 
@@ -69,8 +76,7 @@ TEST_CASE("to_string with various integer widths") {
   }
 }
 
-#if __cpp_lib_format >= 202110L
-#include <format>
+#if defined(__cpp_lib_format) && __cpp_lib_format >= 202110L
 TEST_CASE("std::formatter") {
   semver::version<> v;
   REQUIRE(semver::parse("1.2.3-alpha.1+build.42", v));
@@ -97,7 +103,9 @@ TEST_CASE("std::formatter") {
 }
 #endif
 
-TEST_CASE("to_chars — zero-allocation serialization") {
+TEST_CASE("to_chars zero-allocation serialization") {
+  static_assert(std::is_same_v<semver::to_chars_result, semver::from_chars_result>, "to_chars_result must remain an alias of from_chars_result");
+
   SUBCASE("basic version") {
     version<> v;
     REQUIRE(parse("1.2.3", v));
