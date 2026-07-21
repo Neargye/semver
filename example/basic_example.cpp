@@ -48,14 +48,13 @@ int main() {
   assert(version > version2);
   assert(version2 < version);
 
-  // use 64-bit unsigned integer for large numbers
-  semver::version<std::uint64_t, std::uint64_t, std::uint64_t> version3;
+  semver::version<std::uint64_t> version3;
   if (semver::parse("0.0.999999999999", version3)) {
     std::cout << version3.major() << std::endl; // 0
     std::cout << version3.minor() << std::endl; // 0
     std::cout << version3.patch() << std::endl; // 999999999999
   }
 
-  const bool result = semver::valid("0.0.1-beta");
+  const auto result = semver::valid("0.0.1-beta");
   std::cout << std::boolalpha << result << std::endl; // true
 }

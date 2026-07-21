@@ -36,7 +36,7 @@ int main() {
 
     semver::version version;
     if (semver::parse("1.3.0", version)) {
-      const bool result = range.contains(version);
+      const auto result = range.contains(version);
       std::cout << result << std::endl; // true
     }
   }
@@ -45,7 +45,7 @@ int main() {
   if (semver::parse(">=1.0.0 <=2.0.0 || >=3.0.0", range2)) {
     semver::version version;
     if (semver::parse("3.5.0", version)) {
-      const bool result = range2.contains(version);
+      const auto result = range2.contains(version);
       std::cout << result << std::endl; // true
     }
   }
@@ -54,17 +54,14 @@ int main() {
   if (semver::parse(">1.2.3-alpha.3", range3)) {
     semver::version version;
     if (semver::parse("1.2.3-alpha.7", version)) {
-      const bool result = range3.contains(version);
+      const auto result = range3.contains(version);
       std::cout << result << std::endl; // true
     }
 
     if (semver::parse("3.4.5-alpha.9", version)) {
-      // By default, we exclude prerelease tag from comparison.
-      bool result = range3.contains(version);
+      auto result = range3.contains(version);
       std::cout << result << std::endl; // false
 
-      // But we can suppress this behavior by passing semver::version_compare_option::include_prerelease.
-      // For details see: https://github.com/npm/node-semver#prerelease-tags
       result = range3.contains(version, semver::version_compare_option::include_prerelease);
       std::cout << result << std::endl; // true
     }
