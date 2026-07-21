@@ -344,8 +344,7 @@ TEST_CASE("constexpr range_set") {
 TEST_CASE("constexpr version constructor") {
   static_assert([] {
     semver::version<> v{1, 2, 3};
-    return v.major() == 1 && v.minor() == 2 && v.patch() == 3
-        && v.prerelease_tag().empty() && v.build_metadata().empty();
+    return v.major() == 1 && v.minor() == 2 && v.patch() == 3 && v.prerelease_tag().empty() && v.build_metadata().empty();
   }());
 
   static_assert([] {

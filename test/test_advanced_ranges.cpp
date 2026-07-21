@@ -7,14 +7,18 @@ using namespace semver;
 
 static bool in(const char* range_str, const char* ver_str) {
   range_set<> rs;
-  if (!parse(range_str, rs)) return false;
+  if (!parse(range_str, rs))
+    return false;
+
   const auto v = try_parse(ver_str);
   return v && rs.contains(*v, include_prerelease);
 }
 
 static bool in_def(const char* range_str, const char* ver_str) {
   range_set<> rs;
-  if (!parse(range_str, rs)) return false;
+  if (!parse(range_str, rs))
+    return false;
+
   const auto v = try_parse(ver_str);
   return v && rs.contains(*v);
 }

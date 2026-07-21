@@ -121,8 +121,7 @@ ForwardIt min_satisfying(first, last, const range_set<>& range);
 ForwardIt max_satisfying(first, last, const range_set<>& range);
 ```
 
-`inc()` increments numeric prerelease identifiers without converting them to `std::uint64_t`, so valid identifiers are limited by `SEMVER_MAX_INPUT_LENGTH` rather than an integer
-conversion. Unlike direct `bump_*()` calls, `inc()` reports component overflow with `std::nullopt`.
+`inc()` increments numeric prerelease identifiers without converting them to `std::uint64_t`, so valid identifiers are limited by `SEMVER_MAX_INPUT_LENGTH` rather than an integer conversion. Unlike direct `bump_*()` calls, `inc()` reports component overflow with `std::nullopt`.
 
 ### Feature guards
 

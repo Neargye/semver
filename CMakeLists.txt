@@ -1,6 +1,10 @@
 ﻿cmake_minimum_required(VERSION 3.22)
 
-project(semver VERSION "1.0.0" LANGUAGES CXX)
+project(semver
+    VERSION "1.0.0"
+    HOMEPAGE_URL "https://github.com/Neargye/semver"
+    DESCRIPTION "Header-only C++17 library for Semantic Versioning 2.0.0"
+    LANGUAGES CXX)
 
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     set(IS_TOPLEVEL_PROJECT TRUE)
@@ -11,15 +15,6 @@ endif()
 option(SEMVER_OPT_BUILD_EXAMPLES "Build semver examples" ${IS_TOPLEVEL_PROJECT})
 option(SEMVER_OPT_BUILD_TESTS "Build and perform semver tests" ${IS_TOPLEVEL_PROJECT})
 option(SEMVER_OPT_INSTALL "Generate and install semver target" ${IS_TOPLEVEL_PROJECT})
-
-if(SEMVER_OPT_BUILD_EXAMPLES)
-    add_subdirectory(example)
-endif()
-
-if(SEMVER_OPT_BUILD_TESTS)
-    enable_testing()
-    add_subdirectory(test)
-endif()
 
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
@@ -34,7 +29,17 @@ target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_17)
 
 write_basic_package_version_file(${PROJECT_NAME}ConfigVersion.cmake
         VERSION ${PROJECT_VERSION}
-        COMPATIBILITY AnyNewerVersion)
+        COMPATIBILITY SameMajorVersion
+        ARCH_INDEPENDENT)
+
+if(SEMVER_OPT_BUILD_EXAMPLES)
+    add_subdirectory(example)
+endif()
+
+if(SEMVER_OPT_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(test)
+endif()
 
 if(SEMVER_OPT_INSTALL)
     install(TARGETS ${PROJECT_NAME}

@@ -443,7 +443,9 @@ TEST_CASE("to_chars covers all tag paths") {
   // Helper: parse s, serialize via to_chars, compare with original.
   const auto round_trip = [](std::string_view s) -> bool {
     const auto v = try_parse(std::string{s});
-    if (!v) return false;
+    if (!v)
+      return false;
+
     char buf[128] = {};
     const auto r = to_chars(buf, buf + sizeof(buf), *v);
     return r && std::string_view{buf, static_cast<std::size_t>(r.ptr - buf)} == s;
@@ -483,9 +485,7 @@ TEST_CASE("to_chars covers all tag paths") {
     const version<> v{1, 2, 3, "rc.1"};
     std::array<char, 32> buf = {};
     const auto r = to_chars(buf.data(), buf.data() + buf.size(), v);
-    return r.ec == std::errc{}
-        && buf[0] == '1' && buf[1] == '.' && buf[2] == '2' && buf[3] == '.'
-        && buf[4] == '3' && buf[5] == '-' && buf[6] == 'r' && buf[7] == 'c';
+    return r.ec == std::errc{} && buf[0] == '1' && buf[1] == '.' && buf[2] == '2' && buf[3] == '.' && buf[4] == '3' && buf[5] == '-' && buf[6] == 'r' && buf[7] == 'c';
   }(), "to_chars with prerelease must be constexpr when SEMVER_HAS_CONSTEXPR is set");
 #endif
 }

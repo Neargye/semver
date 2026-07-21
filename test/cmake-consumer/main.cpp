@@ -17,8 +17,7 @@ int main() {
   std::ostringstream stream;
   stream << direct;
 
-  const auto ok = parsed && parsed_prerelease && range_result && direct == *parsed && direct.to_string() == "1.2.3"
-               && prerelease.to_string() == "1.2.3-alpha.1" && stream.str() == "1.2.3" && !range.contains(*parsed_prerelease)
-               && range.contains(*parsed_prerelease, semver::include_prerelease);
+  const auto ok = parsed && parsed_prerelease && range_result && direct == *parsed && direct.to_string() == "1.2.3" && prerelease.to_string() == "1.2.3-alpha.1" && stream.str() == "1.2.3"
+               && !range.contains(*parsed_prerelease) && range.contains(*parsed_prerelease, semver::include_prerelease);
   return ok ? 0 : 1;
 }

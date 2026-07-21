@@ -43,6 +43,14 @@
 #define SEMVER_VERSION_MINOR 0
 #define SEMVER_VERSION_PATCH 0
 
+#if defined(SEMVER_CONFIG_FILE)
+#include SEMVER_CONFIG_FILE
+#endif
+
+#ifndef SEMVER_MAX_INPUT_LENGTH
+#define SEMVER_MAX_INPUT_LENGTH 512
+#endif
+
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
@@ -50,36 +58,22 @@
 #include <functional>
 #include <limits>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <system_error>
 #include <type_traits>
-#include <charconv>
 #include <utility>
 #include <vector>
 
-#if defined(__has_include)
-#  if __has_include(<format>)
-#    include <format>
-#  endif
+#if defined(__has_include) && __has_include(<version>)
+#  include <version>
 #endif
 
-#ifndef SEMVER_MAX_INPUT_LENGTH
-#define SEMVER_MAX_INPUT_LENGTH 512
+#if defined(__cpp_lib_format) && __cpp_lib_format >= 202110L
+#  include <format>
 #endif
 
-#if defined(SEMVER_CONFIG_FILE)
-#include SEMVER_CONFIG_FILE
-#endif
-
-#if defined(__clang__)
-#  pragma clang diagnostic push
-#  pragma clang diagnostic ignored "-Wmissing-braces" // "suggest braces around subobject initializer" false positives
-#endif
-
-// GCC's -Wstringop-overflow fires as a false positive when to_chars is inlined
-// into undersized-buffer call sites: the write_num helper opaquifies p's offset,
-// so GCC loses the avail<needed guard and believes the loops may overflow.
 #if defined(__GNUC__) && !defined(__clang__)
 #  pragma GCC diagnostic push
 #  pragma GCC diagnostic ignored "-Wstringop-overflow"
@@ -126,10 +120,9 @@
 
 namespace semver {
 
-  // Max input length for all parse functions. Configurable via SEMVER_MAX_INPUT_LENGTH.
+  // Maximum input length for all parsers.
   inline constexpr std::size_t max_input_length = SEMVER_MAX_INPUT_LENGTH;
 
-  // Compile-time library version integers; usable in static_assert and templates.
   inline constexpr std::uint32_t library_version_major = SEMVER_VERSION_MAJOR;
   inline constexpr std::uint32_t library_version_minor = SEMVER_VERSION_MINOR;
   inline constexpr std::uint32_t library_version_patch = SEMVER_VERSION_PATCH;
@@ -154,30 +147,37 @@ namespace semver {
       return dest;
     }
 
-    // Returns true when `tag` is a valid §9 pre-release identifier:
-    //   - non-empty dot-separated identifiers, chars [0-9A-Za-z-]
-    //   - no leading zeros in purely-numeric identifiers
+    // Checks SemVer §9 prerelease syntax.
     constexpr bool validate_prerelease_tag(std::string_view tag) noexcept {
-      if (tag.empty()) return true;
+      if (tag.empty())
+        return true;
+
       std::size_t start = 0;
       for (;;) {
         const auto dot = tag.find('.', start);
         const auto len = (dot == std::string_view::npos) ? tag.size() - start : dot - start;
-        if (len == 0) return false; // empty identifier (leading/trailing/double dot)
-        const std::string_view id = tag.substr(start, len);
+        if (len == 0)
+          return false; // empty identifier (leading/trailing/double dot)
+
+        const auto id = tag.substr(start, len);
         bool numeric = true;
         for (char c : id) {
-          const bool is_d = (c >= '0' && c <= '9');
-          const bool is_l = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
-          const bool is_h = (c == '-');
-          if (!is_d && !is_l && !is_h) return false; // invalid char
-          if (!is_d) numeric = false;
+          const auto is_d = (c >= '0' && c <= '9');
+          const auto is_l = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+          const auto is_h = (c == '-');
+          if (!is_d && !is_l && !is_h)
+            return false; // invalid char
+          if (!is_d)
+            numeric = false;
         }
         // Leading zero in a purely-numeric identifier is forbidden (semver §9).
-        if (numeric && len > 1 && id[0] == '0') return false;
-        if (dot == std::string_view::npos) break;
+        if (numeric && len > 1 && id[0] == '0')
+          return false;
+        if (dot == std::string_view::npos)
+          break;
         start = dot + 1;
-        if (start > tag.size()) return false; // trailing dot
+        if (start > tag.size())
+          return false; // trailing dot
       }
       return true;
     }
@@ -229,9 +229,7 @@ namespace semver {
 
     SEMVER_CONSTEXPR version(I1 major, I2 minor, I3 patch) noexcept : major_(major), minor_(minor), patch_(patch) {}
 
-    // Precondition: prerelease must be a valid semver §9 identifier (e.g. "alpha.1", "0")
-    // or empty. Passing an invalid string is a precondition violation (asserted in debug
-    // builds); use try_parse()/from_string() for untrusted input.
+    // prerelease must be empty or valid SemVer §9; use parsing functions for untrusted input.
     SEMVER_CONSTEXPR version(I1 major, I2 minor, I3 patch, std::string_view prerelease) : major_(major), minor_(minor), patch_(patch), prerelease_tag_(prerelease) {
       assert(detail::validate_prerelease_tag(prerelease) && "semver: invalid prerelease tag (bad chars, empty id, or leading zero in numeric id)");
     }
@@ -252,19 +250,25 @@ namespace semver {
     [[nodiscard]] SEMVER_CONSTEXPR I2 minor() const noexcept { return minor_; }
     [[nodiscard]] SEMVER_CONSTEXPR I3 patch() const noexcept { return patch_; }
 
-    // Returns (major+1).0.0; clears pre-release and build.
-    [[nodiscard]] SEMVER_CONSTEXPR version<I1, I2, I3> bump_major() const noexcept {
-      assert(major_ < std::numeric_limits<I1>::max() && "semver: bump_major overflow");
+    // Returns (major+1).0.0, clears qualifiers, and throws on overflow.
+    [[nodiscard]] SEMVER_CONSTEXPR version<I1, I2, I3> bump_major() const {
+      if (major_ == std::numeric_limits<I1>::max()) {
+        throw std::overflow_error{"semver: bump_major overflow"};
+      }
       return version<I1, I2, I3>{static_cast<I1>(major_ + I1{1}), I2{}, I3{}};
     }
-    // Returns major.(minor+1).0; clears pre-release and build.
-    [[nodiscard]] SEMVER_CONSTEXPR version<I1, I2, I3> bump_minor() const noexcept {
-      assert(minor_ < std::numeric_limits<I2>::max() && "semver: bump_minor overflow");
+    // Returns major.(minor+1).0, clears qualifiers, and throws on overflow.
+    [[nodiscard]] SEMVER_CONSTEXPR version<I1, I2, I3> bump_minor() const {
+      if (minor_ == std::numeric_limits<I2>::max()) {
+        throw std::overflow_error{"semver: bump_minor overflow"};
+      }
       return version<I1, I2, I3>{major_, static_cast<I2>(minor_ + I2{1}), I3{}};
     }
-    // Returns major.minor.(patch+1); clears pre-release and build.
-    [[nodiscard]] SEMVER_CONSTEXPR version<I1, I2, I3> bump_patch() const noexcept {
-      assert(patch_ < std::numeric_limits<I3>::max() && "semver: bump_patch overflow");
+    // Returns major.minor.(patch+1), clears qualifiers, and throws on overflow.
+    [[nodiscard]] SEMVER_CONSTEXPR version<I1, I2, I3> bump_patch() const {
+      if (patch_ == std::numeric_limits<I3>::max()) {
+        throw std::overflow_error{"semver: bump_patch overflow"};
+      }
       return version<I1, I2, I3>{major_, minor_, static_cast<I3>(patch_ + I3{1})};
     }
 
@@ -291,9 +295,7 @@ namespace semver {
     std::string build_metadata_;
 
     SEMVER_CONSTEXPR std::size_t length() const noexcept {
-      return detail::length(major_) + detail::length(minor_) + detail::length(patch_) + 2
-        + (prerelease_tag_.empty() ? 0 : prerelease_tag_.length() + 1)
-        + (build_metadata_.empty() ? 0 : build_metadata_.length() + 1);
+      return detail::length(major_) + detail::length(minor_) + detail::length(patch_) + 2 + (prerelease_tag_.empty() ? 0 : prerelease_tag_.length() + 1) + (build_metadata_.empty() ? 0 : build_metadata_.length() + 1);
     }
 
     SEMVER_CONSTEXPR void reset() noexcept {
@@ -306,6 +308,12 @@ namespace semver {
     }
   };
 
+  template <typename T1, typename T2, typename T3, std::enable_if_t<std::is_integral_v<T1> && std::is_integral_v<T2> && std::is_integral_v<T3>, int> = 0>
+  version(T1, T2, T3) -> version<>;
+
+  template <typename T1, typename T2, typename T3, std::enable_if_t<std::is_integral_v<T1> && std::is_integral_v<T2> && std::is_integral_v<T3>, int> = 0>
+  version(T1, T2, T3, std::string_view) -> version<>;
+
   // Follows std::from_chars/std::to_chars conventions.
   // ptr: one past last char on success; first invalid char on failure.
   // ec:  std::errc{} on success; invalid_argument, result_out_of_range, or value_too_large on failure.
@@ -316,7 +324,6 @@ namespace semver {
     [[nodiscard]] explicit constexpr operator bool() const noexcept { return ec == std::errc{}; }
   };
 
-  // Alias for from_chars_result; used as the return type of to_chars.
   using to_chars_result = from_chars_result;
 
   // Controls pre-release handling in range matching and ordering.
@@ -325,11 +332,10 @@ namespace semver {
     include_prerelease  // include pre-release versions in matching and ordering
   };
 
-  // Short-name aliases for version_compare_option.
   inline constexpr auto include_prerelease = version_compare_option::include_prerelease;
   inline constexpr auto exclude_prerelease = version_compare_option::exclude_prerelease;
 
-  // Returned by diff() — describes which component differs between two versions.
+  // Returned by diff(); describes which component differs between two versions.
   enum class version_diff : std::uint8_t {
     none,
     major,
@@ -368,17 +374,15 @@ constexpr char to_char(std::uint8_t i) noexcept {
 }
 
 constexpr int compare_numerically(std::string_view lhs, std::string_view rhs) noexcept {
-  // assume that strings don't have leading zeros (we've already checked it at parsing stage).
-  if (lhs.size() != rhs.size()) {
+  // Parsing already rejected leading zeros.
+  if (lhs.size() != rhs.size())
     return lhs.size() < rhs.size() ? -1 : 1;
-  }
 
   for (std::size_t i = 0; i < lhs.size(); ++i) {
-    int a = lhs[i] - '0';
-    int b = rhs[i] - '0';
-    if (a != b) {
+    const auto a = lhs[i] - '0';
+    const auto b = rhs[i] - '0';
+    if (a != b)
       return a < b ? -1 : 1;
-    }
   }
   return 0;
 }
@@ -427,7 +431,7 @@ public:
   }
 
   SEMVER_CONSTEXPR token advance() noexcept {
-    const token t = get(current);
+    const auto t = get(current);
     ++current;
     return t;
   }
@@ -442,16 +446,17 @@ public:
   }
 
   SEMVER_CONSTEXPR bool advance_if_match(token& token, token_type type) noexcept {
-    if (get(current).type != type) {
+    if (get(current).type != type)
       return false;
-    }
 
     token = advance();
     return true;
   }
 
   SEMVER_CONSTEXPR bool advance_if_match(token_type type) noexcept {
-    if (get(current).type != type) return false;
+    if (get(current).type != type)
+      return false;
+
     ++current;
     return true;
   }
@@ -466,7 +471,7 @@ private:
 
   SEMVER_CONSTEXPR token get(std::size_t i) const noexcept {
     assert(!tokens.empty() && "token_stream used before scan_tokens()");
-    // tokens.back() is always token_type::eol after scan_tokens(); used as safe OOB sentinel.
+    // The final eol token is the out-of-bounds sentinel.
     return i < tokens.size() ? tokens[i] : tokens.back();
   }
 };
@@ -481,12 +486,11 @@ public:
     while (!is_eol()) {
       result = scan_token(token_stream);
       if (!result) {
-        // Always push eol sentinel to preserve OOB invariant, even on failure.
+        // Preserve the sentinel on failure.
         token_stream.push({ token_type::eol, {}, result.ptr });
         return result;
       }
     }
-
     token_stream.push({ token_type::eol, {}, text_.data() + text_.size() });
 
     return result;
@@ -497,7 +501,7 @@ private:
   std::size_t current_pos_;
 
   SEMVER_CONSTEXPR from_chars_result scan_token(token_stream& stream) {
-    const char c = advance();
+    const auto c = advance();
 
     switch (c) {
     case ' ':
@@ -585,7 +589,9 @@ private:
   }
 
   SEMVER_CONSTEXPR bool advance_if_match(char c) noexcept {
-    if (is_eol() || text_[current_pos_] != c) return false;
+    if (is_eol() || text_[current_pos_] != c)
+      return false;
+
     ++current_pos_;
     return true;
   }
@@ -599,7 +605,8 @@ private:
 
 constexpr bool is_numeric_identifier(std::string_view id) noexcept {
   for (char c : id) {
-    if (!is_digit(c)) return false;
+    if (!is_digit(c))
+      return false;
   }
   return !id.empty();
 }
@@ -622,8 +629,8 @@ SEMVER_CONSTEXPR int compare_prerelease_tags(std::string_view lhs, std::string_v
     const auto lhs_id = next_identifier(lhs);
     const auto rhs_id = next_identifier(rhs);
 
-    const bool lhs_numeric = is_numeric_identifier(lhs_id);
-    const bool rhs_numeric = is_numeric_identifier(rhs_id);
+    const auto lhs_numeric = is_numeric_identifier(lhs_id);
+    const auto rhs_numeric = is_numeric_identifier(rhs_id);
 
     int cmp = 0;
     if (lhs_numeric && rhs_numeric) {
@@ -634,21 +641,21 @@ SEMVER_CONSTEXPR int compare_prerelease_tags(std::string_view lhs, std::string_v
       return lhs_numeric ? -1 : 1;
     }
 
-    if (cmp != 0) return cmp;
+    if (cmp != 0)
+      return cmp;
   }
 
-  if (lhs.empty() && rhs.empty()) return 0;
+  if (lhs.empty() && rhs.empty())
+    return 0;
+
   return lhs.empty() ? -1 : 1;
 }
 
-// Returns true for tokens that represent a wildcard version component: *, x, X.
 constexpr bool is_wildcard_token(const token& t) noexcept {
-  return t.type == token_type::wildcard ||
-         (t.type == token_type::letter && (t.value.letter == 'x' || t.value.letter == 'X'));
+  return t.type == token_type::wildcard || (t.type == token_type::letter && (t.value.letter == 'x' || t.value.letter == 'X'));
 }
 
-// A version with optional/wildcard components, used for range desugaring (~, ^, x-ranges, hyphen).
-// A nullopt component means "wildcard" — desugar functions fill it with 0 for lower bounds.
+// Optional components used for range desugaring; nullopt means wildcard.
 struct partial_version {
   std::optional<std::uint64_t> major, minor, patch;
   std::string prerelease; // empty if absent
@@ -666,52 +673,43 @@ public:
   SEMVER_CONSTEXPR from_chars_result parse(version<I1, I2, I3>& out) {
     out.reset();
 
-    from_chars_result result = parse_number(out.major_);
-    if (!result) {
+    auto result = parse_number(out.major_);
+    if (!result)
       return result;
-    }
 
-    if (!stream.advance_if_match(token_type::dot)) {
+    if (!stream.advance_if_match(token_type::dot))
       return failure(stream.peek().lexeme);
-    }
 
     result = parse_number(out.minor_);
-    if (!result) {
+    if (!result)
       return result;
-    }
 
-    if (!stream.advance_if_match(token_type::dot)) {
+    if (!stream.advance_if_match(token_type::dot))
       return failure(stream.peek().lexeme);
-    }
 
     result = parse_number(out.patch_);
-    if (!result) {
+    if (!result)
       return result;
-    }
 
     if (stream.advance_if_match(token_type::hyphen)) {
       result = parse_prerelease_tag(out.prerelease_tag_);
-      if (!result) {
+      if (!result)
         return result;
-      }
     }
 
     if (stream.advance_if_match(token_type::plus)) {
       result = parse_build_metadata(out.build_metadata_);
-      if (!result) {
+      if (!result)
         return result;
-      }
     }
 
     return result;
   }
 
-  // Parses M[.m[.p]][-prerelease][+build] where any of M/m/p may be a wildcard (*, x, X).
-  // Used by range desugaring. Sets out.major/minor/patch to nullopt for wildcard components.
+  // Parses a partial range version; nullopt components are wildcards.
   SEMVER_CONSTEXPR from_chars_result parse_partial(partial_version& out) {
     out = {};
 
-    // Full wildcard (* / x / X) — all components unconstrained.
     if (is_wildcard_token(stream.peek())) {
       stream.advance();
       return success(stream.peek().lexeme);
@@ -721,7 +719,9 @@ public:
       return failure(stream.peek().lexeme);
 
     std::uint64_t n = 0;
-    if (auto r = parse_number(n); !r) return r;
+    if (auto r = parse_number(n); !r)
+      return r;
+
     out.major = n;
 
     if (!stream.advance_if_match(token_type::dot))
@@ -733,7 +733,9 @@ public:
     }
     if (!stream.check(token_type::digit))
       return success(stream.peek().lexeme);
-    if (auto r = parse_number(n); !r) return r;
+    if (auto r = parse_number(n); !r)
+      return r;
+
     out.minor = n;
 
     if (!stream.advance_if_match(token_type::dot))
@@ -745,16 +747,20 @@ public:
     }
     if (!stream.check(token_type::digit))
       return success(stream.peek().lexeme);
-    if (auto r = parse_number(n); !r) return r;
+    if (auto r = parse_number(n); !r)
+      return r;
+
     out.patch = n;
 
-    // Optional prerelease (validated by parse_tag<true>).
-    if (stream.advance_if_match(token_type::hyphen))
-      parse_prerelease_tag(out.prerelease); // best-effort in range context
+    if (stream.advance_if_match(token_type::hyphen)) {
+      if (const auto r = parse_prerelease_tag(out.prerelease); !r)
+        return r;
+    }
 
-    // Build metadata is irrelevant for range matching — skip without allocation.
     if (stream.advance_if_match(token_type::plus)) {
-      skip_tag();
+      std::string ignored_build_metadata;
+      if (const auto r = parse_build_metadata(ignored_build_metadata); !r)
+        return r;
     }
 
     return success(stream.peek().lexeme);
@@ -765,11 +771,10 @@ private:
 
   template <typename Int>
   SEMVER_CONSTEXPR from_chars_result parse_number(Int& out) {
-    token token = stream.advance();
+    auto token = stream.advance();
 
-    if (!is_digit(token)) {
+    if (!is_digit(token))
       return failure(token.lexeme);
-    }
 
     const auto first_digit = token.value.digit;
     std::uint64_t result = first_digit;
@@ -784,9 +789,9 @@ private:
 
     while (stream.advance_if_match(token, token_type::digit)) {
       const auto d = token.value.digit;
-      if (result > (std::numeric_limits<std::uint64_t>::max() - d) / 10) {
+      if (result > (std::numeric_limits<std::uint64_t>::max() - d) / 10)
         return failure(token.lexeme, std::errc::result_out_of_range);
-      }
+
       result = result * 10 + d;
     }
 
@@ -798,15 +803,16 @@ private:
     return failure(token.lexeme, std::errc::result_out_of_range);
   }
 
-  // Dot-separated tag parser used by both parse_prerelease_tag and parse_build_metadata.
-  // check_leading_zeros=true enforces spec §9 (no leading zeros in numeric identifiers).
+  // Shared prerelease and build metadata parser.
   SEMVER_CONSTEXPR from_chars_result parse_tag(std::string& out, bool check_leading_zeros) {
     out.clear();
     do {
-      if (!out.empty()) out.push_back('.');
+      if (!out.empty())
+        out.push_back('.');
       const auto id_start = out.size();
       if (const auto res = parse_identifier(out, check_leading_zeros); !res) {
-        if (id_start > 0) out.resize(id_start - 1); // roll back '.'
+        if (id_start > 0)
+          out.resize(id_start - 1); // roll back '.'
         return res;
       }
     } while (stream.advance_if_match(token_type::dot));
@@ -816,25 +822,13 @@ private:
   SEMVER_CONSTEXPR from_chars_result parse_prerelease_tag(std::string& out) { return parse_tag(out, true); }
   SEMVER_CONSTEXPR from_chars_result parse_build_metadata(std::string& out) { return parse_tag(out, false); }
 
-  // Skips a dot-separated tag (prerelease or build metadata) without building a string.
-  // Used in parse_partial to discard build metadata with zero allocation.
-  SEMVER_CONSTEXPR void skip_tag() noexcept {
-    do {
-      if (!is_alphanumeric(stream.peek())) break;
-      while (is_alphanumeric(stream.peek())) stream.advance();
-    } while (stream.advance_if_match(token_type::dot));
-  }
-
-  // Unified dot-separated identifier parser.
-  // check_leading_zeros=true: prerelease identifiers obey spec §9 (no leading zeros in numeric IDs).
-  // check_leading_zeros=false: build-metadata identifiers have no such restriction.
+  // Parses one dot-separated identifier.
   SEMVER_CONSTEXPR from_chars_result parse_identifier(std::string& out, bool check_leading_zeros) {
-    const auto start = out.size(); // append mode: track where this identifier begins
-    // Peek before consuming: avoids advancing the stream on a non-starter token.
-    if (!is_alphanumeric(stream.peek())) {
+    const auto start = out.size();
+    if (!is_alphanumeric(stream.peek()))
       return failure(stream.peek().lexeme);
-    }
-    token t = stream.advance();
+
+    auto t = stream.advance();
 
     do {
       switch (t.type) {
@@ -847,8 +841,7 @@ private:
       case token_type::digit: {
         const auto digit = t.value.digit;
         if (check_leading_zeros) {
-          // Purely numeric identifiers must not have leading zeros (spec §9).
-          // "1.2.3-01.alpha" → invalid; "1.2.3-01b" → valid (alphanumeric).
+          // Numeric prerelease identifiers cannot have leading zeros.
           if (out.size() == start && is_leading_zero(digit)) {
             out.resize(start);
             return failure(t.lexeme);
@@ -858,27 +851,26 @@ private:
         break;
       }
       default:
-        // All token_type values are handled above; this branch is unreachable.
         out.resize(start);
         return failure(t.lexeme);
       }
-    } while (stream.advance_if_match(t, token_type::hyphen)
-          || stream.advance_if_match(t, token_type::letter)
-          || stream.advance_if_match(t, token_type::digit));
+    } while (stream.advance_if_match(t, token_type::hyphen) || stream.advance_if_match(t, token_type::letter) || stream.advance_if_match(t, token_type::digit));
 
     return success(stream.peek().lexeme);
   }
 
   SEMVER_CONSTEXPR bool is_leading_zero(int digit) noexcept {
-    if (digit != 0) return false;
-    // Scan ahead: letter/hyphen after '0' → alphanumeric identifier → OK.
-    // All digits → purely-numeric with leading zero → reject.
+    if (digit != 0)
+      return false;
+
     for (std::size_t k = 0; ; ++k) {
-      const token t = stream.peek(k);
-      if (!is_alphanumeric(t)) break;        // end of identifier (eol sentinel guarantees exit)
-      if (!is_digit(t))        return false;  // letter or hyphen → alphanumeric → OK
+      const auto t = stream.peek(k);
+      if (!is_alphanumeric(t))
+        break;
+      if (!is_digit(t))
+        return false;
     }
-    return is_digit(stream.peek(0)); // true iff '0' is followed by ≥1 digit
+    return is_digit(stream.peek(0));
   }
 
   SEMVER_CONSTEXPR bool is_digit(const token& token) const noexcept {
@@ -894,54 +886,54 @@ template <typename L1, typename L2, typename L3, typename R1, typename R2, typen
 SEMVER_CONSTEXPR int compare_prerelease(const version<L1, L2, L3>& lhs, const version<R1, R2, R3>& rhs) noexcept {
   const auto lhs_tag = lhs.prerelease_tag();
   const auto rhs_tag = rhs.prerelease_tag();
-  if (lhs_tag.empty() != rhs_tag.empty()) {
+  if (lhs_tag.empty() != rhs_tag.empty())
     return lhs_tag.empty() ? 1 : -1;
-  }
-  if (lhs_tag.empty()) {
+  if (lhs_tag.empty())
     return 0;
-  }
+
   return compare_prerelease_tags(lhs_tag, rhs_tag);
 }
 
 template <typename L1, typename L2, typename L3, typename R1, typename R2, typename R3>
 SEMVER_CONSTEXPR int compare_parsed(const version<L1, L2, L3>& lhs, const version<R1, R2, R3>& rhs, version_compare_option compare_option) noexcept {
-  if (detail::cmp_less(lhs.major(), rhs.major())) return -1;
-  if (detail::cmp_less(rhs.major(), lhs.major())) return  1;
+  if (detail::cmp_less(lhs.major(), rhs.major()))
+    return -1;
+  if (detail::cmp_less(rhs.major(), lhs.major()))
+    return  1;
 
-  if (detail::cmp_less(lhs.minor(), rhs.minor())) return -1;
-  if (detail::cmp_less(rhs.minor(), lhs.minor())) return  1;
+  if (detail::cmp_less(lhs.minor(), rhs.minor()))
+    return -1;
+  if (detail::cmp_less(rhs.minor(), lhs.minor()))
+    return  1;
 
-  if (detail::cmp_less(lhs.patch(), rhs.patch())) return -1;
-  if (detail::cmp_less(rhs.patch(), lhs.patch())) return  1;
+  if (detail::cmp_less(lhs.patch(), rhs.patch()))
+    return -1;
+  if (detail::cmp_less(rhs.patch(), lhs.patch()))
+    return  1;
 
-  if (compare_option == version_compare_option::include_prerelease) {
+  if (compare_option == version_compare_option::include_prerelease)
     return detail::compare_prerelease(lhs, rhs);
-  }
 
   return 0;
 }
 
 template <typename I1, typename I2, typename I3>
 [[nodiscard]] SEMVER_CONSTEXPR from_chars_result parse_version(std::string_view str, version<I1, I2, I3>& out) {
-  if (str.size() > SEMVER_MAX_INPUT_LENGTH) {
+  if (str.size() > SEMVER_MAX_INPUT_LENGTH)
     return failure(str.data(), std::errc::value_too_large);
-  }
 
   token_stream ts{str.size()};
-  from_chars_result result = lexer{ str }.scan_tokens(ts);
-  if (!result) {
+  auto result = lexer{str}.scan_tokens(ts);
+  if (!result)
     return result;
-  }
 
   version<I1, I2, I3> tmp;
-  result = version_parser{ ts }.parse(tmp);
-  if (!result) {
+  result = version_parser{ts}.parse(tmp);
+  if (!result)
     return result;
-  }
 
-  if (!ts.advance_if_match(token_type::eol)) {
+  if (!ts.advance_if_match(token_type::eol))
     return failure(ts.peek().lexeme);
-  }
 
   out = std::move(tmp);
   return success(ts.previous().lexeme);
@@ -959,8 +951,11 @@ template <typename L1, typename L2, typename L3, typename R1, typename R2, typen
 template <typename L1, typename L2, typename L3, typename R1, typename R2, typename R3>
 [[nodiscard]] SEMVER_CONSTEXPR std::strong_ordering operator<=>(const version<L1, L2, L3>& lhs, const version<R1, R2, R3>& rhs) noexcept {
   const int cmp = detail::compare_parsed(lhs, rhs, version_compare_option::include_prerelease);
-  if (cmp == 0) return std::strong_ordering::equal;
-  if (cmp > 0)  return std::strong_ordering::greater;
+  if (cmp == 0)
+    return std::strong_ordering::equal;
+  if (cmp > 0)
+    return std::strong_ordering::greater;
+
   return std::strong_ordering::less;
 }
 #else
@@ -990,14 +985,14 @@ template <typename L1, typename L2, typename L3, typename R1, typename R2, typen
 }
 #endif
 
-// Full-string parse — fails if any trailing characters remain.
+// Full-string parse; fails if any trailing characters remain.
 // On failure, output is left unchanged.
 template <typename I1, typename I2, typename I3>
 [[nodiscard]] SEMVER_CONSTEXPR from_chars_result parse(std::string_view str, version<I1, I2, I3>& output) {
   return detail::parse_version(str, output);
 }
 
-// Like std::from_chars — parses as far as possible, does not require full input consumption.
+// Like std::from_chars, parses as far as possible without requiring full input consumption.
 template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
 [[nodiscard]] SEMVER_CONSTEXPR from_chars_result from_chars(const char* first, const char* last, version<I1, I2, I3>& v) {
   if (!first || !last || last < first)
@@ -1008,12 +1003,13 @@ template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
     return detail::failure(first, std::errc::value_too_large);
 
   detail::token_stream ts{len};
-  // Ignore lexer errors: unrecognized chars act as stop markers.
-  // scan_tokens() always pushes an eol sentinel, so the parser stops cleanly.
+  // Unrecognized characters stop partial parsing.
   detail::lexer{std::string_view{first, len}}.scan_tokens(ts);
   version<I1, I2, I3> tmp;
   const auto res = detail::version_parser{ts}.parse(tmp);
-  if (!res) return res;
+  if (!res)
+    return res;
+
   v = std::move(tmp);
   return res;
 }
@@ -1025,31 +1021,26 @@ template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
   return static_cast<bool>(detail::parse_version(str, v));
 }
 
-// Zero-allocation serialization — follows std::to_chars semantics:
-//   on success: ptr points one past the last written character
-//   on failure (buffer too small): ptr == last, ec == std::errc::value_too_large
+// Zero-allocation serialization following std::to_chars conventions.
 template <typename I1, typename I2, typename I3>
 [[nodiscard]] constexpr to_chars_result to_chars(char* first, char* last, const version<I1, I2, I3>& v) noexcept {
-  const std::string_view pre  = v.prerelease_tag();
-  const std::string_view meta = v.build_metadata();
-  const std::size_t needed =
-      detail::length(v.major()) + detail::length(v.minor()) + detail::length(v.patch()) + 2
-      + (pre.empty()  ? std::size_t{0} : pre.size()  + 1)
-      + (meta.empty() ? std::size_t{0} : meta.size() + 1);
+  const auto pre = v.prerelease_tag();
+  const auto meta = v.build_metadata();
+  const auto needed = detail::length(v.major()) + detail::length(v.minor()) + detail::length(v.patch()) + 2 + (pre.empty() ? std::size_t{0} : pre.size() + 1) + (meta.empty() ? std::size_t{0} : meta.size() + 1);
   if (!first || !last || last < first)
     return detail::failure(last, std::errc::value_too_large);
+
   const auto avail = static_cast<std::size_t>(last - first);
   if (avail < needed)
     return detail::failure(last, std::errc::value_too_large);
 
-  // Fills decimal digits forward using backward-fill helper.
   auto write_num = [](char* p, auto n) noexcept -> char* {
     const auto len = detail::length(n);
-    detail::uint_write_backward(p + len, n); // fills p[0..len) backward from p+len
+    detail::uint_write_backward(p + len, n);
     return p + len;
   };
 
-  char* p = first;
+  auto* p = first;
   p = write_num(p, v.major()); *p++ = '.';
   p = write_num(p, v.minor()); *p++ = '.';
   p = write_num(p, v.patch());
@@ -1068,7 +1059,9 @@ template <typename I1, typename I2, typename I3>
 template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
 [[nodiscard]] SEMVER_CONSTEXPR std::optional<version<I1, I2, I3>> try_parse(std::string_view str) {
   version<I1, I2, I3> v;
-  if (parse(str, v)) return v;
+  if (parse(str, v))
+    return v;
+
   return std::nullopt;
 }
 
@@ -1078,15 +1071,16 @@ template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
   version<I1, I2, I3> v;
   if (const auto res = parse(str, v); !res)
     throw std::system_error(std::make_error_code(res.ec), std::string{str});
+
   return v;
 }
 
-// Permissive parse: strips leading =, v/V, fills missing minor/patch with 0, strips leading zeros.
-// "v1.2" → 1.2.0,  "=1.2.3" → 1.2.3,  "01.2.3" → 1.2.3,  "1.2.3.4" → 1.2.3,  "1.2.3garbage" → 1.2.3.
-// Returns nullopt if no valid numeric prefix or a component overflows the target integer type.
-// Not constexpr: uses std::to_string and string concatenation (C++17 limitations).
+// Permissive parsing with optional =/v prefixes, missing components, and leading zeros.
 template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
 [[nodiscard]] std::optional<version<I1, I2, I3>> coerce(std::string_view str) {
+  if (str.size() > SEMVER_MAX_INPUT_LENGTH)
+    return std::nullopt;
+
   while (!str.empty() && str.front() == ' ') str.remove_prefix(1);
   if (!str.empty() && str.front() == '=') {
     str.remove_prefix(1);
@@ -1096,19 +1090,23 @@ template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
     str.remove_prefix(1);
     while (!str.empty() && str.front() == ' ') str.remove_prefix(1);
   }
-  if (str.empty() || !detail::is_digit(str.front())) return std::nullopt;
+  if (str.empty() || !detail::is_digit(str.front()))
+    return std::nullopt;
 
-  const char* p   = str.data();
-  const char* end = str.data() + str.size();
+  const auto* p = str.data();
+  const auto* end = str.data() + str.size();
 
-  // Parse a run of decimal digits at *p into out (uint64_t); advance p.
-  // Naturally strips leading zeros. Returns false on uint64_t overflow.
+  // Parses one component and advances p.
   const auto parse_component = [&](std::uint64_t& out) noexcept -> bool {
-    if (p >= end || !detail::is_digit(*p)) return false;
+    if (p >= end || !detail::is_digit(*p))
+      return false;
+
     out = 0;
     while (p < end && detail::is_digit(*p)) {
-      const std::uint64_t d = static_cast<std::uint64_t>(static_cast<unsigned char>(*p) - '0');
-      if (out > (std::numeric_limits<std::uint64_t>::max() - d) / 10) return false;
+      const auto d = static_cast<std::uint64_t>(static_cast<unsigned char>(*p) - '0');
+      if (out > (std::numeric_limits<std::uint64_t>::max() - d) / 10)
+        return false;
+
       out = out * 10 + d;
       ++p;
     }
@@ -1116,24 +1114,28 @@ template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
   };
 
   std::uint64_t maj = 0, min_v = 0, pat = 0;
-  if (!parse_component(maj)) return std::nullopt;
+  if (!parse_component(maj))
+    return std::nullopt;
 
   if (p < end && *p == '.') {
-    const char* saved = p++;
-    if (!parse_component(min_v)) { p = saved; min_v = 0; }
-    else if (p < end && *p == '.') {
-      const char* saved2 = p++;
-      if (!parse_component(pat)) { p = saved2; pat = 0; }
+    const auto* saved = p++;
+    if (!parse_component(min_v)) {
+      p = saved;
+      min_v = 0;
+    } else if (p < end && *p == '.') {
+      const auto* saved2 = p++;
+      if (!parse_component(pat)) {
+        p = saved2;
+        pat = 0;
+      }
     }
   }
 
-  if (!detail::number_in_range<I1>(maj) ||
-      !detail::number_in_range<I2>(min_v) ||
-      !detail::number_in_range<I3>(pat)) return std::nullopt;
+  if (!detail::number_in_range<I1>(maj) || !detail::number_in_range<I2>(min_v) || !detail::number_in_range<I3>(pat))
+    return std::nullopt;
 
   version<I1, I2, I3> result{static_cast<I1>(maj), static_cast<I2>(min_v), static_cast<I3>(pat)};
 
-  // Attach optional prerelease/build suffix: rebuild "M.m.p" + suffix and re-parse.
   if (p < end && (*p == '-' || *p == '+')) {
     std::string canonical;
     canonical.reserve(32 + static_cast<std::size_t>(end - p));
@@ -1143,8 +1145,8 @@ template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
     canonical += '.';
     canonical += std::to_string(pat);
     canonical.append(p, static_cast<std::size_t>(end - p));
-    if (auto r = try_parse<I1, I2, I3>(canonical)) return r;
-    // Invalid suffix (e.g. leading-zero numeric identifier) — fall back to M.m.p.
+    if (auto r = try_parse<I1, I2, I3>(canonical))
+      return r;
   }
 
   return result;
@@ -1153,9 +1155,12 @@ template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
 // Writes "MAJOR.MINOR.PATCH[-prerelease][+build]" to os.
 template <typename OStream, typename I1, typename I2, typename I3, typename = std::enable_if_t<std::is_base_of<std::ios_base, OStream>::value>>
 OStream& operator<<(OStream& os, const version<I1, I2, I3>& v) {
-  os << v.major() << '.' << v.minor() << '.' << v.patch();
-  if (!v.prerelease_tag().empty()) os << '-' << v.prerelease_tag();
-  if (!v.build_metadata().empty()) os << '+' << v.build_metadata();
+  // Promote uint8_t-like components to render numbers instead of characters.
+  os << static_cast<std::uintmax_t>(v.major()) << '.' << static_cast<std::uintmax_t>(v.minor()) << '.' << static_cast<std::uintmax_t>(v.patch());
+  if (!v.prerelease_tag().empty())
+    os << '-' << v.prerelease_tag();
+  if (!v.build_metadata().empty())
+    os << '+' << v.build_metadata();
   return os;
 }
 
@@ -1163,31 +1168,35 @@ OStream& operator<<(OStream& os, const version<I1, I2, I3>& v) {
 // Non-standard: spec §10 says build metadata SHOULD be ignored in comparisons.
 template <typename L1, typename L2, typename L3, typename R1, typename R2, typename R3>
 [[nodiscard]] SEMVER_CONSTEXPR int compare_with_build(const version<L1, L2, L3>& lhs, const version<R1, R2, R3>& rhs) noexcept {
-  const int c = detail::compare_parsed(lhs, rhs, version_compare_option::include_prerelease);
-  if (c != 0) return c;
-  const int b = lhs.build_metadata().compare(rhs.build_metadata());
+  const auto c = detail::compare_parsed(lhs, rhs, version_compare_option::include_prerelease);
+  if (c != 0)
+    return c;
+
+  const auto b = lhs.build_metadata().compare(rhs.build_metadata());
   return b < 0 ? -1 : b > 0 ? 1 : 0;
 }
 
 // Returns which component differs between lhs and rhs.
 template <typename L1, typename L2, typename L3, typename R1, typename R2, typename R3>
 [[nodiscard]] SEMVER_CONSTEXPR version_diff diff(const version<L1, L2, L3>& lhs, const version<R1, R2, R3>& rhs) noexcept {
-  if (lhs == rhs) return version_diff::none;
+  if (lhs == rhs)
+    return version_diff::none;
 
-  const int cmp = detail::compare_parsed(lhs, rhs, version_compare_option::include_prerelease);
-  // pre = true if the higher-precedence version has a pre-release tag.
-  // Returns `prerelease` when only the tag differs (e.g. 1.0.0-alpha vs 1.0.0).
+  const auto cmp = detail::compare_parsed(lhs, rhs, version_compare_option::include_prerelease);
   const auto& newer = (cmp > 0) ? lhs : rhs;
-  const bool  pre   = !newer.prerelease_tag().empty();
+  const auto pre = !newer.prerelease_tag().empty();
 
-  const bool major_differs = detail::cmp_less(lhs.major(), rhs.major()) || detail::cmp_less(rhs.major(), lhs.major());
-  if (major_differs) return pre ? version_diff::premajor : version_diff::major;
+  const auto major_differs = detail::cmp_less(lhs.major(), rhs.major()) || detail::cmp_less(rhs.major(), lhs.major());
+  if (major_differs)
+    return pre ? version_diff::premajor : version_diff::major;
 
-  const bool minor_differs = detail::cmp_less(lhs.minor(), rhs.minor()) || detail::cmp_less(rhs.minor(), lhs.minor());
-  if (minor_differs) return pre ? version_diff::preminor : version_diff::minor;
+  const auto minor_differs = detail::cmp_less(lhs.minor(), rhs.minor()) || detail::cmp_less(rhs.minor(), lhs.minor());
+  if (minor_differs)
+    return pre ? version_diff::preminor : version_diff::minor;
 
-  const bool patch_differs = detail::cmp_less(lhs.patch(), rhs.patch()) || detail::cmp_less(rhs.patch(), lhs.patch());
-  if (patch_differs) return pre ? version_diff::prepatch : version_diff::patch;
+  const auto patch_differs = detail::cmp_less(lhs.patch(), rhs.patch()) || detail::cmp_less(rhs.patch(), lhs.patch());
+  if (patch_differs)
+    return pre ? version_diff::prepatch : version_diff::patch;
 
   return version_diff::prerelease;
 }
@@ -1198,7 +1207,7 @@ template <typename L1, typename L2, typename L3, typename R1, typename R2, typen
   return detail::compare_parsed(lhs, rhs, version_compare_option::include_prerelease);
 }
 
-// Reverse compare — returns 1, 0, or -1. Sorts descending when passed to std::sort.
+// Reverse compare returns 1, 0, or -1 and sorts descending when passed to std::sort.
 template <typename L1, typename L2, typename L3, typename R1, typename R2, typename R3>
 [[nodiscard]] SEMVER_CONSTEXPR int rcompare(const version<L1, L2, L3>& lhs, const version<R1, R2, R3>& rhs) noexcept {
   return compare(rhs, lhs);
@@ -1223,7 +1232,7 @@ namespace detail {
       case range_operator::equal:
         return detail::compare_parsed(other, v, version_compare_option::include_prerelease) == 0;
       default:
-        return false; // unreachable: all range_operator values are handled above
+        return false;
       }
     }
 
@@ -1234,38 +1243,24 @@ namespace detail {
     range_operator op;
   };
 
-  // -----------------------------------------------------------------------
-  // Range desugaring helpers
-  // -----------------------------------------------------------------------
-
-  // Exclusive upper bound for range desugaring: version M.m.p-0. Returns nullopt on overflow.
+  // Exclusive M.m.p-0 upper bound.
   template <typename I1, typename I2, typename I3>
-  SEMVER_CONSTEXPR std::optional<version<I1, I2, I3>>
-  make_upper_bound(std::uint64_t maj, std::uint64_t min_, std::uint64_t pat) {
+  SEMVER_CONSTEXPR std::optional<version<I1, I2, I3>> make_upper_bound(std::uint64_t maj, std::uint64_t min_, std::uint64_t pat) {
     if (!number_in_range<I1>(maj) || !number_in_range<I2>(min_) || !number_in_range<I3>(pat))
       return std::nullopt;
-    return version<I1, I2, I3>{
-        static_cast<I1>(maj), static_cast<I2>(min_), static_cast<I3>(pat),
-        std::string_view{"0"}};
+
+    return version<I1, I2, I3>{static_cast<I1>(maj), static_cast<I2>(min_), static_cast<I3>(pat), std::string_view{"0"}};
   }
 
-  // Pushes a >= comparator for the given partial version.
   template <typename I1, typename I2, typename I3>
-  SEMVER_CONSTEXPR bool push_lower(
-      const partial_version& pv,
-      std::uint64_t maj, std::uint64_t min_, std::uint64_t pat,
-      std::vector<range_comparator<I1, I2, I3>>& out) {
+  SEMVER_CONSTEXPR bool push_lower(const partial_version& pv, std::uint64_t maj, std::uint64_t min_, std::uint64_t pat, std::vector<range_comparator<I1, I2, I3>>& out) {
     if (!number_in_range<I1>(maj) || !number_in_range<I2>(min_) || !number_in_range<I3>(pat))
       return false;
+
     if (!pv.prerelease.empty()) {
-      out.emplace_back(
-          version<I1, I2, I3>{static_cast<I1>(maj), static_cast<I2>(min_), static_cast<I3>(pat),
-                               std::string_view{pv.prerelease}},
-          range_operator::greater_or_equal);
+      out.emplace_back(version<I1, I2, I3>{static_cast<I1>(maj), static_cast<I2>(min_), static_cast<I3>(pat), std::string_view{pv.prerelease}}, range_operator::greater_or_equal);
     } else {
-      out.emplace_back(
-          version<I1, I2, I3>{static_cast<I1>(maj), static_cast<I2>(min_), static_cast<I3>(pat)},
-          range_operator::greater_or_equal);
+      out.emplace_back(version<I1, I2, I3>{static_cast<I1>(maj), static_cast<I2>(min_), static_cast<I3>(pat)}, range_operator::greater_or_equal);
     }
     return true;
   }
@@ -1274,25 +1269,34 @@ namespace detail {
   //          M.* →  >=M.0.0 <(M+1).0.0-0
   //          M.m.* → >=M.m.0 <M.(m+1).0-0
   template <typename I1, typename I2, typename I3>
-  SEMVER_CONSTEXPR bool desugar_xrange(
-      const partial_version& pv,
-      std::vector<range_comparator<I1, I2, I3>>& out) {
-    const std::uint64_t maj  = pv.major.value_or(0);
-    const std::uint64_t min_ = pv.minor.value_or(0);
-    const std::uint64_t pat  = pv.patch.value_or(0);
-    if (!push_lower(pv, maj, min_, pat, out)) return false;
-    if (!pv.major.has_value()) return true; // * → >=0.0.0, no upper bound
+  SEMVER_CONSTEXPR bool desugar_xrange(const partial_version& pv, std::vector<range_comparator<I1, I2, I3>>& out) {
+    const auto maj = pv.major.value_or(0);
+    const auto min_ = pv.minor.value_or(0);
+    const auto pat = pv.patch.value_or(0);
+    if (!push_lower(pv, maj, min_, pat, out))
+      return false;
+    if (!pv.major.has_value())
+      return true; // * → >=0.0.0, no upper bound
+
     if (!pv.minor.has_value()) {
-      if (maj == std::numeric_limits<std::uint64_t>::max()) return false;
+      if (maj == std::numeric_limits<std::uint64_t>::max())
+        return false;
+
       auto ub = make_upper_bound<I1, I2, I3>(maj + 1, 0, 0);
-      if (!ub) return false;
+      if (!ub)
+        return false;
+
       out.emplace_back(*ub, range_operator::less);
       return true;
     }
-    // M.m.* or bare M.m — lock minor
-    if (min_ == std::numeric_limits<std::uint64_t>::max()) return false;
+
+    if (min_ == std::numeric_limits<std::uint64_t>::max())
+      return false;
+
     auto ub = make_upper_bound<I1, I2, I3>(maj, min_ + 1, 0);
-    if (!ub) return false;
+    if (!ub)
+      return false;
+
     out.emplace_back(*ub, range_operator::less);
     return true;
   }
@@ -1300,32 +1304,38 @@ namespace detail {
   // Tilde: ~M.m[.p] → >=M.m.p  <M.(m+1).0-0
   //        ~M       → >=M.0.0   <(M+1).0.0-0
   template <typename I1, typename I2, typename I3>
-  SEMVER_CONSTEXPR bool desugar_tilde(
-      const partial_version& pv,
-      std::vector<range_comparator<I1, I2, I3>>& out) {
-    const std::uint64_t maj  = pv.major.value_or(0);
-    const std::uint64_t min_ = pv.minor.value_or(0);
-    const std::uint64_t pat  = pv.patch.value_or(0);
-    if (!push_lower(pv, maj, min_, pat, out)) return false;
-    if (!pv.major.has_value()) return true; // ~* — no upper bound
+  SEMVER_CONSTEXPR bool desugar_tilde(const partial_version& pv, std::vector<range_comparator<I1, I2, I3>>& out) {
+    const auto maj = pv.major.value_or(0);
+    const auto min_ = pv.minor.value_or(0);
+    const auto pat = pv.patch.value_or(0);
+    if (!push_lower(pv, maj, min_, pat, out))
+      return false;
+    if (!pv.major.has_value())
+      return true;
+
     if (pv.minor.has_value()) {
-      // ~M.m[.p] — lock minor
-      if (min_ == std::numeric_limits<std::uint64_t>::max()) return false;
+      if (min_ == std::numeric_limits<std::uint64_t>::max())
+        return false;
+
       auto ub = make_upper_bound<I1, I2, I3>(maj, min_ + 1, 0);
-      if (!ub) return false;
+      if (!ub)
+        return false;
+
       out.emplace_back(*ub, range_operator::less);
     } else {
-      // ~M — lock major
-      if (maj == std::numeric_limits<std::uint64_t>::max()) return false;
+      if (maj == std::numeric_limits<std::uint64_t>::max())
+        return false;
+
       auto ub = make_upper_bound<I1, I2, I3>(maj + 1, 0, 0);
-      if (!ub) return false;
+      if (!ub)
+        return false;
+
       out.emplace_back(*ub, range_operator::less);
     }
     return true;
   }
 
-  // Caret: locks the leftmost non-zero component (or follows the node-semver
-  // rules for zero-prefixed and wildcard versions).
+  // Caret locks the leftmost non-zero component.
   //   ^M.m.p (M>0)            → >=M.m.p  <(M+1).0.0-0
   //   ^0.m.p (m>0)            → >=0.m.p  <0.(m+1).0-0
   //   ^0.0.p                  → >=0.0.p  <0.0.(p+1)-0
@@ -1333,30 +1343,39 @@ namespace detail {
   //   ^0.m   (missing patch)  → >=0.m.0  <0.(m+1).0-0
   //   ^0.0   (missing patch)  → >=0.0.0  <0.1.0-0
   template <typename I1, typename I2, typename I3>
-  SEMVER_CONSTEXPR bool desugar_caret(
-      const partial_version& pv,
-      std::vector<range_comparator<I1, I2, I3>>& out) {
-    const std::uint64_t maj  = pv.major.value_or(0);
-    const std::uint64_t min_ = pv.minor.value_or(0);
-    const std::uint64_t pat  = pv.patch.value_or(0);
-    if (!push_lower(pv, maj, min_, pat, out)) return false;
+  SEMVER_CONSTEXPR bool desugar_caret(const partial_version& pv, std::vector<range_comparator<I1, I2, I3>>& out) {
+    const auto maj = pv.major.value_or(0);
+    const auto min_ = pv.minor.value_or(0);
+    const auto pat = pv.patch.value_or(0);
+    if (!push_lower(pv, maj, min_, pat, out))
+      return false;
+
     if (maj > 0 || !pv.minor.has_value()) {
-      // Lock major: <(M+1).0.0-0
-      if (maj == std::numeric_limits<std::uint64_t>::max()) return false;
+      if (maj == std::numeric_limits<std::uint64_t>::max())
+        return false;
+
       auto ub = make_upper_bound<I1, I2, I3>(maj + 1, 0, 0);
-      if (!ub) return false;
+      if (!ub)
+        return false;
+
       out.emplace_back(*ub, range_operator::less);
     } else if (!pv.patch.has_value() || min_ > 0) {
-      // Lock minor: <0.(m+1).0-0
-      if (min_ == std::numeric_limits<std::uint64_t>::max()) return false;
+      if (min_ == std::numeric_limits<std::uint64_t>::max())
+        return false;
+
       auto ub = make_upper_bound<I1, I2, I3>(0, min_ + 1, 0);
-      if (!ub) return false;
+      if (!ub)
+        return false;
+
       out.emplace_back(*ub, range_operator::less);
     } else {
-      // M=0, m=0, patch explicitly specified: lock patch <0.0.(p+1)-0
-      if (pat == std::numeric_limits<std::uint64_t>::max()) return false;
+      if (pat == std::numeric_limits<std::uint64_t>::max())
+        return false;
+
       auto ub = make_upper_bound<I1, I2, I3>(0, 0, pat + 1);
-      if (!ub) return false;
+      if (!ub)
+        return false;
+
       out.emplace_back(*ub, range_operator::less);
     }
     return true;
@@ -1366,43 +1385,42 @@ namespace detail {
   //   lower: >=lo (missing components filled with 0)
   //   upper: <=hi if hi.patch specified; <hi.M.(hi.m+1).0-0 if only M.m; <(hi.M+1).0.0-0 if only M
   template <typename I1, typename I2, typename I3>
-  SEMVER_CONSTEXPR bool desugar_hyphen(
-      const partial_version& lo, const partial_version& hi,
-      std::vector<range_comparator<I1, I2, I3>>& out) {
-    const std::uint64_t lo_maj = lo.major.value_or(0);
-    const std::uint64_t lo_min = lo.minor.value_or(0);
-    const std::uint64_t lo_pat = lo.patch.value_or(0);
-    if (!push_lower(lo, lo_maj, lo_min, lo_pat, out)) return false;
+  SEMVER_CONSTEXPR bool desugar_hyphen(const partial_version& lo, const partial_version& hi, std::vector<range_comparator<I1, I2, I3>>& out) {
+    const auto lo_maj = lo.major.value_or(0);
+    const auto lo_min = lo.minor.value_or(0);
+    const auto lo_pat = lo.patch.value_or(0);
+    if (!push_lower(lo, lo_maj, lo_min, lo_pat, out))
+      return false;
 
-    const std::uint64_t hi_maj = hi.major.value_or(0);
-    const std::uint64_t hi_min = hi.minor.value_or(0);
-    const std::uint64_t hi_pat = hi.patch.value_or(0);
+    const auto hi_maj = hi.major.value_or(0);
+    const auto hi_min = hi.minor.value_or(0);
+    const auto hi_pat = hi.patch.value_or(0);
     if (!number_in_range<I1>(hi_maj) || !number_in_range<I2>(hi_min) || !number_in_range<I3>(hi_pat))
       return false;
 
     if (hi.patch.has_value()) {
-      // Full upper: <=hi
       if (!hi.prerelease.empty()) {
-        out.emplace_back(
-            version<I1, I2, I3>{static_cast<I1>(hi_maj), static_cast<I2>(hi_min), static_cast<I3>(hi_pat),
-                                 std::string_view{hi.prerelease}},
-            range_operator::less_or_equal);
+        out.emplace_back(version<I1, I2, I3>{static_cast<I1>(hi_maj), static_cast<I2>(hi_min), static_cast<I3>(hi_pat), std::string_view{hi.prerelease}}, range_operator::less_or_equal);
       } else {
-        out.emplace_back(
-            version<I1, I2, I3>{static_cast<I1>(hi_maj), static_cast<I2>(hi_min), static_cast<I3>(hi_pat)},
-            range_operator::less_or_equal);
+        out.emplace_back(version<I1, I2, I3>{static_cast<I1>(hi_maj), static_cast<I2>(hi_min), static_cast<I3>(hi_pat)}, range_operator::less_or_equal);
       }
     } else if (hi.minor.has_value()) {
-      // M.m: <M.(m+1).0-0
-      if (hi_min == std::numeric_limits<std::uint64_t>::max()) return false;
+      if (hi_min == std::numeric_limits<std::uint64_t>::max())
+        return false;
+
       auto ub = make_upper_bound<I1, I2, I3>(hi_maj, hi_min + 1, 0);
-      if (!ub) return false;
+      if (!ub)
+        return false;
+
       out.emplace_back(*ub, range_operator::less);
     } else {
-      // M: <(M+1).0.0-0
-      if (hi_maj == std::numeric_limits<std::uint64_t>::max()) return false;
+      if (hi_maj == std::numeric_limits<std::uint64_t>::max())
+        return false;
+
       auto ub = make_upper_bound<I1, I2, I3>(hi_maj + 1, 0, 0);
-      if (!ub) return false;
+      if (!ub)
+        return false;
+
       out.emplace_back(*ub, range_operator::less);
     }
     return true;
@@ -1417,13 +1435,13 @@ namespace detail {
 
     SEMVER_CONSTEXPR bool contains(const version<I1, I2, I3>& v, version_compare_option option) const noexcept {
       if (option == version_compare_option::exclude_prerelease) {
-        if (!match_at_least_one_comparator_with_prerelease(v)) {
+        if (!match_at_least_one_comparator_with_prerelease(v))
           return false;
-        }
       }
 
       for (const auto& rc : ranges_comparators) {
-        if (!rc.contains(v)) return false;
+        if (!rc.contains(v))
+          return false;
       }
       return true;
     }
@@ -1431,14 +1449,14 @@ namespace detail {
     std::vector<range_comparator<I1, I2, I3>> ranges_comparators;
 
     SEMVER_CONSTEXPR bool match_at_least_one_comparator_with_prerelease(const version<I1, I2, I3>& v) const noexcept {
-      if (v.prerelease_tag().empty()) {
+      if (v.prerelease_tag().empty())
         return true;
-      }
 
       for (const auto& rc : ranges_comparators) {
-        const bool has_prerelease = !rc.get_version().prerelease_tag().empty();
-        const bool equal_without_prerelease = detail::compare_parsed(v, rc.get_version(), version_compare_option::exclude_prerelease) == 0;
-        if (has_prerelease && equal_without_prerelease) return true;
+        const auto has_prerelease = !rc.get_version().prerelease_tag().empty();
+        const auto equal_without_prerelease = detail::compare_parsed(v, rc.get_version(), version_compare_option::exclude_prerelease) == 0;
+        if (has_prerelease && equal_without_prerelease)
+          return true;
       }
       return false;
     }
@@ -1457,12 +1475,11 @@ class range_set {
 public:
   friend class detail::range_parser;
 
-  // Returns true if v satisfies at least one OR-separated comparator set.
-  // With exclude_prerelease (default): a pre-release v only matches if a comparator
-  // in the set explicitly targets the same [major.minor.patch] with a pre-release tag.
+  // A prerelease matches by default only when its comparator targets the same M.m.p.
   [[nodiscard]] SEMVER_CONSTEXPR bool contains(const version<I1, I2, I3>& v, version_compare_option option = version_compare_option::exclude_prerelease) const noexcept {
     for (const auto& range : ranges) {
-      if (range.contains(v, option)) return true;
+      if (range.contains(v, option))
+        return true;
     }
     return false;
   }
@@ -1482,9 +1499,8 @@ namespace detail {
 
       do {
         detail::range<I1, I2, I3> rng;
-        if (const auto res = parse_range(rng); !res) {
+        if (const auto res = parse_range(rng); !res)
           return res;
-        }
 
         out.ranges.push_back(std::move(rng));
         skip_whitespaces();
@@ -1493,31 +1509,28 @@ namespace detail {
 
       return success(stream.peek().lexeme);
     }
-    
+
   private:
     token_stream& stream;
 
-    // Returns true if token t can begin a new comparator (operator, digit, *, ~, ^, x, X).
     SEMVER_CONSTEXPR bool can_start_comparator(const token& t) const noexcept {
-      return t.type == token_type::range_operator
-          || t.type == token_type::digit
-          || t.type == token_type::tilde
-          || t.type == token_type::caret
-          || detail::is_wildcard_token(t); // covers *, x, X
+      return t.type == token_type::range_operator || t.type == token_type::digit || t.type == token_type::tilde || t.type == token_type::caret || detail::is_wildcard_token(t);
     }
 
     template <typename I1, typename I2, typename I3>
     SEMVER_CONSTEXPR from_chars_result parse_range(detail::range<I1, I2, I3>& out) {
       do {
         skip_whitespaces();
-        const token first = stream.peek();
+        const auto first = stream.peek();
 
         if (first.type == token_type::tilde) {
           stream.advance();
           skip_whitespaces();
           detail::partial_version pv;
           version_parser vp{stream};
-          if (auto r = vp.parse_partial(pv); !r) return r;
+          if (auto r = vp.parse_partial(pv); !r)
+            return r;
+
           if (!detail::desugar_tilde<I1, I2, I3>(pv, out.ranges_comparators))
             return failure(first.lexeme, std::errc::result_out_of_range);
         }
@@ -1526,67 +1539,62 @@ namespace detail {
           skip_whitespaces();
           detail::partial_version pv;
           version_parser vp{stream};
-          if (auto r = vp.parse_partial(pv); !r) return r;
+          if (auto r = vp.parse_partial(pv); !r)
+            return r;
+
           if (!detail::desugar_caret<I1, I2, I3>(pv, out.ranges_comparators))
             return failure(first.lexeme, std::errc::result_out_of_range);
         }
         else if (first.type == token_type::range_operator) {
-          // Explicit operator (>=, <=, <, >, =): existing strict-version logic.
-          if (auto res = parse_range_comparator(out.ranges_comparators); !res) return res;
+          if (auto res = parse_range_comparator(out.ranges_comparators); !res)
+            return res;
         }
         else {
-          // No operator: bare version, X-range, or the left side of a hyphen range.
           detail::partial_version pv;
           version_parser vp{stream};
-          if (auto r = vp.parse_partial(pv); !r) return r;
+          if (auto r = vp.parse_partial(pv); !r)
+            return r;
 
-          skip_whitespaces(); // consume space before potential hyphen
+          skip_whitespaces();
 
-          // Hyphen range: space(s) before '-' consumed by skip_whitespaces above.
-          // Scan past '-' and any number of trailing spaces to find digit/wildcard.
-          // Requires at least one space on each side (i.e. "1.2.3 - 2.0.0").
+          // Hyphen ranges require spaces on both sides.
           const auto is_hyphen_range = [&]() noexcept -> bool {
-            if (stream.peek(0).type != token_type::hyphen) return false;
+            if (stream.peek(0).type != token_type::hyphen)
+              return false;
+
             std::size_t k = 1;
             while (stream.peek(k).type == token_type::space) ++k;
-            return k > 1 // at least one space after hyphen
-                   && (stream.peek(k).type == token_type::digit
-                       || detail::is_wildcard_token(stream.peek(k)));
+            return k > 1 && (stream.peek(k).type == token_type::digit || detail::is_wildcard_token(stream.peek(k)));
           };
           if (is_hyphen_range()) {
-            stream.advance(); // hyphen
-            skip_whitespaces(); // consume all spaces after hyphen (≥1)
+            stream.advance();
+            skip_whitespaces();
             detail::partial_version pv2;
             version_parser vp2{stream};
-            if (auto r = vp2.parse_partial(pv2); !r) return r;
+            if (auto r = vp2.parse_partial(pv2); !r)
+              return r;
+
             if (!detail::desugar_hyphen<I1, I2, I3>(pv, pv2, out.ranges_comparators))
               return failure(first.lexeme, std::errc::result_out_of_range);
           }
           else if (pv.has_wildcard()) {
-            // X-range (any component is wildcard / unspecified).
             if (!detail::desugar_xrange<I1, I2, I3>(pv, out.ranges_comparators))
               return failure(first.lexeme, std::errc::result_out_of_range);
           }
           else {
-            // Plain bare version with all three components — treat as implicit '='.
             if (!pv.major.has_value())
               return failure(first.lexeme);
-            const std::uint64_t maj  = *pv.major;
-            const std::uint64_t min_ = pv.minor.value_or(0);
-            const std::uint64_t pat  = pv.patch.value_or(0);
-            if (!detail::number_in_range<I1>(maj) ||
-                !detail::number_in_range<I2>(min_) ||
-                !detail::number_in_range<I3>(pat))
+
+            const auto maj = *pv.major;
+            const auto min_ = pv.minor.value_or(0);
+            const auto pat = pv.patch.value_or(0);
+            if (!detail::number_in_range<I1>(maj) || !detail::number_in_range<I2>(min_) || !detail::number_in_range<I3>(pat))
               return failure(first.lexeme, std::errc::result_out_of_range);
+
             if (!pv.prerelease.empty()) {
-              out.ranges_comparators.emplace_back(
-                  version<I1, I2, I3>{static_cast<I1>(maj), static_cast<I2>(min_), static_cast<I3>(pat),
-                                      std::string_view{pv.prerelease}},
-                  range_operator::equal);
+              out.ranges_comparators.emplace_back(version<I1, I2, I3>{static_cast<I1>(maj), static_cast<I2>(min_), static_cast<I3>(pat), std::string_view{pv.prerelease}}, range_operator::equal);
             } else {
-              out.ranges_comparators.emplace_back(
-                  version<I1, I2, I3>{static_cast<I1>(maj), static_cast<I2>(min_), static_cast<I3>(pat)},
-                  range_operator::equal);
+              out.ranges_comparators.emplace_back(version<I1, I2, I3>{static_cast<I1>(maj), static_cast<I2>(min_), static_cast<I3>(pat)}, range_operator::equal);
             }
           }
         }
@@ -1597,8 +1605,7 @@ namespace detail {
       return success(stream.peek().lexeme);
     }
 
-    // Explicit-operator comparator (>=, <=, <, >, =) + full M.m.p version.
-    // Note: partial/wildcard with explicit operators (e.g. ">=1.x") are unsupported — use ~, ^ or X-range syntax.
+    // Explicit operators require a complete M.m.p version.
     template <typename I1, typename I2, typename I3>
     SEMVER_CONSTEXPR from_chars_result parse_range_comparator(std::vector<detail::range_comparator<I1, I2, I3>>& out) {
       range_operator op = range_operator::equal;
@@ -1610,10 +1617,9 @@ namespace detail {
       skip_whitespaces();
 
       version<I1, I2, I3> ver;
-      version_parser parser{ stream };
-      if (const auto res = parser.parse(ver); !res) {
+      version_parser parser{stream};
+      if (const auto res = parser.parse(ver); !res)
         return res;
-      }
 
       out.emplace_back(std::move(ver), op);
       return success(stream.peek().lexeme);
@@ -1629,92 +1635,94 @@ namespace detail {
 
 template <typename I1, typename I2, typename I3>
 [[nodiscard]] SEMVER_CONSTEXPR from_chars_result parse(std::string_view str, range_set<I1, I2, I3>& out) {
-  if (str.size() > SEMVER_MAX_INPUT_LENGTH) {
+  if (str.size() > SEMVER_MAX_INPUT_LENGTH)
     return detail::failure(str.data(), std::errc::value_too_large);
-  }
 
-  if (!str.empty() && str.front() == ' ') {
+  if (!str.empty() && str.front() == ' ')
     return detail::failure(str.data());
-  }
 
-  if (!str.empty() && str.back() == ' ') {
+  if (!str.empty() && str.back() == ' ')
     return detail::failure(str.data() + str.size() - 1);
-  }
 
   detail::token_stream ts{str.size()};
-  const from_chars_result result = detail::lexer{str}.scan_tokens(ts);
-  if (!result) {
+  const auto result = detail::lexer{str}.scan_tokens(ts);
+  if (!result)
     return result;
-  }
 
   range_set<I1, I2, I3> tmp;
-  const from_chars_result parse_result = detail::range_parser{ ts }.parse(tmp);
-  if (!parse_result) {
+  const auto parse_result = detail::range_parser{ts}.parse(tmp);
+  if (!parse_result)
     return parse_result;
-  }
 
-  if (!ts.advance_if_match(detail::token_type::eol)) {
+  if (!ts.advance_if_match(detail::token_type::eol))
     return detail::failure(ts.peek().lexeme);
-  }
 
   out = std::move(tmp);
   return detail::success(ts.previous().lexeme);
 }
 
-// Satisfies check with a pre-parsed range_set.
 template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
-[[nodiscard]] SEMVER_CONSTEXPR bool satisfies(
-    const version<I1, I2, I3>& v,
-    const range_set<I1, I2, I3>& rs,
-    version_compare_option option = exclude_prerelease) noexcept {
+[[nodiscard]] SEMVER_CONSTEXPR bool satisfies(const version<I1, I2, I3>& v, const range_set<I1, I2, I3>& rs, version_compare_option option = exclude_prerelease) noexcept {
   return rs.contains(v, option);
 }
 
-// Parses range_str then checks containment. Re-parses on every call — pre-parse for hot paths.
+// Parses range_str and checks containment. Pre-parse the range for hot paths.
 template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
-[[nodiscard]] SEMVER_CONSTEXPR bool satisfies(
-    const version<I1, I2, I3>& v,
-    std::string_view range_str,
-    version_compare_option option = exclude_prerelease) {
+[[nodiscard]] SEMVER_CONSTEXPR bool satisfies(const version<I1, I2, I3>& v, std::string_view range_str, version_compare_option option = exclude_prerelease) {
   range_set<I1, I2, I3> rs;
-  if (!parse(range_str, rs)) return false;
+  if (!parse(range_str, rs))
+    return false;
+
   return rs.contains(v, option);
 }
 
-// Bumps v by kind with optional pre-release tag. Returns nullopt if kind == none.
-// For pre-* variants, pre defaults to "0". For prerelease without explicit pre:
-// increments the last numeric identifier in the tag, or appends ".0" if non-numeric.
-// Not constexpr: uses std::from_chars, std::to_string (C++17 limitations).
+// Returns nullopt for none, overflow, or invalid prerelease.
 template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
 [[nodiscard]] std::optional<version<I1, I2, I3>> inc(const version<I1, I2, I3>& v, version_diff kind, std::string_view pre = {}) {
-  if (kind == version_diff::none) return std::nullopt;
+  if (kind == version_diff::none)
+    return std::nullopt;
+
   if (kind == version_diff::major) {
-    if (v.major() == std::numeric_limits<I1>::max()) return std::nullopt;
+    if (v.major() == std::numeric_limits<I1>::max())
+      return std::nullopt;
+
     return v.bump_major();
   }
   if (kind == version_diff::minor) {
-    if (v.minor() == std::numeric_limits<I2>::max()) return std::nullopt;
+    if (v.minor() == std::numeric_limits<I2>::max())
+      return std::nullopt;
+
     return v.bump_minor();
   }
   if (kind == version_diff::patch) {
-    if (v.patch() == std::numeric_limits<I3>::max()) return std::nullopt;
+    if (v.patch() == std::numeric_limits<I3>::max())
+      return std::nullopt;
+
     return v.bump_patch();
   }
 
   version<I1, I2, I3> base;
   switch (kind) {
     case version_diff::premajor:
-      if (v.major() == std::numeric_limits<I1>::max()) return std::nullopt;
+      if (v.major() == std::numeric_limits<I1>::max())
+        return std::nullopt;
+
       base = v.bump_major(); break;
     case version_diff::preminor:
-      if (v.minor() == std::numeric_limits<I2>::max()) return std::nullopt;
+      if (v.minor() == std::numeric_limits<I2>::max())
+        return std::nullopt;
+
       base = v.bump_minor(); break;
     case version_diff::prepatch:
-      if (v.patch() == std::numeric_limits<I3>::max()) return std::nullopt;
+      if (v.patch() == std::numeric_limits<I3>::max())
+        return std::nullopt;
+
       base = v.bump_patch(); break;
     case version_diff::prerelease:
       if (v.prerelease_tag().empty()) {
-        if (v.patch() == std::numeric_limits<I3>::max()) return std::nullopt;
+        if (v.patch() == std::numeric_limits<I3>::max())
+          return std::nullopt;
+
         base = v.bump_patch();
       } else {
         base = version<I1, I2, I3>{v.major(), v.minor(), v.patch()};
@@ -1727,20 +1735,22 @@ template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
   if (!pre.empty()) {
     tag = std::string{pre};
   } else if (kind == version_diff::prerelease && !v.prerelease_tag().empty()) {
-    // Increment the last numeric identifier in the existing pre-release tag.
     tag = std::string{v.prerelease_tag()};
     const auto dot_pos = tag.rfind('.');
-    const std::size_t last_start = (dot_pos == std::string::npos) ? 0 : dot_pos + 1;
-    const std::string last_id = tag.substr(last_start);
-    const bool is_numeric = detail::is_numeric_identifier(last_id);
+    const auto last_start = (dot_pos == std::string::npos) ? 0 : dot_pos + 1;
+    const auto last_id = tag.substr(last_start);
+    const auto is_numeric = detail::is_numeric_identifier(last_id);
     if (is_numeric) {
-      // Increment using integer arithmetic; nullopt on overflow.
-      std::uint64_t num = 0;
-      (void)std::from_chars(last_id.data(), last_id.data() + last_id.size(), num); // all-digit string, never fails
-      if (num == std::numeric_limits<std::uint64_t>::max()) return std::nullopt;
-      const std::string incremented = std::to_string(num + 1);
-      tag = (dot_pos == std::string::npos) ? incremented
-                                           : tag.substr(0, dot_pos + 1) + incremented;
+      auto digit_pos = tag.size();
+      while (digit_pos > last_start && tag[digit_pos - 1] == '9') {
+        tag[digit_pos - 1] = '0';
+        --digit_pos;
+      }
+      if (digit_pos == last_start) {
+        tag.insert(last_start, 1, '1');
+      } else {
+        ++tag[digit_pos - 1];
+      }
     } else {
       tag += ".0";
     }
@@ -1748,15 +1758,16 @@ template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
     tag = "0";
   }
 
-  // Direct construction; validate_prerelease_tag guards the 4-arg constructor precondition.
-  if (!detail::validate_prerelease_tag(tag)) return std::nullopt;
+  if (!detail::validate_prerelease_tag(tag))
+    return std::nullopt;
+
   return version<I1, I2, I3>{base.major(), base.minor(), base.patch(), std::string_view{tag}};
 }
 
 // Returns iterator to the highest version in [first, last) satisfying rs, or last if none.
 template <typename ForwardIt, typename I1, typename I2, typename I3>
 [[nodiscard]] SEMVER_CONSTEXPR ForwardIt max_satisfying(ForwardIt first, ForwardIt last, const range_set<I1, I2, I3>& rs, version_compare_option opt = version_compare_option::exclude_prerelease) noexcept {
-  ForwardIt result = last;
+  auto result = last;
   for (auto it = first; it != last; ++it) {
     if (rs.contains(*it, opt) && (result == last || *result < *it))
       result = it;
@@ -1767,7 +1778,7 @@ template <typename ForwardIt, typename I1, typename I2, typename I3>
 // Returns iterator to the lowest version in [first, last) satisfying rs, or last if none.
 template <typename ForwardIt, typename I1, typename I2, typename I3>
 [[nodiscard]] SEMVER_CONSTEXPR ForwardIt min_satisfying(ForwardIt first, ForwardIt last, const range_set<I1, I2, I3>& rs, version_compare_option opt = version_compare_option::exclude_prerelease) noexcept {
-  ForwardIt result = last;
+  auto result = last;
   for (auto it = first; it != last; ++it) {
     if (rs.contains(*it, opt) && (result == last || *it < *result))
       result = it;
@@ -1775,15 +1786,17 @@ template <typename ForwardIt, typename I1, typename I2, typename I3>
   return result;
 }
 
-// Strips leading/trailing whitespace and optional leading '='/'v'/'V', then strict-parses.
-// Unlike coerce(), does not fill missing components.
-// clean("  =v1.2.3  ") → 1.2.3,  clean("v1.2.3-alpha") → 1.2.3-alpha,
-// clean("~1.2.3") → nullopt,  clean("1.2") → nullopt.
+// Trims wrappers and whitespace, then parses strictly.
 template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
 [[nodiscard]] SEMVER_CONSTEXPR std::optional<version<I1, I2, I3>> clean(std::string_view str) {
+  if (str.size() > SEMVER_MAX_INPUT_LENGTH)
+    return std::nullopt;
+
   while (!str.empty() && str.front() == ' ') str.remove_prefix(1);
-  if (!str.empty() && str.front() == '=')                              str.remove_prefix(1);
-  if (!str.empty() && (str.front() == 'v' || str.front() == 'V'))     str.remove_prefix(1);
+  if (!str.empty() && str.front() == '=')
+    str.remove_prefix(1);
+  if (!str.empty() && (str.front() == 'v' || str.front() == 'V'))
+    str.remove_prefix(1);
   while (!str.empty() && str.front() == ' ') str.remove_prefix(1);
   while (!str.empty() && str.back()  == ' ') str.remove_suffix(1);
   return try_parse<I1, I2, I3>(str);
@@ -1793,7 +1806,6 @@ inline const version<> library_version{SEMVER_VERSION_MAJOR, SEMVER_VERSION_MINO
 
 #if SEMVER_HAS_CONSTEVAL_LITERAL
 namespace literals {
-  // Compile-time version literal. Requires SEMVER_HAS_CONSTEVAL_LITERAL == 1.
   consteval version<> operator""_semver(const char* str, std::size_t len) {
     version<> v;
     const auto result = detail::parse_version(std::string_view{str, len}, v);
@@ -1807,33 +1819,23 @@ namespace literals {
 
 } // namespace semver
 
-// SEMVER_CONSTEXPR is internal; undef'd after use.
-// SEMVER_HAS_CONSTEXPR and SEMVER_HAS_CONSTEVAL_LITERAL are user-queryable feature flags.
+// Keep only the public feature flags.
 #undef SEMVER_CONSTEXPR
-
-#if defined(__clang__)
-#  pragma clang diagnostic pop
-#endif
-
-#if defined(__GNUC__) && !defined(__clang__)
-#  pragma GCC diagnostic pop
-#endif
 
 namespace std {
   template <typename I1, typename I2, typename I3>
   struct hash<semver::version<I1, I2, I3>> {
     std::size_t operator()(const semver::version<I1, I2, I3>& v) const noexcept {
-      // build_metadata excluded per §10.
-      // Fibonacci-derived mixing constant, width-appropriate.
+      // Build metadata is excluded by SemVer §10.
 #if SIZE_MAX > 0xFFFFFFFFU
-      static constexpr std::size_t kPhiHash = std::size_t{0x9e3779b97f4a7c15ULL};
+      static constexpr auto kPhiHash = std::size_t{0x9e3779b97f4a7c15ULL};
 #else
-      static constexpr std::size_t kPhiHash = std::size_t{0x9e3779b9U};
+      static constexpr auto kPhiHash = std::size_t{0x9e3779b9U};
 #endif
       static constexpr auto hash_combine = [](std::size_t seed, std::size_t value) noexcept -> std::size_t {
         return seed ^ (value + kPhiHash + (seed << 6) + (seed >> 2));
       };
-      std::size_t h = std::hash<I1>{}(v.major());
+      auto h = std::hash<I1>{}(v.major());
       h = hash_combine(h, std::hash<I2>{}(v.minor()));
       h = hash_combine(h, std::hash<I3>{}(v.patch()));
       h = hash_combine(h, std::hash<std::string_view>{}(v.prerelease_tag()));
@@ -1850,6 +1852,7 @@ namespace std {
       auto it = ctx.begin();
       if (it != ctx.end() && *it != '}')
         throw format_error("semver::version does not support format specs");
+
       return it;
     }
 
@@ -1860,6 +1863,10 @@ namespace std {
     }
   };
 } // namespace std
+#endif
+
+#if defined(__GNUC__) && !defined(__clang__)
+#  pragma GCC diagnostic pop
 #endif
 
 #endif // NEARGYE_SEMANTIC_VERSIONING_HPP
