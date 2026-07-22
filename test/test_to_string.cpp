@@ -1,14 +1,26 @@
 ﻿#include <semver.hpp>
 #include <doctest.h>
 #include <array>
+#include <iomanip>
 #include <iterator>
 #include <ostream>
 #include <sstream>
 #include <string>
 #include <type_traits>
+#include <utility>
 #include "test_utils.hpp"
 
 using namespace semver;
+
+namespace {
+
+template <typename Stream, typename Value, typename = void>
+inline constexpr bool is_stream_insertable_v = false;
+
+template <typename Stream, typename Value>
+inline constexpr bool is_stream_insertable_v<Stream, Value, std::void_t<decltype(std::declval<Stream&>() << std::declval<const Value&>())>> = true;
+
+} // namespace
 
 TEST_CASE("to string") {
   version version;
@@ -41,6 +53,23 @@ TEST_CASE("operator<<") {
     const version<std::uint8_t> v{std::uint8_t{255}, std::uint8_t{2}, std::uint8_t{3}};
     os << v;
     REQUIRE(os.str() == "255.2.3");
+  }
+
+  SUBCASE("numeric flags do not alter the canonical version") {
+    const version<> v{10, 11, 12, "rc.1", "build"};
+    os << std::hex << std::showbase << v;
+    REQUIRE(os.str() == "10.11.12-rc.1+build");
+  }
+
+  SUBCASE("width applies to the complete version") {
+    const version<> v{10, 11, 12, "rc.1", "build"};
+    os << std::setfill('_') << std::setw(24) << v;
+    REQUIRE(os.str() == "_____10.11.12-rc.1+build");
+  }
+
+  SUBCASE("insertion is limited to narrow streams") {
+    static_assert(is_stream_insertable_v<std::ostringstream, version<>>);
+    static_assert(!is_stream_insertable_v<std::wostringstream, version<>>);
   }
 }
 
@@ -76,7 +105,7 @@ TEST_CASE("to_string with various integer widths") {
   }
 }
 
-#if defined(__cpp_lib_format) && __cpp_lib_format >= 202110L
+#if defined(__cpp_lib_format) && __cpp_lib_format >= 201907L
 TEST_CASE("std::formatter") {
   semver::version<> v;
   REQUIRE(semver::parse("1.2.3-alpha.1+build.42", v));
@@ -104,7 +133,9 @@ TEST_CASE("std::formatter") {
 #endif
 
 TEST_CASE("to_chars zero-allocation serialization") {
-  static_assert(std::is_same_v<semver::to_chars_result, semver::from_chars_result>, "to_chars_result must remain an alias of from_chars_result");
+  static_assert(!std::is_same_v<semver::to_chars_result, semver::from_chars_result>);
+  static_assert(std::is_same_v<decltype(semver::to_chars_result::ptr), char*>);
+  static_assert(std::is_same_v<decltype(semver::from_chars_result::ptr), const char*>);
 
   SUBCASE("basic version") {
     version<> v;
@@ -204,12 +235,25 @@ TEST_CASE("to_chars zero-allocation serialization") {
     REQUIRE(written == std::string_view("10.200.3000").size());
   }
 
-  SUBCASE("null first pointer returns value_too_large") {
+  SUBCASE("null pointer ranges return value_too_large") {
     version<> v;
     REQUIRE(parse("1.2.3", v));
-    const auto r = semver::to_chars(nullptr, nullptr, v);
-    REQUIRE_FALSE(r);
-    REQUIRE(r.ec == std::errc::value_too_large);
+    char buf[32];
+
+    const auto both_null = semver::to_chars(nullptr, nullptr, v);
+    REQUIRE_FALSE(both_null);
+    REQUIRE(both_null.ec == std::errc::value_too_large);
+    REQUIRE(both_null.ptr == nullptr);
+
+    const auto null_first = semver::to_chars(nullptr, buf, v);
+    REQUIRE_FALSE(null_first);
+    REQUIRE(null_first.ec == std::errc::value_too_large);
+    REQUIRE(null_first.ptr == buf);
+
+    const auto null_last = semver::to_chars(buf, nullptr, v);
+    REQUIRE_FALSE(null_last);
+    REQUIRE(null_last.ec == std::errc::value_too_large);
+    REQUIRE(null_last.ptr == nullptr);
   }
 
   SUBCASE("reversed pointers (last < first) returns value_too_large") {

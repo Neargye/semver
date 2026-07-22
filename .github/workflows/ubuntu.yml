@@ -53,3 +53,40 @@ jobs:
 
     - name: Test
       run: ctest --test-dir build --output-on-failure -C ${{ matrix.build_type }}
+
+  sanitizers:
+    name: "Clang 20 / ASan + UBSan"
+    runs-on: ubuntu-24.04
+
+    env:
+      CC: clang-20
+      CXX: clang++-20
+      ASAN_OPTIONS: detect_leaks=1
+      UBSAN_OPTIONS: print_stacktrace=1
+
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Install Clang 20
+      run: |
+        wget -qO - https://apt.llvm.org/llvm-snapshot.gpg.key | gpg --dearmor | sudo tee /etc/apt/keyrings/llvm-archive-keyring.gpg > /dev/null
+        codename="$(lsb_release -cs)"
+        echo "deb [signed-by=/etc/apt/keyrings/llvm-archive-keyring.gpg] http://apt.llvm.org/${codename}/ llvm-toolchain-${codename}-20 main" | sudo tee /etc/apt/sources.list.d/llvm.list
+        sudo apt update
+        sudo apt install -y clang-20
+
+    - name: Configure
+      run: >-
+        cmake -S . -B build-sanitizers
+        -DCMAKE_BUILD_TYPE=Debug
+        -DSEMVER_OPT_BUILD_EXAMPLES=OFF
+        -DSEMVER_OPT_BUILD_TESTS=ON
+        -DSEMVER_OPT_INSTALL=OFF
+        -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
+        -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+
+    - name: Build
+      run: cmake --build build-sanitizers --parallel
+
+    - name: Test
+      run: ctest --test-dir build-sanitizers --output-on-failure

@@ -1,10 +1,15 @@
 ﻿#include <semver.hpp>
 #include <doctest.h>
 #include <array>
+#include <cstdint>
+#include <limits>
 #include <ostream>
+#include <string>
+#include <utility>
+#include <vector>
 
 static void test_parse_and_check(std::string_view range_str, std::string_view ver_str,
-  semver::version_compare_option option = semver::version_compare_option::exclude_prerelease)
+  semver::prerelease_policy policy = semver::prerelease_policy::exclude)
 {
   semver::version v;
   REQUIRE(semver::parse(ver_str, v));
@@ -12,11 +17,11 @@ static void test_parse_and_check(std::string_view range_str, std::string_view ve
   semver::range_set rs;
   REQUIRE(semver::parse(range_str, rs));
 
-  REQUIRE(rs.contains(v, option));
+  REQUIRE(rs.contains(v, policy));
 }
 
 static void test_parse_and_check_false(std::string_view range_str, std::string_view ver_str,
-  semver::version_compare_option option = semver::version_compare_option::exclude_prerelease)
+  semver::prerelease_policy policy = semver::prerelease_policy::exclude)
 {
   semver::version v;
   REQUIRE(semver::parse(ver_str, v));
@@ -24,10 +29,28 @@ static void test_parse_and_check_false(std::string_view range_str, std::string_v
   semver::range_set rs;
   REQUIRE(semver::parse(range_str, rs));
 
-  REQUIRE_FALSE(rs.contains(v, option));
+  REQUIRE_FALSE(rs.contains(v, policy));
 }
 
 TEST_CASE("ranges") {
+  SUBCASE("default range matches nothing and empty input is invalid") {
+    semver::range_set<> rs;
+    REQUIRE_FALSE(rs.contains(semver::version<>{1, 2, 3}));
+
+    constexpr std::array<std::string_view, 3> invalid = {{"", " ", "\t\r\n"}};
+    for (const auto range : invalid) {
+      const auto result = semver::parse(range, rs);
+      REQUIRE_FALSE(result);
+      REQUIRE(result.ptr == range.data() + range.size());
+      REQUIRE_FALSE(rs.contains(semver::version<>{1, 2, 3}));
+    }
+
+    const std::string_view empty;
+    const auto result = semver::parse(empty, rs);
+    REQUIRE_FALSE(result);
+    REQUIRE(result.ptr == empty.data());
+  }
+
   SUBCASE("constructor") {
     constexpr std::string_view v1{"1.2.3"};
     constexpr std::string_view r1{">1.0.0 <=2.0.0"};
@@ -81,6 +104,69 @@ TEST_CASE("ranges") {
     test_parse_and_check_false(range, v4);
     test_parse_and_check_false(range, v5);
   }
+
+  SUBCASE("wildcard aliases are terms in intersections") {
+    test_parse_and_check(">=1 x", "1.2.3");
+    test_parse_and_check_false(">=1 x", "0.9.9");
+    test_parse_and_check(">=1 X <2", "1.5.0");
+    test_parse_and_check_false(">=1 X <2", "2.0.0");
+    test_parse_and_check("* x X", "42.0.0");
+  }
+
+  SUBCASE("partial lower-inclusive and upper-exclusive comparators") {
+    constexpr std::array<range_test_case, 8> tests = {{
+      {">=1", "1.0.0", true},
+      {">=1", "0.9.9", false},
+      {">=1.2", "1.2.0", true},
+      {">=1.2", "1.1.99", false},
+      {"<1.2", "1.1.99", true},
+      {"<1.2", "1.2.0", false},
+      {"<2", "1.99.99", true},
+      {"<2", "2.0.0", false}
+    }};
+
+    for (const auto& test : tests) {
+      if (test.contains)
+        test_parse_and_check(test.range, test.ver);
+      else
+        test_parse_and_check_false(test.range, test.ver);
+    }
+  }
+
+  SUBCASE("not-equal comparator excludes one complete version") {
+    test_parse_and_check(">=1 <2 !=1.5.0", "1.4.9");
+    test_parse_and_check_false(">=1 <2 !=1.5.0", "1.5.0");
+    test_parse_and_check(">=1 <2 !=1.5.0", "1.5.1");
+    test_parse_and_check_false("!= 1.2.3", "1.2.3+build.7");
+
+    test_parse_and_check_false("!=1.2.3-alpha", "1.2.3-alpha");
+    test_parse_and_check_false("!=1.2.3-alpha", "1.2.3-beta");
+    test_parse_and_check_false("!=1.2.3-alpha", "1.2.3-alpha", semver::prerelease_policy::include);
+    test_parse_and_check("!=1.2.3-alpha", "1.2.3-beta", semver::prerelease_policy::include);
+    test_parse_and_check_false("!=1.2.3-alpha", "1.2.4-beta");
+    test_parse_and_check("!=1.2.3-alpha", "1.2.4-beta", semver::prerelease_policy::include);
+
+    constexpr auto prerelease_range = ">=1.2.3-alpha <1.2.3 !=1.2.3-beta";
+    test_parse_and_check(prerelease_range, "1.2.3-alpha");
+    test_parse_and_check_false(prerelease_range, "1.2.3-beta");
+    test_parse_and_check(prerelease_range, "1.2.3-rc");
+  }
+
+  SUBCASE("not-equal requires a complete version") {
+    constexpr std::array<std::string_view, 5> invalid = {{"!1.2.3", "!", "!=", "!=1", "!=1.2"}};
+    for (const auto range : invalid) {
+      semver::range_set<> rs;
+      REQUIRE_FALSE(semver::parse(range, rs));
+    }
+  }
+
+  SUBCASE("all ASCII whitespace separates comparators") {
+    constexpr std::array<char, 6> whitespace = {{' ', '\t', '\n', '\r', '\v', '\f'}};
+    for (const auto ws : whitespace) {
+      const auto comparator_range = std::string{">=1"} + ws + "<2";
+      test_parse_and_check(comparator_range, "1.5.0");
+    }
+  }
 }
 
 TEST_CASE("ranges with prerelease tags") {
@@ -112,16 +198,16 @@ TEST_CASE("ranges with prerelease tags") {
     }
 
     SUBCASE("include prerelease") {
-      test_parse_and_check(r1, v1, semver::version_compare_option::include_prerelease);
-      test_parse_and_check(r1, v2, semver::version_compare_option::include_prerelease);
-      test_parse_and_check(r1, v3, semver::version_compare_option::include_prerelease);
-      test_parse_and_check(r1, v4, semver::version_compare_option::include_prerelease);
-      test_parse_and_check_false(r2, v1, semver::version_compare_option::include_prerelease);
-      test_parse_and_check(r3, v1, semver::version_compare_option::include_prerelease);
-      test_parse_and_check(r4, v5, semver::version_compare_option::include_prerelease);
-      test_parse_and_check_false(r4, v1, semver::version_compare_option::include_prerelease);
-      test_parse_and_check(r5, v5, semver::version_compare_option::include_prerelease);
-      test_parse_and_check_false(r6, v5, semver::version_compare_option::include_prerelease);
+      test_parse_and_check(r1, v1, semver::prerelease_policy::include);
+      test_parse_and_check(r1, v2, semver::prerelease_policy::include);
+      test_parse_and_check(r1, v3, semver::prerelease_policy::include);
+      test_parse_and_check(r1, v4, semver::prerelease_policy::include);
+      test_parse_and_check_false(r2, v1, semver::prerelease_policy::include);
+      test_parse_and_check(r3, v1, semver::prerelease_policy::include);
+      test_parse_and_check(r4, v5, semver::prerelease_policy::include);
+      test_parse_and_check_false(r4, v1, semver::prerelease_policy::include);
+      test_parse_and_check(r5, v5, semver::prerelease_policy::include);
+      test_parse_and_check_false(r6, v5, semver::prerelease_policy::include);
     }
   }
 
@@ -149,17 +235,17 @@ TEST_CASE("ranges with prerelease tags") {
     }
 
     SUBCASE("include prerelease") {
-      test_parse_and_check(r1, v1, semver::version_compare_option::include_prerelease);
-      test_parse_and_check_false(r1, v2, semver::version_compare_option::include_prerelease);
-      test_parse_and_check_false(r1, v3, semver::version_compare_option::include_prerelease);
+      test_parse_and_check(r1, v1, semver::prerelease_policy::include);
+      test_parse_and_check_false(r1, v2, semver::prerelease_policy::include);
+      test_parse_and_check_false(r1, v3, semver::prerelease_policy::include);
 
-      test_parse_and_check(r2, v1, semver::version_compare_option::include_prerelease);
-      test_parse_and_check(r2, v2, semver::version_compare_option::include_prerelease);
-      test_parse_and_check_false(r2, v3, semver::version_compare_option::include_prerelease);
+      test_parse_and_check(r2, v1, semver::prerelease_policy::include);
+      test_parse_and_check(r2, v2, semver::prerelease_policy::include);
+      test_parse_and_check_false(r2, v3, semver::prerelease_policy::include);
 
-      test_parse_and_check(r3, v1, semver::version_compare_option::include_prerelease);
-      test_parse_and_check(r3, v2, semver::version_compare_option::include_prerelease);
-      test_parse_and_check(r3, v3, semver::version_compare_option::include_prerelease);
+      test_parse_and_check(r3, v1, semver::prerelease_policy::include);
+      test_parse_and_check(r3, v2, semver::prerelease_policy::include);
+      test_parse_and_check(r3, v3, semver::prerelease_policy::include);
     }
   }
 }
@@ -167,14 +253,22 @@ TEST_CASE("ranges with prerelease tags") {
 TEST_CASE("range parse failures") {
   semver::range_set rs;
 
-  SUBCASE("empty string") {
-    REQUIRE_FALSE(semver::parse("", rs));
+  SUBCASE("operator without version") {
+    constexpr std::array<std::string_view, 5> invalid = {{"<", "<=", ">", ">=", "="}};
+    for (const auto range : invalid)
+      REQUIRE_FALSE(semver::parse(range, rs));
   }
 
-  SUBCASE("operator without version") {
-    REQUIRE_FALSE(semver::parse(">",  rs));
-    REQUIRE_FALSE(semver::parse(">=", rs));
-    REQUIRE_FALSE(semver::parse("<",  rs));
+  SUBCASE("malformed operator combinations are rejected") {
+    constexpr std::array<std::string_view, 6> invalid = {{"==1.2.3", "=>1.2.3", "=<1.2.3", ">>1.2.3", "<<1.2.3", "!1.2.3"}};
+    for (const auto range : invalid)
+      REQUIRE_FALSE(semver::parse(range, rs));
+  }
+
+  SUBCASE("legacy range aliases are rejected") {
+    REQUIRE_FALSE(semver::parse("~>1.2.3", rs));
+    REQUIRE_FALSE(semver::parse("v1.2.3", rs));
+    REQUIRE_FALSE(semver::parse("=v1.2.3", rs));
   }
 
   SUBCASE("dangling union separator") {
@@ -182,18 +276,42 @@ TEST_CASE("range parse failures") {
   }
 
   SUBCASE("isolated or misplaced union separators") {
+    REQUIRE_FALSE(semver::parse("|", rs));
     REQUIRE_FALSE(semver::parse("||", rs));
     REQUIRE_FALSE(semver::parse("|| >=1.0.0", rs));
     REQUIRE_FALSE(semver::parse(">=1.0.0 || || <2.0.0", rs));
   }
 
-  SUBCASE("tabs are invalid separators") {
-    REQUIRE_FALSE(semver::parse(">=1.0.0\t<2.0.0", rs));
+  SUBCASE("non-ASCII and embedded null are rejected") {
+    REQUIRE_FALSE(semver::parse("1.2.3-\xCE\xB2", rs));
+
+    constexpr char embedded_null[] = "1.2.3\0||2.0.0";
+    REQUIRE_FALSE(semver::parse(std::string_view{embedded_null, sizeof(embedded_null) - 1}, rs));
   }
 
-  SUBCASE("leading and trailing spaces are rejected") {
-    REQUIRE_FALSE(semver::parse(" >=1.0.0", rs));
-    REQUIRE_FALSE(semver::parse(">=1.0.0 ", rs));
+  SUBCASE("comparator sets require spaces between adjacent comparators") {
+    REQUIRE_FALSE(semver::parse(">=1.0.0<2.0.0", rs));
+    REQUIRE_FALSE(semver::parse("1.2.3>=1.0.0", rs));
+    REQUIRE_FALSE(semver::parse("1.*2.0.0", rs));
+    REQUIRE_FALSE(semver::parse("1.2.*2.0.0", rs));
+    REQUIRE_FALSE(semver::parse("~1.2.3<2.0.0", rs));
+    REQUIRE_FALSE(semver::parse("^1.2.3<2.0.0", rs));
+  }
+
+  SUBCASE("logical-or remains valid without surrounding spaces") {
+    REQUIRE(semver::parse("1.2.3||2.0.0", rs));
+  }
+
+  SUBCASE("leading and trailing whitespace is accepted") {
+    REQUIRE(semver::parse(" >=1.0.0", rs));
+    REQUIRE(semver::parse(">=1.0.0\t", rs));
+  }
+
+  SUBCASE("hyphen ranges are not part of the range grammar") {
+    REQUIRE_FALSE(semver::parse("1.2.3 - 2.0.0", rs));
+    REQUIRE_FALSE(semver::parse("1.2 - 2", rs));
+    REQUIRE_FALSE(semver::parse("1.2- 2.0.0", rs));
+    REQUIRE_FALSE(semver::parse("1.2 -2.0.0", rs));
   }
 
   SUBCASE("trailing garbage after valid comparator") {
@@ -208,7 +326,7 @@ TEST_CASE("range parse failures") {
   SUBCASE("tilde or caret without a following version") {
     REQUIRE_FALSE(semver::parse("~",  rs));
     REQUIRE_FALSE(semver::parse("^",  rs));
-    REQUIRE_FALSE(semver::parse("~ ", rs)); // leading space rejected before parser
+    REQUIRE_FALSE(semver::parse("~ ", rs));
     REQUIRE_FALSE(semver::parse("^ ", rs));
   }
 
@@ -218,25 +336,84 @@ TEST_CASE("range parse failures") {
     REQUIRE_FALSE(semver::parse("^01.0.0", rs));
   }
 
+  SUBCASE("a dot in a partial version requires a following component") {
+    REQUIRE_FALSE(semver::parse("1.", rs));
+    REQUIRE_FALSE(semver::parse("1.2.", rs));
+    REQUIRE_FALSE(semver::parse("~1.", rs));
+    REQUIRE_FALSE(semver::parse("~1.2.", rs));
+    REQUIRE_FALSE(semver::parse("^1.", rs));
+    REQUIRE_FALSE(semver::parse("^1.2.", rs));
+  }
+
+  SUBCASE("wildcards and qualifiers are rejected outside supported positions") {
+    constexpr std::array<std::string_view, 15> invalid = {{
+      "*.1", "1.*.3", "1.2.*-alpha", "~*", "~1.*", "^*", "^1.2.*",
+      "x.1", "1.x.3", "1.2.X-alpha", "~x", "^1.x",
+      "1.2-alpha", "1.2+build", "1.2.x+build"
+    }};
+    for (const auto range : invalid)
+      REQUIRE_FALSE(semver::parse(range, rs));
+  }
+
+  SUBCASE("ambiguous partial comparators are rejected") {
+    constexpr std::array<std::string_view, 6> invalid = {{">1", ">1.2", "<=1", "<=1.2", "=1", "=1.2"}};
+    for (const auto range : invalid)
+      REQUIRE_FALSE(semver::parse(range, rs));
+  }
+
   SUBCASE("invalid prerelease qualifiers are rejected in all range forms") {
     REQUIRE_FALSE(semver::parse("^1.2.3-01", rs));
     REQUIRE_FALSE(semver::parse("~1.2.3-alpha.", rs));
     REQUIRE_FALSE(semver::parse("1.2.3-01", rs));
-    REQUIRE_FALSE(semver::parse("1.2.3 - 2.0.0-01", rs));
   }
 
-  SUBCASE("invalid build metadata is rejected even though ranges ignore it") {
+  SUBCASE("build metadata is not accepted in range boundaries") {
+    REQUIRE_FALSE(semver::parse("1.2.3+build", rs));
+    REQUIRE_FALSE(semver::parse(">=1.2.3+build", rs));
+    REQUIRE_FALSE(semver::parse("^1.2.3+build", rs));
     REQUIRE_FALSE(semver::parse("^1.2.3+", rs));
     REQUIRE_FALSE(semver::parse("^1.2.3+build.", rs));
     REQUIRE_FALSE(semver::parse("1.2.3+", rs));
-    REQUIRE_FALSE(semver::parse("1.2.3 - 2.0.0+build.", rs));
   }
 
-  SUBCASE("explicit comparators require a complete version") {
-    REQUIRE_FALSE(semver::parse(">=1", rs));
-    REQUIRE_FALSE(semver::parse(">=1.2", rs));
-    REQUIRE_FALSE(semver::parse(">=1.x", rs));
+  SUBCASE("wildcards are rejected after operators") {
+    REQUIRE_FALSE(semver::parse(">=*", rs));
+    REQUIRE_FALSE(semver::parse(">=1.*", rs));
+    REQUIRE_FALSE(semver::parse("<1.2.*", rs));
+    REQUIRE_FALSE(semver::parse("<=x", rs));
+    REQUIRE_FALSE(semver::parse(">X", rs));
   }
+
+  SUBCASE("typed component overflow is reported for every range form") {
+    constexpr std::array<std::string_view, 28> invalid = {{
+      "~256", "~1.256", "~1.2.256", "^256", "^1.256", "^1.2.256",
+      "256.*", "1.256.*", "256.0.0", "1.256.0", "1.2.256",
+      ">=256", ">=256.0.0", ">=1.256.0", ">=1.2.256",
+      "18446744073709551616.0.0", "1.18446744073709551616.0",
+      "1.2.18446744073709551616",
+      "255", "255.*", "1.255", "1.255.*", "255.255.*", "~255", "~1.255",
+      "^255", "^0.255", "^0.0.255"
+    }};
+    semver::range_set<std::uint8_t> small;
+    REQUIRE(semver::parse("1.*", small));
+
+    for (const auto range : invalid) {
+      const auto result = semver::parse(range, small);
+      REQUIRE_FALSE(result);
+      REQUIRE(result.ec == std::errc::result_out_of_range);
+      REQUIRE(small.contains(semver::version<std::uint8_t>{1, 2, 3}));
+    }
+  }
+}
+
+TEST_CASE("try_parse_range returns an optional range") {
+  const auto parsed = semver::try_parse_range("1.x || 3.2.X");
+  REQUIRE(parsed);
+  CHECK(parsed->contains(semver::version<>{1, 9, 0}));
+  CHECK(parsed->contains(semver::version<>{3, 2, 7}));
+  CHECK_FALSE(parsed->contains(semver::version<>{2, 0, 0}));
+  CHECK_FALSE(semver::try_parse_range("1.x ||"));
+  CHECK_FALSE(semver::try_parse_range<std::uint8_t>("256.x"));
 }
 
 TEST_CASE("range from_chars_result contract") {
@@ -283,7 +460,7 @@ TEST_CASE("range from_chars_result contract") {
     REQUIRE(semver::parse("1.5.0", v));
     REQUIRE(rs.contains(v));
 
-    const auto result = semver::parse(">=1.0.0\t<2.0.0", rs);
+    const auto result = semver::parse(">=1.0.0,<2.0.0", rs);
     REQUIRE_FALSE(result);
     REQUIRE(result.ec == std::errc::invalid_argument);
     REQUIRE(rs.contains(v));
@@ -352,6 +529,23 @@ TEST_CASE("range boundary conditions") {
     test_parse_and_check_false("<=2.0.0", "2.0.1"); // above
   }
 
+  SUBCASE("partial comparators use zero-filled typed boundaries") {
+    using V = semver::version<std::uint8_t>;
+    semver::range_set<std::uint8_t> rs;
+
+    REQUIRE(semver::parse(">=255", rs));
+    REQUIRE(rs.contains(V{255, 0, 0}));
+    REQUIRE(rs.contains(V{255, 255, 255}));
+
+    REQUIRE(semver::parse("<255", rs));
+    REQUIRE(rs.contains(V{254, 255, 255}));
+    REQUIRE_FALSE(rs.contains(V{255, 0, 0}));
+  }
+
+  SUBCASE("candidate build metadata is ignored for matching") {
+    test_parse_and_check("1.2.3", "1.2.3+candidate.2");
+  }
+
   SUBCASE("three-set union covers distinct sub-ranges") {
     constexpr std::string_view r = ">=1.0.0 <2.0.0 || >=3.0.0 <4.0.0 || >=5.0.0";
     // inside each sub-range
@@ -367,20 +561,20 @@ TEST_CASE("range boundary conditions") {
 }
 
 TEST_CASE("range prerelease behavior in unions") {
-  // exclude_prerelease should accept prerelease only when at least one
+  // The exclude policy should accept prerelease only when at least one
   // comparator in the matching comparator-set carries a prerelease.
   constexpr std::string_view union_range = ">=1.2.3 <2.0.0 || >=1.2.3-alpha.1 <1.2.3";
 
   SUBCASE("matching prerelease branch includes prerelease") {
-    test_parse_and_check(union_range, "1.2.3-alpha.2", semver::version_compare_option::exclude_prerelease);
+    test_parse_and_check(union_range, "1.2.3-alpha.2", semver::prerelease_policy::exclude);
   }
 
   SUBCASE("plain branch does not include prerelease by default") {
-    test_parse_and_check_false(">=1.2.3 <2.0.0", "1.5.0-alpha.1", semver::version_compare_option::exclude_prerelease);
+    test_parse_and_check_false(">=1.2.3 <2.0.0", "1.5.0-alpha.1", semver::prerelease_policy::exclude);
   }
 
-  SUBCASE("include_prerelease overrides exclusion") {
-    test_parse_and_check(">=1.2.3 <2.0.0", "1.5.0-alpha.1", semver::version_compare_option::include_prerelease);
+  SUBCASE("include policy overrides exclusion") {
+    test_parse_and_check(">=1.2.3 <2.0.0", "1.5.0-alpha.1", semver::prerelease_policy::include);
   }
 }
 
@@ -402,9 +596,9 @@ TEST_CASE("satisfies") {
     REQUIRE_FALSE(semver::satisfies(v, ">=1.0.0 <2.0.0"));
   }
 
-  SUBCASE("prerelease included with include_prerelease option") {
+  SUBCASE("prerelease included with include policy") {
     REQUIRE(semver::parse("1.5.0-alpha", v));
-    REQUIRE(semver::satisfies(v, ">=1.0.0-alpha <2.0.0", semver::include_prerelease));
+    REQUIRE(semver::satisfies(v, ">=1.0.0-alpha <2.0.0", semver::prerelease_policy::include));
   }
 
   SUBCASE("invalid range string returns false") {
@@ -418,9 +612,9 @@ TEST_CASE("satisfies") {
   }
 }
 
-TEST_CASE("version_compare_option aliases") {
-  // Range has no prerelease tag in comparators, so pre-release versions are
-  // excluded by default (semver spec §11).
+TEST_CASE("prerelease_policy") {
+  // Ranges exclude prereleases by default when no comparator targets a
+  // prerelease with the same M.m.p tuple.
   semver::range_set<> rs;
   REQUIRE(semver::parse(">=1.0.0 <2.0.0", rs));
 
@@ -428,22 +622,22 @@ TEST_CASE("version_compare_option aliases") {
   REQUIRE(semver::parse("1.5.0-alpha", v_pre));
   REQUIRE(semver::parse("1.5.0", v_rel));
 
-  SUBCASE("exclude_prerelease alias excludes prerelease versions") {
-    REQUIRE_FALSE(rs.contains(v_pre, semver::exclude_prerelease));
-    REQUIRE(rs.contains(v_rel, semver::exclude_prerelease));
+  SUBCASE("exclude policy excludes prerelease versions") {
+    REQUIRE_FALSE(rs.contains(v_pre, semver::prerelease_policy::exclude));
+    REQUIRE(rs.contains(v_rel, semver::prerelease_policy::exclude));
   }
 
-  SUBCASE("include_prerelease alias allows prerelease versions") {
-    REQUIRE(rs.contains(v_pre, semver::include_prerelease));
-    REQUIRE(rs.contains(v_rel, semver::include_prerelease));
+  SUBCASE("include policy allows prerelease versions") {
+    REQUIRE(rs.contains(v_pre, semver::prerelease_policy::include));
+    REQUIRE(rs.contains(v_rel, semver::prerelease_policy::include));
   }
 
   // include_build_metadata was removed in the breaking-change refactor;
-  // use include_prerelease to allow pre-release versions through.
+  // Use the include policy to allow pre-release versions through.
 }
 
 TEST_CASE("max_satisfying and min_satisfying") {
-  using V = semver::version<>;
+  using V = semver::version<std::uint64_t>;
   std::vector<V> vs;
   for (auto s : {"1.0.0", "1.2.0", "1.5.0", "2.0.0", "2.1.0"}) {
     V v;
@@ -487,4 +681,156 @@ TEST_CASE("max_satisfying and min_satisfying") {
     REQUIRE(semver::min_satisfying(vs.end(), vs.end(), rs) == vs.end());
   }
 }
+
+TEST_CASE("range matching supports mixed component types") {
+  SUBCASE("candidate components are never narrowed to range storage") {
+    semver::range_set<> rs;
+    REQUIRE(semver::parse(">=1", rs));
+
+    const semver::version<std::uint64_t> wide{
+      static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()) + 1, 0, 0};
+    REQUIRE(rs.contains(wide));
+  }
+
+  SUBCASE("wide range storage accepts a narrow candidate") {
+    semver::range_set<std::uint64_t> rs;
+    REQUIRE(semver::parse(">=1 <2", rs));
+
+    const semver::version<std::uint8_t> narrow{1, 2, 3};
+    REQUIRE(rs.contains(narrow));
+  }
+
+  SUBCASE("mixed prerelease matching keeps the same-core filter") {
+    semver::range_set<std::uint8_t> rs;
+    REQUIRE(semver::parse(">=1.2.3-alpha <2", rs));
+
+    const semver::version<std::uint64_t> same_core{1, 2, 3, "beta"};
+    const semver::version<std::uint64_t> other_core{1, 2, 4, "beta"};
+    REQUIRE(rs.contains(same_core));
+    REQUIRE_FALSE(rs.contains(other_core));
+    REQUIRE(rs.contains(other_core, semver::prerelease_policy::include));
+  }
+}
+
+TEST_CASE("min_version returns the lowest representable match") {
+  SUBCASE("any range follows prerelease policy") {
+    semver::range_set<> rs;
+    REQUIRE(semver::parse("*", rs));
+    REQUIRE(semver::min_version(rs)->to_string() == "0.0.0");
+    REQUIRE(semver::min_version(rs, semver::prerelease_policy::include)->to_string() == "0.0.0-0");
+  }
+
+  SUBCASE("strict and excluded lower bounds advance to the next candidate") {
+    semver::range_set<> rs;
+    REQUIRE(semver::parse(">=1 <2 !=1.0.0 !=1.0.1", rs));
+    REQUIRE(semver::min_version(rs)->to_string() == "1.0.2");
+    REQUIRE(semver::min_version(rs, semver::prerelease_policy::include)->to_string() == "1.0.0-0");
+
+    REQUIRE(semver::parse("!=0.0.0", rs));
+    REQUIRE(semver::min_version(rs)->to_string() == "0.0.1");
+    REQUIRE(semver::min_version(rs, semver::prerelease_policy::include)->to_string() == "0.0.0-0");
+
+    REQUIRE(semver::parse(">1.2.3 <2", rs));
+    REQUIRE(semver::min_version(rs)->to_string() == "1.2.4");
+    REQUIRE(semver::min_version(rs, semver::prerelease_policy::include)->to_string() == "1.2.4-0");
+  }
+
+  SUBCASE("explicit prerelease boundary has an exact successor") {
+    semver::range_set<> rs;
+    REQUIRE(semver::parse(">1.2.3-alpha <1.2.3", rs));
+    REQUIRE(semver::min_version(rs)->to_string() == "1.2.3-alpha.0");
+
+    REQUIRE(semver::parse(">0.0.0-0 <0.0.0-0.0", rs));
+    REQUIRE_FALSE(semver::min_version(rs).has_value());
+  }
+
+  SUBCASE("OR branches choose the global minimum") {
+    semver::range_set<> rs;
+    REQUIRE(semver::parse(">=3 || >=1.2 <2", rs));
+    REQUIRE(semver::min_version(rs)->to_string() == "1.2.0");
+  }
+
+  SUBCASE("empty and unrepresentable sets return nullopt") {
+    semver::range_set<> empty;
+    REQUIRE_FALSE(semver::min_version(empty).has_value());
+
+    semver::range_set<std::uint8_t> above_max;
+    REQUIRE(semver::parse(">255.255.255", above_max));
+    REQUIRE_FALSE(semver::min_version(above_max).has_value());
+  }
+}
+
+TEST_CASE("intersects checks whether two range sets share a version") {
+  SUBCASE("overlapping, touching, and disjoint bounds") {
+    semver::range_set<> lhs, rhs;
+    REQUIRE(semver::parse(">=1 <2", lhs));
+    REQUIRE(semver::parse(">=1.5 <3", rhs));
+    REQUIRE(semver::intersects(lhs, rhs));
+
+    REQUIRE(semver::parse("<=1.0.0", lhs));
+    REQUIRE(semver::parse(">=1.0.0", rhs));
+    REQUIRE(semver::intersects(lhs, rhs));
+
+    REQUIRE(semver::parse("<1.0.0", lhs));
+    REQUIRE_FALSE(semver::intersects(lhs, rhs));
+  }
+
+  SUBCASE("OR branches and exclusions are respected") {
+    semver::range_set<> lhs, rhs;
+    REQUIRE(semver::parse("<1 || >=3 <4", lhs));
+    REQUIRE(semver::parse(">=2 <3.5", rhs));
+    REQUIRE(semver::intersects(lhs, rhs));
+
+    REQUIRE(semver::parse("1.2.3", lhs));
+    REQUIRE(semver::parse("!=1.2.3", rhs));
+    REQUIRE_FALSE(semver::intersects(lhs, rhs));
+  }
+
+  SUBCASE("prerelease filters apply independently") {
+    semver::range_set<> lhs, rhs;
+    REQUIRE(semver::parse(">=1.0.0-alpha <1.0.0", lhs));
+    REQUIRE(semver::parse("<1.0.0", rhs));
+    REQUIRE_FALSE(semver::intersects(lhs, rhs));
+    REQUIRE(semver::intersects(lhs, rhs, semver::prerelease_policy::include));
+
+    REQUIRE(semver::parse(">1.0.0-beta <1.0.0", rhs));
+    REQUIRE(semver::intersects(lhs, rhs));
+  }
+
+  SUBCASE("adjacent versions leave no hidden value") {
+    semver::range_set<> lhs, rhs;
+    REQUIRE(semver::parse(">1.0.0-alpha", lhs));
+    REQUIRE(semver::parse("<1.0.0-alpha.0", rhs));
+    REQUIRE_FALSE(semver::intersects(lhs, rhs));
+
+    REQUIRE(semver::parse(">1.0.0", lhs));
+    REQUIRE(semver::parse("<1.0.1-0", rhs));
+    REQUIRE_FALSE(semver::intersects(lhs, rhs, semver::prerelease_policy::include));
+  }
+
+  SUBCASE("an any range does not opt into prereleases by default") {
+    semver::range_set<> prereleases, any;
+    REQUIRE(semver::parse("<0.0.0", prereleases));
+    REQUIRE(semver::parse("*", any));
+    REQUIRE_FALSE(semver::intersects(prereleases, any));
+    REQUIRE(semver::intersects(prereleases, any, semver::prerelease_policy::include));
+  }
+
+  SUBCASE("mixed storage types and unbounded tails") {
+    semver::range_set<std::uint8_t> narrow;
+    semver::range_set<std::uint16_t> wide;
+    REQUIRE(semver::parse(">255.255.255", narrow));
+    REQUIRE(semver::parse(">=256", wide));
+    REQUIRE(semver::intersects(narrow, wide));
+  }
+
+  SUBCASE("default-constructed range intersects nothing") {
+    semver::range_set<> empty, any;
+    REQUIRE(semver::parse("*", any));
+    REQUIRE_FALSE(semver::intersects(empty, any));
+  }
+}
+
+static_assert(noexcept(std::declval<const semver::range_set<>&>().contains(
+  std::declval<const semver::version<std::uint64_t>&>())));
 

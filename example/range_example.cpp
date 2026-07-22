@@ -62,7 +62,7 @@ int main() {
       auto result = range3.contains(version);
       std::cout << result << std::endl; // false
 
-      result = range3.contains(version, semver::version_compare_option::include_prerelease);
+      result = range3.contains(version, semver::prerelease_policy::include);
       std::cout << result << std::endl; // true
     }
   }

@@ -28,23 +28,8 @@ TEST_CASE("compare returns -1, 0, or 1") {
     REQUIRE(compare(V("1.0.0-alpha"), V("1.0.0-alpha.1")) == -1);
     REQUIRE(compare(V("1.0.0-alpha.1"), V("1.0.0-alpha.beta")) == -1);
     REQUIRE(compare(V("1.0.0-alpha.beta"), V("1.0.0-beta")) == -1);
-  }
-}
-
-TEST_CASE("rcompare is the reverse of compare") {
-  REQUIRE(rcompare(V("1.0.0"), V("2.0.0")) == 1);
-  REQUIRE(rcompare(V("2.0.0"), V("1.0.0")) == -1);
-  REQUIRE(rcompare(V("1.0.0"), V("1.0.0")) == 0);
-
-  SUBCASE("rcompare sorts descending") {
-    std::array<version<>, 4> vs = {V("1.0.0"), V("3.0.0"), V("2.0.0"), V("1.5.0")};
-    std::sort(vs.begin(), vs.end(), [](const auto& a, const auto& b) {
-      return rcompare(a, b) < 0;
-    });
-    REQUIRE(vs[0].to_string() == "3.0.0");
-    REQUIRE(vs[1].to_string() == "2.0.0");
-    REQUIRE(vs[2].to_string() == "1.5.0");
-    REQUIRE(vs[3].to_string() == "1.0.0");
+    REQUIRE(compare(V("1.0.0-a"), V("1.0.0-z")) == -1);
+    REQUIRE(compare(V("1.0.0-z"), V("1.0.0-a")) == 1);
   }
 }
 
@@ -53,6 +38,7 @@ TEST_CASE("compare_with_build includes build metadata") {
     REQUIRE(compare_with_build(V("1.0.0+build.1"), V("1.0.0+build.2")) == -1);
     REQUIRE(compare_with_build(V("1.0.0+build.2"), V("1.0.0+build.1")) ==  1);
     REQUIRE(compare_with_build(V("1.0.0+build.1"), V("1.0.0+build.1")) ==  0);
+    REQUIRE(compare_with_build(V("1.0.0+build.10"), V("1.0.0+build.2")) == -1);
   }
 
   SUBCASE("different versions override build metadata ordering") {
@@ -104,6 +90,15 @@ TEST_CASE("coerce strips leading zeros and fills missing components") {
     REQUIRE(v->to_string() == "1.2.0");
   }
 
+  SUBCASE("incomplete components are ignored") {
+    const auto major = coerce("1.");
+    const auto minor = coerce("1.2.");
+    REQUIRE(major.has_value());
+    REQUIRE(minor.has_value());
+    REQUIRE(major->to_string() == "1.0.0");
+    REQUIRE(minor->to_string() == "1.2.0");
+  }
+
   SUBCASE("normal version unchanged") {
     const auto v = coerce("1.2.3");
     REQUIRE(v.has_value());
@@ -126,62 +121,91 @@ TEST_CASE("coerce strips leading zeros and fills missing components") {
     REQUIRE_FALSE(coerce("abc").has_value());
   }
 
+  SUBCASE("component overflow returns nullopt") {
+    REQUIRE_FALSE(coerce("18446744073709551616.0.0").has_value());
+    REQUIRE_FALSE(coerce("1.18446744073709551616.0").has_value());
+    REQUIRE_FALSE(coerce("1.2.18446744073709551616").has_value());
+    REQUIRE_FALSE(coerce<std::uint8_t>("256.0.0").has_value());
+    REQUIRE_FALSE(coerce<std::uint8_t>("1.256.0").has_value());
+    REQUIRE_FALSE(coerce<std::uint8_t>("1.2.256").has_value());
+  }
+
   SUBCASE("prerelease suffix preserved") {
     const auto v = coerce("01.02.03-alpha.1");
     REQUIRE(v.has_value());
     REQUIRE(v->to_string() == "1.2.3-alpha.1");
   }
+
+  SUBCASE("valid shorthand qualifiers at the raw input limit are preserved") {
+    std::string prerelease{"1-"};
+    prerelease.append(max_input_length - prerelease.size(), 'a');
+    REQUIRE(prerelease.size() == max_input_length);
+    const auto prerelease_version = coerce(prerelease);
+    REQUIRE(prerelease_version.has_value());
+    REQUIRE(prerelease_version->prerelease_tag().size() == max_input_length - 2);
+
+    std::string build{"1+"};
+    build.append(max_input_length - build.size(), 'b');
+    REQUIRE(build.size() == max_input_length);
+    const auto build_version = coerce(build);
+    REQUIRE(build_version.has_value());
+    REQUIRE(build_version->build_metadata().size() == max_input_length - 2);
+  }
 }
 
-TEST_CASE("inc with prerelease diff increments numeric identifier") {
+TEST_CASE("inc with prerelease change increments numeric identifier") {
   SUBCASE("last identifier is numeric: increments it") {
-    const auto v = inc(V("1.0.0-alpha.9"), version_diff::prerelease);
+    const auto v = inc(V("1.0.0-alpha.9"), version_change::prerelease);
     REQUIRE(v.has_value());
     REQUIRE(v->to_string() == "1.0.0-alpha.10");
   }
 
   SUBCASE("bare numeric identifier: increments it") {
-    const auto v = inc(V("1.0.0-9"), version_diff::prerelease);
+    const auto v = inc(V("1.0.0-9"), version_change::prerelease);
     REQUIRE(v.has_value());
     REQUIRE(v->to_string() == "1.0.0-10");
   }
 
   SUBCASE("last identifier is alphanumeric: appends .0") {
-    const auto v = inc(V("1.0.0-alpha"), version_diff::prerelease);
+    const auto v = inc(V("1.0.0-alpha"), version_change::prerelease);
     REQUIRE(v.has_value());
     REQUIRE(v->to_string() == "1.0.0-alpha.0");
   }
 
   SUBCASE("numeric identifier larger than uint64_t increments exactly") {
-    const auto v = inc(V("1.0.0-18446744073709551616"), version_diff::prerelease);
+    const auto v = inc(V("1.0.0-18446744073709551616"), version_change::prerelease);
     REQUIRE(v.has_value());
     REQUIRE(v->to_string() == "1.0.0-18446744073709551617");
   }
 
   SUBCASE("arbitrarily long all-nines identifier grows by one digit") {
-    const auto v = inc(V("1.0.0-alpha.999999999999999999999999999999"), version_diff::prerelease);
+    const auto v = inc(V("1.0.0-alpha.999999999999999999999999999999"), version_change::prerelease);
     REQUIRE(v.has_value());
     REQUIRE(v->to_string() == "1.0.0-alpha.1000000000000000000000000000000");
   }
 
   SUBCASE("no prerelease: bumps patch and adds -0") {
-    const auto v = inc(V("1.0.0"), version_diff::prerelease);
+    const auto v = inc(V("1.0.0"), version_change::prerelease);
     REQUIRE(v.has_value());
     REQUIRE(v->to_string() == "1.0.1-0");
   }
 
   SUBCASE("none returns nullopt") {
-    REQUIRE_FALSE(inc(V("1.0.0"), version_diff::none).has_value());
+    REQUIRE_FALSE(inc(V("1.0.0"), version_change::none).has_value());
+  }
+
+  SUBCASE("unknown change returns nullopt") {
+    REQUIRE_FALSE(inc(V("1.0.0"), static_cast<version_change>(255)).has_value());
   }
 
   SUBCASE("premajor bumps major and adds -0") {
-    const auto v = inc(V("1.2.3"), version_diff::premajor);
+    const auto v = inc(V("1.2.3"), version_change::premajor);
     REQUIRE(v.has_value());
     REQUIRE(v->to_string() == "2.0.0-0");
   }
 
   SUBCASE("preminor bumps minor and adds -0") {
-    const auto v = inc(V("1.2.3"), version_diff::preminor);
+    const auto v = inc(V("1.2.3"), version_change::preminor);
     REQUIRE(v.has_value());
     REQUIRE(v->to_string() == "1.3.0-0");
   }
@@ -235,21 +259,21 @@ TEST_CASE("min_satisfying returns lowest matching version") {
   }
 }
 
-TEST_CASE("max_satisfying and min_satisfying with prerelease option") {
+TEST_CASE("max_satisfying and min_satisfying with prerelease policy") {
   std::array<version<>, 3> vs = {V("1.0.0-alpha"), V("1.0.0"), V("2.0.0-beta")};
   range_set<> rs;
   REQUIRE(parse(">=1.0.0-alpha <=2.0.0", rs));
 
-  SUBCASE("exclude_prerelease skips pre-releases") {
+  SUBCASE("exclude policy skips pre-releases") {
     const auto mx = max_satisfying(vs.begin(), vs.end(), rs,
-                                   version_compare_option::exclude_prerelease);
+                                   prerelease_policy::exclude);
     REQUIRE(mx != vs.end());
     REQUIRE(mx->to_string() == "1.0.0");
   }
 
-  SUBCASE("include_prerelease includes pre-releases") {
+  SUBCASE("include policy includes pre-releases") {
     const auto mx = max_satisfying(vs.begin(), vs.end(), rs,
-                                   version_compare_option::include_prerelease);
+                                   prerelease_policy::include);
     REQUIRE(mx != vs.end());
     REQUIRE(mx->to_string() == "2.0.0-beta");
   }
@@ -258,6 +282,12 @@ TEST_CASE("max_satisfying and min_satisfying with prerelease option") {
 TEST_CASE("clean strips prefix/suffix whitespace, = and v") {
   SUBCASE("leading spaces and = and v") {
     const auto v = clean("  =v1.2.3  ");
+    REQUIRE(v.has_value());
+    REQUIRE(v->to_string() == "1.2.3");
+  }
+
+  SUBCASE("spaces between wrappers") {
+    const auto v = clean("  = v1.2.3  ");
     REQUIRE(v.has_value());
     REQUIRE(v->to_string() == "1.2.3");
   }
@@ -369,38 +399,38 @@ TEST_CASE("coerce strips = prefix") {
 TEST_CASE("inc() returns nullopt on integer overflow") {
   SUBCASE("major overflow with uint8_t") {
     const version<uint8_t> v{uint8_t{255}, uint8_t{0}, uint8_t{0}};
-    CHECK_FALSE(inc(v, version_diff::major).has_value());
-    CHECK_FALSE(inc(v, version_diff::premajor).has_value());
+    CHECK_FALSE(inc(v, version_change::major).has_value());
+    CHECK_FALSE(inc(v, version_change::premajor).has_value());
   }
 
   SUBCASE("minor overflow with uint8_t") {
     const version<uint8_t> v{uint8_t{1}, uint8_t{255}, uint8_t{0}};
-    CHECK_FALSE(inc(v, version_diff::minor).has_value());
-    CHECK_FALSE(inc(v, version_diff::preminor).has_value());
+    CHECK_FALSE(inc(v, version_change::minor).has_value());
+    CHECK_FALSE(inc(v, version_change::preminor).has_value());
   }
 
   SUBCASE("patch overflow with uint8_t") {
     const version<uint8_t> v{uint8_t{1}, uint8_t{2}, uint8_t{255}};
-    CHECK_FALSE(inc(v, version_diff::patch).has_value());
-    CHECK_FALSE(inc(v, version_diff::prepatch).has_value());
+    CHECK_FALSE(inc(v, version_change::patch).has_value());
+    CHECK_FALSE(inc(v, version_change::prepatch).has_value());
   }
 
   SUBCASE("patch overflow for prerelease bump without existing tag") {
     const version<uint8_t> v{uint8_t{1}, uint8_t{2}, uint8_t{255}};
-    CHECK_FALSE(inc(v, version_diff::prerelease).has_value());
+    CHECK_FALSE(inc(v, version_change::prerelease).has_value());
   }
 
   SUBCASE("prerelease with existing tag does not bump patch") {
     const version<uint8_t> v{uint8_t{1}, uint8_t{2}, uint8_t{255}, "alpha.1"};
-    const auto r = inc(v, version_diff::prerelease);
+    const auto r = inc(v, version_change::prerelease);
     REQUIRE(r.has_value());
     CHECK(r->to_string() == "1.2.255-alpha.2");
   }
 
   SUBCASE("uint64_t max major returns nullopt") {
     const version<uint64_t> v{std::numeric_limits<uint64_t>::max(), uint64_t{0}, uint64_t{0}};
-    CHECK_FALSE(inc(v, version_diff::major).has_value());
-    CHECK_FALSE(inc(v, version_diff::premajor).has_value());
+    CHECK_FALSE(inc(v, version_change::major).has_value());
+    CHECK_FALSE(inc(v, version_change::premajor).has_value());
   }
 }
 
@@ -427,6 +457,14 @@ TEST_CASE("coerce() falls back to M.m.p on invalid suffix") {
     const auto v = coerce("1.2.3-alpha..1");
     REQUIRE(v.has_value());
     CHECK(v->to_string() == "1.2.3");
+  }
+
+  SUBCASE("empty explicit qualifiers fall back") {
+    for (const auto input : {"1.2.3-", "1.2.3+", "1.2.3-alpha+"}) {
+      const auto v = coerce(input);
+      REQUIRE(v.has_value());
+      REQUIRE(v->to_string() == "1.2.3");
+    }
   }
 
   SUBCASE("valid prerelease is preserved") {

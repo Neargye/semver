@@ -1,5 +1,6 @@
 ﻿#include <semver.hpp>
 #include <doctest.h>
+#include <limits>
 #include <ostream>
 #include <string>
 #include <type_traits>
@@ -147,11 +148,68 @@ TEST_CASE("default constructor produces 0.1.0") {
   REQUIRE(v.to_string() == "0.1.0");
 }
 
+TEST_CASE("direct construction validates component conversions") {
+  static_assert(std::is_constructible_v<semver::version<>, int, int, int>);
+  static_assert(!std::is_constructible_v<semver::version<>, bool, bool, bool>);
+  static_assert(std::is_nothrow_constructible_v<semver::version<>, std::uint32_t, std::uint32_t, std::uint32_t>);
+  static_assert(std::is_nothrow_constructible_v<semver::version<std::uint64_t>, std::uint32_t, std::uint32_t, std::uint32_t>);
+  static_assert(!std::is_nothrow_constructible_v<semver::version<>, std::uint64_t, std::uint64_t, std::uint64_t>);
+  static_assert(!std::is_nothrow_constructible_v<semver::version<>, int, int, int>);
+
+  SUBCASE("ordinary integer literals remain convenient") {
+    const semver::version v{1, 2, 3};
+    REQUIRE(v.to_string() == "1.2.3");
+  }
+
+  SUBCASE("widening unsigned conversions cannot fail") {
+    const semver::version<std::uint64_t> v{std::uint32_t{1}, std::uint32_t{2}, std::uint32_t{3}};
+    REQUIRE(v.to_string() == "1.2.3");
+  }
+
+  SUBCASE("negative values are rejected") {
+    CHECK_THROWS_AS((semver::version<>(-1, 2, 3)), std::out_of_range);
+  }
+
+  SUBCASE("values outside explicit component storage are rejected") {
+    CHECK_THROWS_AS((semver::version<std::uint8_t>(256, 2, 3)), std::out_of_range);
+    CHECK_THROWS_AS((semver::version<>(std::numeric_limits<std::uint64_t>::max(), 2, 3)), std::out_of_range);
+  }
+
+  SUBCASE("qualified construction performs the same checks") {
+    CHECK_THROWS_AS((semver::version<std::uint8_t>(1, 256, 3, "alpha")), std::out_of_range);
+  }
+}
+
+TEST_CASE("class template argument deduction preserves component capacity") {
+  static_assert(std::is_same_v<decltype(semver::version{1, 2, 3}), semver::version<>>);
+  static_assert(std::is_same_v<decltype(semver::version{std::uint64_t{1}, 2, std::uint16_t{3}}),
+    semver::version<std::uint64_t, std::uint32_t, std::uint32_t>>);
+  static_assert(std::is_same_v<decltype(semver::version{1, std::int64_t{2}, 3, "alpha"}),
+    semver::version<std::uint32_t, std::uint64_t, std::uint32_t>>);
+  static_assert(std::is_same_v<decltype(semver::version{1, 2, std::uint64_t{3}, "alpha", "build"}),
+    semver::version<std::uint32_t, std::uint32_t, std::uint64_t>>);
+
+  SUBCASE("wide components no longer narrow to version<> storage") {
+    constexpr auto wide = static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()) + 1;
+    const semver::version v{wide, 2, wide, "alpha", "build"};
+    REQUIRE(v.major() == wide);
+    REQUIRE(v.minor() == 2);
+    REQUIRE(v.patch() == wide);
+    REQUIRE(v.to_string() == "4294967296.2.4294967296-alpha+build");
+  }
+
+  SUBCASE("wide signed sources still reject negative values") {
+    CHECK_THROWS_AS((semver::version{std::int64_t{-1}, 2, 3}), std::out_of_range);
+  }
+}
+
 TEST_CASE("version copy and move preserve public state") {
   static_assert(std::is_copy_constructible_v<semver::version<>>);
   static_assert(std::is_copy_assignable_v<semver::version<>>);
   static_assert(std::is_move_constructible_v<semver::version<>>);
   static_assert(std::is_move_assignable_v<semver::version<>>);
+  static_assert(std::is_nothrow_move_constructible_v<semver::version<>>);
+  static_assert(std::is_nothrow_move_assignable_v<semver::version<>>);
 
   const auto source = semver::from_string("1.2.3-alpha.1+build.42");
 
@@ -305,6 +363,36 @@ TEST_CASE("constexpr valid/invalid detection") {
 
 TEST_CASE("constexpr range_set") {
   static_assert([] {
+    const auto rs = semver::try_parse_range("1.x");
+    return rs && rs->contains(semver::version<>{1, 5, 0}) && !rs->contains(semver::version<>{2, 0, 0});
+  }());
+
+  static_assert(!semver::try_parse_range("1.x ||"));
+
+  static_assert([] {
+    semver::range_set<> rs;
+    return semver::parse("*", rs) && rs.contains(semver::version<>{1, 0, 0}) &&
+           !rs.contains(semver::version<>{1, 0, 0, "alpha"}) &&
+           rs.contains(semver::version<>{1, 0, 0, "alpha"}, semver::prerelease_policy::include);
+  }());
+
+  static_assert([] {
+    semver::range_set<> rs;
+    return !semver::parse("", rs) && !rs.contains(semver::version<>{1, 0, 0});
+  }());
+
+  static_assert([] {
+    semver::range_set<std::uint8_t> rs;
+    const auto result = semver::parse("255.*", rs);
+    return !result && result.ec == std::errc::result_out_of_range;
+  }());
+
+  static_assert([] {
+    semver::range_set<> rs;
+    return semver::parse(" \t>=1 <2\n", rs) && rs.contains(semver::version<>{1, 5, 0});
+  }());
+
+  static_assert([] {
     semver::range_set<> rs;
     (void)semver::parse(">=1.0.0 <2.0.0", rs);
     semver::version<> v;
@@ -339,6 +427,19 @@ TEST_CASE("constexpr range_set") {
     (void)semver::parse("1.0.0-alpha.2", v);
     return rs.contains(v);
   }());
+
+  static_assert([] {
+    semver::range_set<> rs;
+    return semver::parse(">=1 <2 !=1.5.0", rs) && rs.contains(semver::version<>{1, 4, 0}) && !rs.contains(semver::version<>{1, 5, 0});
+  }());
+
+  static_assert([] {
+    semver::range_set<> lhs, rhs;
+    if (!semver::parse(">=1 <2", lhs) || !semver::parse(">=1.5 <3", rhs))
+      return false;
+    const auto minimum = semver::min_version(lhs);
+    return minimum && *minimum == semver::version<>{1, 0, 0} && semver::intersects(lhs, rhs);
+  }());
 }
 
 TEST_CASE("constexpr version constructor") {
@@ -347,11 +448,23 @@ TEST_CASE("constexpr version constructor") {
     return v.major() == 1 && v.minor() == 2 && v.patch() == 3 && v.prerelease_tag().empty() && v.build_metadata().empty();
   }());
 
+  static_assert([] { semver::version<> v{1, 2, 3, "alpha.1", "build.01"}; return v.prerelease_tag() == "alpha.1" && v.build_metadata() == "build.01"; }());
+
+  static_assert([] { return semver::version<>{1, 2, 3, "alpha.1", "build.01"}.without_prerelease().to_string() == "1.2.3+build.01"; }());
+
+  static_assert([] { return semver::version<>{1, 2, 3, "alpha.1", "build.01"}.without_build_metadata().to_string() == "1.2.3-alpha.1"; }());
+
   static_assert([] {
     semver::version<> def;
     return def.major() == 0 && def.minor() == 1 && def.patch() == 0;
   }());
 }
+#endif
+
+#if defined(__GNUC__) && __GNUC__ >= 14 && !defined(__clang__) && defined(__GLIBCXX__) && \
+    defined(_GLIBCXX_RELEASE) && _GLIBCXX_RELEASE >= 14 && __cplusplus >= 202002L
+static_assert(SEMVER_HAS_CONSTEXPR == 1, "GCC with libstdc++ 14+ must enable constexpr parsing in C++20");
+static_assert(SEMVER_HAS_CONSTEVAL_LITERAL == 1, "GCC with libstdc++ 14+ must expose the consteval literal in C++20");
 #endif
 
 #if SEMVER_HAS_CONSTEVAL_LITERAL

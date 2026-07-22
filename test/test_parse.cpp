@@ -205,6 +205,25 @@ TEST_CASE("construct") {
     REQUIRE(v.to_string() == "1.2.3-alpha.1");
   }
 
+  SUBCASE("five-argument constructor validates prerelease and build metadata") {
+    const semver::version v{1, 2, 3, "alpha.1", "build.01"};
+    static_assert(std::is_same_v<std::remove_cv_t<decltype(v)>, semver::version<>>, "five-argument CTAD must use the default component types");
+    REQUIRE(v.to_string() == "1.2.3-alpha.1+build.01");
+
+    const semver::version build_only{1, 2, 3, "", "build.42"};
+    REQUIRE(build_only.to_string() == "1.2.3+build.42");
+
+    const semver::version empty_views{1, 2, 3, std::string_view{}, std::string_view{}};
+    REQUIRE(empty_views.to_string() == "1.2.3");
+  }
+
+  SUBCASE("qualified constructor rejects invalid identifiers") {
+    REQUIRE_THROWS_AS(semver::version<>(1, 2, 3, "01"), std::invalid_argument);
+    REQUIRE_THROWS_AS(semver::version<>(1, 2, 3, "alpha."), std::invalid_argument);
+    REQUIRE_THROWS_AS(semver::version<>(1, 2, 3, "alpha", "build..42"), std::invalid_argument);
+    REQUIRE_THROWS_AS(semver::version<>(1, 2, 3, "", "build+42"), std::invalid_argument);
+  }
+
   SUBCASE("single-type template version<uint32_t>") {
     semver::version<uint32_t> v{1u, 0u, 0u};
     REQUIRE(v.major() == 1u);
@@ -330,6 +349,15 @@ TEST_CASE("parse malformed identifiers") {
   SUBCASE("reject numeric prerelease leading zero but allow alphanumeric") {
     REQUIRE_FALSE(semver::parse("1.0.0-01", v));
     REQUIRE(semver::parse("1.0.0-01a", v));
+  }
+
+  SUBCASE("reject whitespace, non-ASCII identifiers, and embedded null") {
+    constexpr std::array<std::string_view, 7> invalid = {{" 1.2.3", "1. 2.3", "1.2 .3", "1.2. 3", "1.2.3\n", "1.2.3-\xCE\xB2", "1.2.3+\xCE\xB2"}};
+    for (const auto input : invalid)
+      REQUIRE_FALSE(semver::parse(input, v));
+
+    constexpr char embedded_null[] = "1.2.3\0tail";
+    REQUIRE_FALSE(semver::parse(std::string_view{embedded_null, sizeof(embedded_null) - 1}, v));
   }
 }
 
@@ -486,30 +514,144 @@ TEST_CASE("from_chars partial parse semantics") {
     REQUIRE(*r.ptr == '\t');
   }
 
+  SUBCASE("incomplete build suffix remains unconsumed") {
+    const char buf[] = "1.2.3+";
+    version<> v;
+    const auto r = semver::from_chars(buf, buf + sizeof(buf) - 1, v);
+    REQUIRE(r);
+    REQUIRE(v.to_string() == "1.2.3");
+    REQUIRE(r.ptr == buf + 5);
+    REQUIRE(*r.ptr == '+');
+    REQUIRE_FALSE(semver::valid(std::string_view{buf, sizeof(buf) - 1}));
+  }
+
+  SUBCASE("incomplete prerelease identifier remains unconsumed") {
+    const char buf[] = "1.2.3-alpha.";
+    version<> v;
+    const auto r = semver::from_chars(buf, buf + sizeof(buf) - 1, v);
+    REQUIRE(r);
+    REQUIRE(v.to_string() == "1.2.3-alpha");
+    REQUIRE(r.ptr == buf + sizeof(buf) - 2);
+    REQUIRE(*r.ptr == '.');
+  }
+
+  SUBCASE("longest valid prefix may end inside a malformed prerelease") {
+    const char buf[] = "1.2.3-01";
+    version<> v;
+    const auto r = semver::from_chars(buf, buf + sizeof(buf) - 1, v);
+    REQUIRE(r);
+    REQUIRE(v.to_string() == "1.2.3-0");
+    REQUIRE(r.ptr == buf + sizeof(buf) - 2);
+    REQUIRE(*r.ptr == '1');
+    REQUIRE_FALSE(semver::valid(std::string_view{buf, sizeof(buf) - 1}));
+  }
+
   SUBCASE("zero-length range returns failure") {
     const char buf[] = "";
     version<> v;
-    REQUIRE_FALSE(semver::from_chars(buf, buf, v));
+    const auto r = semver::from_chars(buf, buf, v);
+    REQUIRE_FALSE(r);
+    REQUIRE(r.ec == std::errc::invalid_argument);
+    REQUIRE(r.ptr == buf);
+  }
+
+  SUBCASE("incomplete core is not a matching prefix") {
+    const char buf[] = "1.2";
+    version<> v{2, 3, 4, "alpha", "build"};
+    const auto r = semver::from_chars(buf, buf + sizeof(buf) - 1, v);
+    REQUIRE_FALSE(r);
+    REQUIRE(r.ec == std::errc::invalid_argument);
+    REQUIRE(r.ptr == buf);
+    REQUIRE(v.to_string() == "2.3.4-alpha+build");
+  }
+
+  SUBCASE("invalid pointer ranges fail without modifying output") {
+    version<> v{2, 3, 4, "alpha", "build"};
+
+    const auto null_result = semver::from_chars(nullptr, nullptr, v);
+    REQUIRE_FALSE(null_result);
+    REQUIRE(null_result.ec == std::errc::invalid_argument);
+    REQUIRE(null_result.ptr == nullptr);
+    REQUIRE(v.to_string() == "2.3.4-alpha+build");
+
+    const char buf[] = "1.2.3";
+    const auto null_first_result = semver::from_chars(nullptr, buf + 5, v);
+    REQUIRE_FALSE(null_first_result);
+    REQUIRE(null_first_result.ec == std::errc::invalid_argument);
+    REQUIRE(null_first_result.ptr == nullptr);
+    REQUIRE(v.to_string() == "2.3.4-alpha+build");
+
+    const auto null_last_result = semver::from_chars(buf, nullptr, v);
+    REQUIRE_FALSE(null_last_result);
+    REQUIRE(null_last_result.ec == std::errc::invalid_argument);
+    REQUIRE(null_last_result.ptr == buf);
+    REQUIRE(v.to_string() == "2.3.4-alpha+build");
+
+    const auto reversed_result = semver::from_chars(buf + 5, buf, v);
+    REQUIRE_FALSE(reversed_result);
+    REQUIRE(reversed_result.ec == std::errc::invalid_argument);
+    REQUIRE(reversed_result.ptr == buf + 5);
+    REQUIRE(v.to_string() == "2.3.4-alpha+build");
   }
 
   SUBCASE("invalid input (no dots) returns failure") {
     const char buf[] = "garbage";
     version<> v;
-    REQUIRE_FALSE(semver::from_chars(buf, buf + sizeof(buf) - 1, v));
+    const auto r = semver::from_chars(buf, buf + sizeof(buf) - 1, v);
+    REQUIRE_FALSE(r);
+    REQUIRE(r.ec == std::errc::invalid_argument);
+    REQUIRE(r.ptr == buf);
   }
 
   SUBCASE("uint8_t overflow returns result_out_of_range") {
     const char buf[] = "256.0.0";
-    version<uint8_t> v;
+    version<uint8_t> v{2, 3, 4, "alpha", "build"};
     const auto r = semver::from_chars(buf, buf + sizeof(buf) - 1, v);
     REQUIRE_FALSE(r);
     REQUIRE(r.ec == std::errc::result_out_of_range);
+    REQUIRE(r.ptr == buf + sizeof(buf) - 1);
+    REQUIRE(v.to_string() == "2.3.4-alpha+build");
+  }
+
+  SUBCASE("overflow consumes the complete matching prefix") {
+    const char buf[] = "1.256.0-alpha+build trailing";
+    version<uint8_t> v{2, 3, 4};
+    const auto r = semver::from_chars(buf, buf + sizeof(buf) - 1, v);
+    REQUIRE_FALSE(r);
+    REQUIRE(r.ec == std::errc::result_out_of_range);
+    REQUIRE(r.ptr == buf + 19);
+    REQUIRE(*r.ptr == ' ');
+    REQUIRE(v.to_string() == "2.3.4");
+  }
+
+  SUBCASE("overflow without a complete version is invalid_argument") {
+    const char buf[] = "256.0 trailing";
+    version<uint8_t> v{2, 3, 4};
+    const auto r = semver::from_chars(buf, buf + sizeof(buf) - 1, v);
+    REQUIRE_FALSE(r);
+    REQUIRE(r.ec == std::errc::invalid_argument);
+    REQUIRE(r.ptr == buf);
+    REQUIRE(v.to_string() == "2.3.4");
+  }
+
+  SUBCASE("uint64_t overflow still consumes the matching prefix") {
+    const char buf[] = "18446744073709551616.0.0,next";
+    version<std::uint64_t> v{2, 3, 4};
+    const auto r = semver::from_chars(buf, buf + sizeof(buf) - 1, v);
+    REQUIRE_FALSE(r);
+    REQUIRE(r.ec == std::errc::result_out_of_range);
+    REQUIRE(r.ptr == buf + 24);
+    REQUIRE(*r.ptr == ',');
+    REQUIRE(v.to_string() == "2.3.4");
   }
 
   SUBCASE("leading zero in component returns failure") {
     const char buf[] = "01.0.0 rest";
     version<> v;
-    REQUIRE_FALSE(semver::from_chars(buf, buf + sizeof(buf) - 1, v));
+    const auto r = semver::from_chars(buf, buf + sizeof(buf) - 1, v);
+    REQUIRE_FALSE(r);
+    REQUIRE(r.ec == std::errc::invalid_argument);
+    REQUIRE(r.ptr == buf);
   }
 
   SUBCASE("result is same as parse() for clean version string") {

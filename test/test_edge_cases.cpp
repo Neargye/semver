@@ -140,122 +140,54 @@ TEST_CASE("leading zero detection boundary") {
   }
 }
 
-TEST_CASE("hyphen range with multiple spaces") {
-  SUBCASE("two spaces after hyphen") {
-    range_set<> rs;
-    REQUIRE(parse("1.2.3 -  2.3.4", rs));
-    CHECK(rs.contains(*try_parse("1.2.3"), include_prerelease));
-    CHECK(rs.contains(*try_parse("2.0.0"), include_prerelease));
-    CHECK(rs.contains(*try_parse("2.3.4"), include_prerelease));
-    CHECK_FALSE(rs.contains(*try_parse("1.2.2"), include_prerelease));
-    CHECK_FALSE(rs.contains(*try_parse("2.3.5"), include_prerelease));
-  }
-
-  SUBCASE("three spaces after hyphen") {
-    range_set<> rs;
-    REQUIRE(parse("1.0.0 -   2.0.0", rs));
-    CHECK(rs.contains(*try_parse("1.5.0"), include_prerelease));
-    CHECK_FALSE(rs.contains(*try_parse("2.0.1"), include_prerelease));
-  }
-
-  SUBCASE("single space works") {
-    range_set<> rs;
-    REQUIRE(parse("1.0.0 - 2.0.0", rs));
-    CHECK(rs.contains(*try_parse("1.5.0"), include_prerelease));
-  }
-
-  SUBCASE("no space after hyphen is NOT a hyphen range") {
-    // "1.0.0 -2.0.0" is ambiguous and must not be treated as a hyphen range.
-    range_set<> rs;
-    const auto result = parse("1.0.0 -2.0.0", rs);
-    // If it parses differently, it still must not silently match as a hyphen range.
-    if (result) {
-      // A hyphen range would match 1.5.0.
-      CHECK_FALSE(rs.contains(*try_parse("1.5.0"), include_prerelease));
-    }
-  }
-
-  SUBCASE("hyphen range with wildcard RHS and multiple spaces") {
-    range_set<> rs;
-    REQUIRE(parse("1.2.3 -  2.x", rs));
-    CHECK(rs.contains(*try_parse("1.2.3"), include_prerelease));
-    CHECK(rs.contains(*try_parse("2.5.0"), include_prerelease));
-    CHECK_FALSE(rs.contains(*try_parse("3.0.0"), include_prerelease));
-  }
-}
-
 TEST_CASE("inc() direct construction correctness") {
   SUBCASE("premajor with explicit pre tag") {
-    const auto v = inc(from_string("1.2.3"), version_diff::premajor, "beta");
+    const auto v = inc(from_string("1.2.3"), version_change::premajor, "beta");
     REQUIRE(v.has_value());
     CHECK(v->to_string() == "2.0.0-beta");
   }
 
   SUBCASE("preminor with explicit pre tag") {
-    const auto v = inc(from_string("1.2.3"), version_diff::preminor, "rc.1");
+    const auto v = inc(from_string("1.2.3"), version_change::preminor, "rc.1");
     REQUIRE(v.has_value());
     CHECK(v->to_string() == "1.3.0-rc.1");
   }
 
   SUBCASE("prepatch with explicit pre tag") {
-    const auto v = inc(from_string("1.2.3"), version_diff::prepatch, "alpha");
+    const auto v = inc(from_string("1.2.3"), version_change::prepatch, "alpha");
     REQUIRE(v.has_value());
     CHECK(v->to_string() == "1.2.4-alpha");
   }
 
   SUBCASE("prerelease with explicit pre tag replaces existing") {
-    const auto v = inc(from_string("1.0.0-alpha.1"), version_diff::prerelease, "beta");
+    const auto v = inc(from_string("1.0.0-alpha.1"), version_change::prerelease, "beta");
     REQUIRE(v.has_value());
     CHECK(v->to_string() == "1.0.0-beta");
   }
 
   SUBCASE("inc with invalid user-provided pre tag returns nullopt") {
     // Leading zero in numeric identifier → validate_prerelease_tag fails → nullopt
-    CHECK_FALSE(inc(from_string("1.0.0"), version_diff::premajor, "01").has_value());
+    CHECK_FALSE(inc(from_string("1.0.0"), version_change::premajor, "01").has_value());
     // Empty dot-separated identifier
-    CHECK_FALSE(inc(from_string("1.0.0"), version_diff::premajor, "alpha.").has_value());
+    CHECK_FALSE(inc(from_string("1.0.0"), version_change::premajor, "alpha.").has_value());
     // Invalid character
-    CHECK_FALSE(inc(from_string("1.0.0"), version_diff::premajor, "alpha!").has_value());
+    CHECK_FALSE(inc(from_string("1.0.0"), version_change::premajor, "alpha!").has_value());
   }
 
   SUBCASE("inc prerelease increments last numeric identifier") {
-    CHECK(inc(from_string("1.0.0-alpha.1"), version_diff::prerelease)->to_string()
+    CHECK(inc(from_string("1.0.0-alpha.1"), version_change::prerelease)->to_string()
           == "1.0.0-alpha.2");
-    CHECK(inc(from_string("1.0.0-9"), version_diff::prerelease)->to_string()
+    CHECK(inc(from_string("1.0.0-9"), version_change::prerelease)->to_string()
           == "1.0.0-10");
-    CHECK(inc(from_string("1.0.0-alpha"), version_diff::prerelease)->to_string()
+    CHECK(inc(from_string("1.0.0-alpha"), version_change::prerelease)->to_string()
           == "1.0.0-alpha.0");
   }
 
   SUBCASE("inc default pre is '0'") {
-    CHECK(inc(from_string("1.0.0"), version_diff::premajor)->to_string()   == "2.0.0-0");
-    CHECK(inc(from_string("1.0.0"), version_diff::preminor)->to_string()   == "1.1.0-0");
-    CHECK(inc(from_string("1.0.0"), version_diff::prepatch)->to_string()   == "1.0.1-0");
-    CHECK(inc(from_string("1.0.0"), version_diff::prerelease)->to_string() == "1.0.1-0");
-  }
-}
-
-TEST_CASE("range parse with build metadata in range boundary") {
-  SUBCASE("caret range: build metadata on lower bound is discarded") {
-    // ^1.2.3+build parses and the '+build' is stripped for range matching
-    range_set<> rs;
-    REQUIRE(parse("^1.2.3+build.42", rs));
-    CHECK(rs.contains(*try_parse("1.5.0"), include_prerelease));
-    CHECK_FALSE(rs.contains(*try_parse("2.0.0"), include_prerelease));
-  }
-
-  SUBCASE("tilde range: build metadata ignored") {
-    range_set<> rs;
-    REQUIRE(parse("~1.2.3+xyz", rs));
-    CHECK(rs.contains(*try_parse("1.2.9"), include_prerelease));
-    CHECK_FALSE(rs.contains(*try_parse("1.3.0"), include_prerelease));
-  }
-
-  SUBCASE("hyphen range: build metadata on upper bound is discarded") {
-    range_set<> rs;
-    REQUIRE(parse("1.2.3 - 2.0.0+meta", rs));
-    CHECK(rs.contains(*try_parse("1.5.0"), include_prerelease));
-    CHECK_FALSE(rs.contains(*try_parse("2.0.1"), include_prerelease));
+    CHECK(inc(from_string("1.0.0"), version_change::premajor)->to_string()   == "2.0.0-0");
+    CHECK(inc(from_string("1.0.0"), version_change::preminor)->to_string()   == "1.1.0-0");
+    CHECK(inc(from_string("1.0.0"), version_change::prepatch)->to_string()   == "1.0.1-0");
+    CHECK(inc(from_string("1.0.0"), version_change::prerelease)->to_string() == "1.0.1-0");
   }
 }
 
@@ -285,7 +217,7 @@ TEST_CASE("operator<< writes correct output") {
   }
 }
 
-TEST_CASE("satisfies() range_set overload") {
+TEST_CASE("range_set contains agrees with string satisfies") {
   range_set<> rs;
   REQUIRE(parse("^1.2.0", rs));
 
@@ -294,52 +226,43 @@ TEST_CASE("satisfies() range_set overload") {
   const auto v_pre  = *try_parse("1.5.0-alpha");
 
   SUBCASE("matches version in range") {
-    CHECK(satisfies(v_in, rs));
+    CHECK(rs.contains(v_in));
   }
 
   SUBCASE("rejects version out of range") {
-    CHECK_FALSE(satisfies(v_out, rs));
+    CHECK_FALSE(rs.contains(v_out));
   }
 
-  SUBCASE("exclude_prerelease default blocks prereleases") {
-    CHECK_FALSE(satisfies(v_pre, rs));
+  SUBCASE("exclude policy blocks prereleases by default") {
+    CHECK_FALSE(rs.contains(v_pre));
   }
 
-  SUBCASE("include_prerelease includes prerelease when range bounds are satisfied") {
-    // With include_prerelease, the "explicit comparator with same M.m.p" filter
+  SUBCASE("include policy allows prerelease when range bounds are satisfied") {
+    // The include policy disables the "explicit comparator with same M.m.p" filter
     // is bypassed entirely. 1.5.0-alpha satisfies ^1.2.0 because
     //   1.5.0-alpha >= 1.2.0   (true)
     //   1.5.0-alpha < 2.0.0-0  (true, since 1.5 < 2.0)
-    CHECK(satisfies(v_pre, rs, include_prerelease));
+    CHECK(rs.contains(v_pre, prerelease_policy::include));
 
     // But a prerelease above the upper bound is still excluded.
     const auto v_above = *try_parse("2.0.0-alpha");
     // 2.0.0-alpha < 2.0.0-0? No: 2.0.0-alpha > 2.0.0-0 (alpha > 0 alphanumeric vs numeric)
-    CHECK_FALSE(satisfies(v_above, rs, include_prerelease));
+    CHECK_FALSE(rs.contains(v_above, prerelease_policy::include));
   }
 
-  SUBCASE("string overload and range_set overload agree") {
+  SUBCASE("string satisfies and pre-parsed contains agree") {
     for (const auto& s : {"1.2.0", "1.5.0", "2.0.0", "1.2.0-0"}) {
       const auto v = try_parse(s);
       REQUIRE(v.has_value());
-      CHECK(satisfies(*v, rs) == satisfies(*v, "^1.2.0"));
+      CHECK(rs.contains(*v) == satisfies(*v, "^1.2.0"));
     }
   }
 }
 
-TEST_CASE("constexpr library version constants") {
-  static_assert(library_version_major == SEMVER_VERSION_MAJOR, "major mismatch");
-  static_assert(library_version_minor == SEMVER_VERSION_MINOR, "minor mismatch");
-  static_assert(library_version_patch == SEMVER_VERSION_PATCH, "patch mismatch");
-
-  CHECK(library_version_major == SEMVER_VERSION_MAJOR);
-  CHECK(library_version_minor == SEMVER_VERSION_MINOR);
-  CHECK(library_version_patch == SEMVER_VERSION_PATCH);
-
-  // Must match the runtime library_version object.
-  CHECK(library_version.major() == library_version_major);
-  CHECK(library_version.minor() == library_version_minor);
-  CHECK(library_version.patch() == library_version_patch);
+TEST_CASE("library version") {
+  CHECK(library_version.major() == SEMVER_VERSION_MAJOR);
+  CHECK(library_version.minor() == SEMVER_VERSION_MINOR);
+  CHECK(library_version.patch() == SEMVER_VERSION_PATCH);
 }
 
 TEST_CASE("validate_prerelease_tag contract via parse") {
