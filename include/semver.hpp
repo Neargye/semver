@@ -44,11 +44,11 @@
 #define SEMVER_VERSION_PATCH 0
 
 #if defined(SEMVER_CONFIG_FILE)
-#include SEMVER_CONFIG_FILE
+#  include SEMVER_CONFIG_FILE
 #endif
 
 #ifndef SEMVER_MAX_INPUT_LENGTH
-#define SEMVER_MAX_INPUT_LENGTH 512
+#  define SEMVER_MAX_INPUT_LENGTH 512
 #endif
 
 #include <cassert>
@@ -80,29 +80,29 @@
 #endif
 
 #if defined(__cpp_impl_three_way_comparison) && __cpp_impl_three_way_comparison >= 201907L
-#include <compare>
+#  include <compare>
 #endif
 
 // Clang with libstdc++ < 13 cannot constexpr-evaluate std::string.
 #if defined(__cpp_lib_constexpr_string) && __cpp_lib_constexpr_string >= 201907L && defined(__cpp_lib_constexpr_vector) && __cpp_lib_constexpr_vector >= 201907L
-  #if defined(__clang__) && defined(__GLIBCXX__) && (!defined(_GLIBCXX_RELEASE) || _GLIBCXX_RELEASE < 13)
-    #define SEMVER_HAS_CONSTEXPR 0
-    #define SEMVER_CONSTEXPR inline
-  #else
-    #define SEMVER_HAS_CONSTEXPR 1
-    #define SEMVER_CONSTEXPR constexpr
-  #endif
+#  if defined(__clang__) && defined(__GLIBCXX__) && (!defined(_GLIBCXX_RELEASE) || _GLIBCXX_RELEASE < 13)
+#    define SEMVER_HAS_CONSTEXPR 0
+#    define SEMVER_CONSTEXPR inline
+#  else
+#    define SEMVER_HAS_CONSTEXPR 1
+#    define SEMVER_CONSTEXPR constexpr
+#  endif
 #else
-  #define SEMVER_HAS_CONSTEXPR 0
-  #define SEMVER_CONSTEXPR inline
+#  define SEMVER_HAS_CONSTEXPR 0
+#  define SEMVER_CONSTEXPR inline
 #endif
 
 // MSVC cannot return version<> from a consteval literal.
 // GCC with libstdc++ < 14 cannot propagate consteval parse failures.
 #if defined(__cpp_consteval) && __cpp_consteval >= 201811L && SEMVER_HAS_CONSTEXPR && !defined(_MSC_VER) && !(defined(__GLIBCXX__) && !defined(__clang__) && (!defined(__GNUC__) || __GNUC__ < 14 || !defined(_GLIBCXX_RELEASE) || _GLIBCXX_RELEASE < 14))
-  #define SEMVER_HAS_CONSTEVAL_LITERAL 1
+#  define SEMVER_HAS_CONSTEVAL_LITERAL 1
 #else
-  #define SEMVER_HAS_CONSTEVAL_LITERAL 0
+#  define SEMVER_HAS_CONSTEVAL_LITERAL 0
 #endif
 
 // Avoid system major/minor macros.
@@ -314,7 +314,7 @@ namespace semver {
   template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
 #if defined(__cpp_concepts) && __cpp_concepts >= 201907L
     requires detail::are_component_types_v<I1, I2, I3>
-  #endif
+#endif
   class version {
     static_assert(detail::is_component_type_v<I1>, "semver: I1 must be an unsigned integral type");
     static_assert(detail::is_component_type_v<I2>, "semver: I2 must be an unsigned integral type");
@@ -1660,13 +1660,13 @@ namespace std {
   struct hash<semver::version<I1, I2, I3>> {
     std::size_t operator()(const semver::version<I1, I2, I3>& v) const noexcept {
       // Build metadata is excluded by SemVer §10.
-#if SIZE_MAX > 0xFFFFFFFFU
-      static constexpr auto kPhiHash = std::size_t{0x9e3779b97f4a7c15ULL};
+#if SIZE_MAX > UINT32_MAX
+      static constexpr auto hash_combine_constant = std::size_t{0x9e3779b97f4a7c15ULL};
 #else
-      static constexpr auto kPhiHash = std::size_t{0x9e3779b9U};
+      static constexpr auto hash_combine_constant = std::size_t{0x9e3779b9U};
 #endif
       static constexpr auto hash_combine = [](std::size_t seed, std::size_t value) noexcept -> std::size_t {
-        return seed ^ (value + kPhiHash + (seed << 6) + (seed >> 2));
+        return seed ^ (value + hash_combine_constant + (seed << 6) + (seed >> 2));
       };
       auto h = std::hash<I1>{}(v.major());
       h = hash_combine(h, std::hash<I2>{}(v.minor()));
