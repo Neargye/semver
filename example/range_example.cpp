@@ -23,6 +23,8 @@
 
 #include <cassert>
 #include <iostream>
+#include <string_view>
+#include <system_error>
 #include "semver.hpp"
 
 int main() {
@@ -37,7 +39,7 @@ int main() {
     semver::version version;
     if (semver::parse("1.3.0", version)) {
       const auto result = range.contains(version);
-      std::cout << result << std::endl; // true
+      std::cout << result << '\n'; // true
     }
   }
 
@@ -46,7 +48,7 @@ int main() {
     semver::version version;
     if (semver::parse("3.5.0", version)) {
       const auto result = range2.contains(version);
-      std::cout << result << std::endl; // true
+      std::cout << result << '\n'; // true
     }
   }
 
@@ -55,15 +57,15 @@ int main() {
     semver::version version;
     if (semver::parse("1.2.3-alpha.7", version)) {
       const auto result = range3.contains(version);
-      std::cout << result << std::endl; // true
+      std::cout << result << '\n'; // true
     }
 
     if (semver::parse("3.4.5-alpha.9", version)) {
       auto result = range3.contains(version);
-      std::cout << result << std::endl; // false
+      std::cout << result << '\n'; // false
 
       result = range3.contains(version, semver::prerelease_policy::include);
-      std::cout << result << std::endl; // true
+      std::cout << result << '\n'; // true
     }
   }
 

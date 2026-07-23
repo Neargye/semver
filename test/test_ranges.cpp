@@ -1,7 +1,9 @@
 ﻿#include <semver.hpp>
 #include <doctest.h>
+#include <algorithm>
 #include <array>
 #include <cstdint>
+#include <forward_list>
 #include <limits>
 #include <ostream>
 #include <string>
@@ -440,6 +442,32 @@ TEST_CASE("range from_chars_result contract") {
     REQUIRE(ptr == bad.data() + 8);
   }
 
+  SUBCASE("ptr reports the earliest parse failure") {
+    semver::range_set rs;
+    constexpr std::string_view structural = ">=1..2@";
+    auto result = semver::parse(structural, rs);
+    REQUIRE(result.ec == std::errc::invalid_argument);
+    REQUIRE(result.ptr == structural.data() + 4);
+
+    constexpr std::string_view trailing = ">=1.0.0 tail@";
+    result = semver::parse(trailing, rs);
+    REQUIRE(result.ec == std::errc::invalid_argument);
+    REQUIRE(result.ptr == trailing.data() + 8);
+  }
+
+  SUBCASE("typed overflow reports the failing union term") {
+    semver::range_set<std::uint8_t> rs;
+    const semver::version<std::uint8_t> preserved{2, 0, 0};
+    REQUIRE(semver::parse(">=2", rs));
+
+    constexpr std::string_view overflow = "1 || >=256";
+    const auto result = semver::parse(overflow, rs);
+    REQUIRE_FALSE(result);
+    REQUIRE(result.ec == std::errc::result_out_of_range);
+    REQUIRE(result.ptr == overflow.data() + 5);
+    REQUIRE(rs.contains(preserved));
+  }
+
   SUBCASE("failed parse leaves output unchanged") {
     semver::range_set rs;
     semver::version v;
@@ -680,6 +708,22 @@ TEST_CASE("max_satisfying and min_satisfying") {
     REQUIRE(semver::max_satisfying(vs.end(), vs.end(), rs) == vs.end());
     REQUIRE(semver::min_satisfying(vs.end(), vs.end(), rs) == vs.end());
   }
+
+  SUBCASE("the algorithms accept forward iterators") {
+    std::forward_list<V> forward_versions{
+      semver::from_string<std::uint64_t>("2.0.0"),
+      semver::from_string<std::uint64_t>("1.5.0"),
+      semver::from_string<std::uint64_t>("1.0.0")
+    };
+
+    const auto lowest = semver::min_satisfying(forward_versions.begin(), forward_versions.end(), rs);
+    const auto highest = semver::max_satisfying(forward_versions.begin(), forward_versions.end(), rs);
+
+    REQUIRE(lowest != forward_versions.end());
+    REQUIRE(highest != forward_versions.end());
+    CHECK(lowest->to_string() == "1.0.0");
+    CHECK(highest->to_string() == "1.5.0");
+  }
 }
 
 TEST_CASE("range matching supports mixed component types") {
@@ -710,6 +754,38 @@ TEST_CASE("range matching supports mixed component types") {
     REQUIRE_FALSE(rs.contains(other_core));
     REQUIRE(rs.contains(other_core, semver::prerelease_policy::include));
   }
+
+  SUBCASE("heterogeneous component storage preserves each boundary") {
+    using mixed_version = semver::version<std::uint8_t, std::uint16_t, std::uint32_t>;
+    using mixed_range = semver::range_set<std::uint8_t, std::uint16_t, std::uint32_t>;
+
+    mixed_version boundary;
+    REQUIRE(semver::parse("255.65535.4294967295", boundary));
+    CHECK(boundary.major() == std::numeric_limits<std::uint8_t>::max());
+    CHECK(boundary.minor() == std::numeric_limits<std::uint16_t>::max());
+    CHECK(boundary.patch() == std::numeric_limits<std::uint32_t>::max());
+
+    for (const auto overflow : {"256.0.0", "1.65536.0", "1.2.4294967296"}) {
+      const auto result = semver::parse(overflow, boundary);
+      CHECK_FALSE(result);
+      CHECK(result.ec == std::errc::result_out_of_range);
+    }
+
+    mixed_range strict;
+    REQUIRE(semver::parse(">1.65535.4294967295", strict));
+    const auto minimum = semver::min_version(strict);
+    REQUIRE(minimum.has_value());
+    CHECK(minimum->to_string() == "2.0.0");
+  }
+
+  SUBCASE("intersects widens each component independently") {
+    semver::range_set<std::uint16_t, std::uint8_t, std::uint8_t> wide_major;
+    semver::range_set<std::uint8_t, std::uint16_t, std::uint8_t> wide_minor;
+    REQUIRE(semver::parse(">=256.1.0 <300", wide_major));
+    REQUIRE(semver::parse(">=200.300.0", wide_minor));
+    CHECK(semver::intersects(wide_major, wide_minor));
+    CHECK(semver::intersects(wide_minor, wide_major));
+  }
 }
 
 TEST_CASE("min_version returns the lowest representable match") {
@@ -733,6 +809,15 @@ TEST_CASE("min_version returns the lowest representable match") {
     REQUIRE(semver::parse(">1.2.3 <2", rs));
     REQUIRE(semver::min_version(rs)->to_string() == "1.2.4");
     REQUIRE(semver::min_version(rs, semver::prerelease_policy::include)->to_string() == "1.2.4-0");
+  }
+
+  SUBCASE("strict lower bounds carry across component limits") {
+    semver::range_set<std::uint8_t> rs;
+    REQUIRE(semver::parse(">1.2.255", rs));
+    REQUIRE(semver::min_version(rs)->to_string() == "1.3.0");
+
+    REQUIRE(semver::parse(">1.255.255", rs));
+    REQUIRE(semver::min_version(rs)->to_string() == "2.0.0");
   }
 
   SUBCASE("explicit prerelease boundary has an exact successor") {
@@ -797,6 +882,21 @@ TEST_CASE("intersects checks whether two range sets share a version") {
     REQUIRE(semver::intersects(lhs, rhs));
   }
 
+  SUBCASE("a generated prerelease floor can be the only overlap") {
+    semver::range_set<> lhs, rhs;
+    REQUIRE(semver::parse(">=1", lhs));
+    REQUIRE(semver::parse("<1.0.0", rhs));
+    REQUIRE_FALSE(semver::intersects(lhs, rhs));
+    REQUIRE(semver::intersects(lhs, rhs, semver::prerelease_policy::include));
+  }
+
+  SUBCASE("strict lower bound witnesses carry across component limits") {
+    semver::range_set<std::uint8_t> lhs, rhs;
+    REQUIRE(semver::parse(">1.2.255 <2", lhs));
+    REQUIRE(semver::parse(">=1.3.0 <2", rhs));
+    REQUIRE(semver::intersects(lhs, rhs));
+  }
+
   SUBCASE("adjacent versions leave no hidden value") {
     semver::range_set<> lhs, rhs;
     REQUIRE(semver::parse(">1.0.0-alpha", lhs));
@@ -824,10 +924,117 @@ TEST_CASE("intersects checks whether two range sets share a version") {
     REQUIRE(semver::intersects(narrow, wide));
   }
 
+  SUBCASE("unbounded narrow ranges intersect beyond their storage types") {
+    semver::range_set<std::uint8_t> lhs, rhs;
+    REQUIRE(semver::parse(">255.255.255", lhs));
+    REQUIRE(semver::parse(">255.255.255", rhs));
+    REQUIRE_FALSE(semver::min_version(lhs).has_value());
+    REQUIRE_FALSE(semver::min_version(rhs).has_value());
+    CHECK(semver::intersects(lhs, rhs));
+  }
+
   SUBCASE("default-constructed range intersects nothing") {
     semver::range_set<> empty, any;
     REQUIRE(semver::parse("*", any));
     REQUIRE_FALSE(semver::intersects(empty, any));
+  }
+
+  SUBCASE("representative ranges are symmetric") {
+    constexpr std::array<std::string_view, 12> cases = {{
+      "*", "<1", ">=1 <2", "1.2", "~1.2", "^0.2.3",
+      ">=1.0.0-alpha <1.0.0", "!=1.2.3", "<1 || >=3", "1.2.3",
+      ">=1 <2 !=1.5.0", "^0.0.3 || 2.x"
+    }};
+    constexpr std::array policies = {
+      semver::prerelease_policy::exclude,
+      semver::prerelease_policy::include
+    };
+
+    std::array<semver::range_set<>, cases.size()> ranges;
+    for (std::size_t i = 0; i < cases.size(); ++i)
+      REQUIRE(semver::parse(cases[i], ranges[i]));
+
+    for (std::size_t i = 0; i < ranges.size(); ++i) {
+      for (std::size_t j = 0; j < ranges.size(); ++j) {
+        for (const auto policy : policies) {
+          const auto include_prereleases = policy == semver::prerelease_policy::include;
+          CAPTURE(cases[i]);
+          CAPTURE(cases[j]);
+          CAPTURE(include_prereleases);
+          CHECK(semver::intersects(ranges[i], ranges[j], policy) == semver::intersects(ranges[j], ranges[i], policy));
+        }
+      }
+    }
+  }
+}
+
+TEST_CASE("range utility candidates agree with bounded exhaustive search") {
+  const std::vector<std::string_view> range_texts{
+    "*", "0", "1", "2", "3", "0.0", "0.1", "1.0", "1.2", "2.0",
+    "0.0.0", "0.0.0-0", "0.0.0-alpha", "1.2.3", "1.2.3-alpha",
+    ">0.0.0", ">0.0.0-0", ">0.0.0-alpha", ">1.2.3", ">1.2.3-alpha",
+    ">=0.0.0", ">=0.0.0-alpha", ">=1.2.3", ">=1.2.3-alpha",
+    "<0.0.0", "<0.0.0-alpha", "<1", "<1.2", "<1.2.3", "<1.2.3-alpha",
+    "<=0.0.0", "<=0.0.0-alpha", "<=1.2.3", "<=1.2.3-alpha",
+    "!=0.0.0", "!=0.0.0-0", "!=0.0.0-alpha", "!=1.2.3",
+    ">=0 <1", ">=1 <2", ">=1.2 <1.3", ">=1.2.3 <2",
+    ">0.0.0 <0.0.1", ">0.0.0-0 <0.0.0", ">0.0.0-alpha <0.0.0-beta",
+    ">=0.0.0 !=0.0.0 <0.0.2", ">=1 <3 !=2.0.0",
+    "~0", "~1", "~1.2", "~1.2.3", "^0", "^0.0.3", "^0.2.3", "^1.2.3",
+    "0 || 2", ">=0 <1 || >=2 <3", ">4.4.4"
+  };
+  constexpr std::array<std::string_view, 15> prereleases{{
+    "", "0", "0.0", "0.0.0", "1", "1.0",
+    "alpha", "alpha.0", "alpha.0.0", "alpha.1", "alpha.1.0",
+    "beta", "beta.0", "z", "z.0"
+  }};
+
+  std::vector<semver::range_set<std::uint8_t>> ranges;
+  ranges.reserve(range_texts.size());
+  for (const auto text : range_texts) {
+    const auto range = semver::try_parse_range<std::uint8_t>(text);
+    CAPTURE(text);
+    REQUIRE(range.has_value());
+    ranges.push_back(*range);
+  }
+
+  std::vector<semver::version<std::uint8_t>> versions;
+  for (std::uint8_t major = 0; major <= 6; ++major) {
+    for (std::uint8_t minor = 0; minor <= 6; ++minor) {
+      for (std::uint8_t patch = 0; patch <= 6; ++patch) {
+        for (const auto prerelease : prereleases)
+          versions.emplace_back(major, minor, patch, prerelease);
+      }
+    }
+  }
+  std::sort(versions.begin(), versions.end());
+  versions.erase(std::unique(versions.begin(), versions.end()), versions.end());
+
+  constexpr std::array policies{
+    semver::prerelease_policy::exclude,
+    semver::prerelease_policy::include
+  };
+  for (const auto policy : policies) {
+    const auto include_prereleases = policy == semver::prerelease_policy::include;
+    for (std::size_t i = 0; i < ranges.size(); ++i) {
+      const auto brute_min = std::find_if(versions.begin(), versions.end(), [&](const auto& version) { return ranges[i].contains(version, policy); });
+      const auto actual_min = semver::min_version(ranges[i], policy);
+
+      CAPTURE(range_texts[i]);
+      CAPTURE(include_prereleases);
+      CHECK(actual_min.has_value() == (brute_min != versions.end()));
+      if (actual_min && brute_min != versions.end())
+        CHECK(*actual_min == *brute_min);
+
+      for (std::size_t j = 0; j < ranges.size(); ++j) {
+        const auto brute_intersects = std::any_of(versions.begin(), versions.end(), [&](const auto& version) {
+          return ranges[i].contains(version, policy) && ranges[j].contains(version, policy);
+        });
+
+        CAPTURE(range_texts[j]);
+        CHECK(semver::intersects(ranges[i], ranges[j], policy) == brute_intersects);
+      }
+    }
   }
 }
 

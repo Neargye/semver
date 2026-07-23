@@ -215,7 +215,7 @@ std::basic_ostream<char, Traits>& operator<<(std::basic_ostream<char, Traits>& s
 
 Stream insertion supports narrow character streams and writes the canonical version as one value. Numeric base flags do not affect components, and width and alignment apply to the complete version.
 
-When `<format>` support is available, `std::formatter<semver::version<...>>` enables `std::format("{}", value)`. Format specifications other than `{}` are rejected.
+When `<format>` support is available, `std::formatter<semver::version<...>>` enables `std::format("{}", value)` and supports the standard string format specifications, including width, fill, alignment, and precision.
 
 `std::hash<semver::version<...>>` is provided. It follows equality and therefore excludes build metadata.
 
@@ -262,6 +262,8 @@ wildcard     = M "." wildcard-any | M "." m "." wildcard-any
 `M`, `m`, and `p` are decimal components without leading zeros. Prerelease qualifiers require a complete version. Build metadata is not accepted in range boundaries because it does not affect SemVer precedence.
 
 Spaces are optional after range operators. All six ASCII whitespace characters are accepted around the range and between intersection terms. Empty input, empty `||` branches, wildcard operands for `~`, `^`, or comparators, and partial operands for `>`, `<=`, `=`, or `!=` are invalid.
+
+The table summarizes release bounds. With `prerelease_policy::include`, some generated boundaries use `-0` sentinels as described in [Prerelease matching](#prerelease-matching).
 
 | Form | Expansion or effect |
 | --- | --- |

@@ -22,7 +22,10 @@
 // SOFTWARE.
 
 #include <cassert>
+#include <cstdint>
 #include <iostream>
+#include <string_view>
+#include <system_error>
 #include "semver.hpp"
 
 int main() {
@@ -31,18 +34,18 @@ int main() {
   const auto [ptr, ec] = semver::parse(raw_version, version);
   if (ec == std::errc{}) {
     assert(ptr == (raw_version.data() + raw_version.size()));
-    std::cout << version.major() << std::endl; // 1
-    std::cout << version.minor() << std::endl; // 2
-    std::cout << version.patch() << std::endl; // 3
+    std::cout << version.major() << '\n'; // 1
+    std::cout << version.minor() << '\n'; // 2
+    std::cout << version.patch() << '\n'; // 3
   }
 
   semver::version version2;
   if (semver::parse("1.2.3-alpha0.1+build", version2)) {
-    std::cout << version2.major() << std::endl; // 1
-    std::cout << version2.minor() << std::endl; // 2
-    std::cout << version2.patch() << std::endl; // 3
-    std::cout << version2.prerelease_tag() << std::endl; // "alpha0.1"
-    std::cout << version2.build_metadata() << std::endl; // "build"
+    std::cout << version2.major() << '\n'; // 1
+    std::cout << version2.minor() << '\n'; // 2
+    std::cout << version2.patch() << '\n'; // 3
+    std::cout << version2.prerelease_tag() << '\n'; // "alpha0.1"
+    std::cout << version2.build_metadata() << '\n'; // "build"
   }
 
   assert(version > version2);
@@ -50,11 +53,11 @@ int main() {
 
   semver::version<std::uint64_t> version3;
   if (semver::parse("0.0.999999999999", version3)) {
-    std::cout << version3.major() << std::endl; // 0
-    std::cout << version3.minor() << std::endl; // 0
-    std::cout << version3.patch() << std::endl; // 999999999999
+    std::cout << version3.major() << '\n'; // 0
+    std::cout << version3.minor() << '\n'; // 0
+    std::cout << version3.patch() << '\n'; // 999999999999
   }
 
   const auto result = semver::valid("0.0.1-beta");
-  std::cout << std::boolalpha << result << std::endl; // true
+  std::cout << std::boolalpha << result << '\n'; // true
 }

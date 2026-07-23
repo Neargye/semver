@@ -76,6 +76,6 @@ Build metadata does not participate in SemVer precedence. Consequently, normal c
 
 ## Formatting
 
-`std::format` integration is available only when the standard library reports C++20 format support. The formatter accepts `{}` and rejects additional format specifications.
+`std::format` integration is available only when the standard library reports C++20 format support. The formatter supports the same format specifications as `std::string_view`.
 
 `to_chars` does not append a null terminator. The caller must provide enough space for the complete serialized version.

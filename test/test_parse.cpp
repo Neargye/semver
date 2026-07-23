@@ -296,6 +296,19 @@ TEST_CASE("from_chars_result contract") {
     REQUIRE(ptr == bad.data() + 4);
   }
 
+  SUBCASE("ptr reports the earliest parse failure") {
+    semver::version v;
+    constexpr std::string_view structural = "1..2@";
+    auto result = semver::parse(structural, v);
+    REQUIRE(result.ec == std::errc::invalid_argument);
+    REQUIRE(result.ptr == structural.data() + 2);
+
+    constexpr std::string_view trailing = "1.2.3x@";
+    result = semver::parse(trailing, v);
+    REQUIRE(result.ec == std::errc::invalid_argument);
+    REQUIRE(result.ptr == trailing.data() + 5);
+  }
+
   SUBCASE("failed parse preserves the previous output object") {
     semver::version v;
     REQUIRE(semver::parse("2.3.4-alpha+meta", v));

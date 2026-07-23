@@ -71,7 +71,6 @@
 #endif
 
 #if defined(__cpp_lib_format) && __cpp_lib_format >= 201907L
-#  include <algorithm>
 #  include <format>
 #endif
 
@@ -220,8 +219,16 @@ namespace semver {
         return true;
       };
 
-      if (!parse_component() || pos >= str.size() || str[pos++] != '.' ||
-          !parse_component() || pos >= str.size() || str[pos++] != '.' ||
+      const auto consume_dot = [&]() constexpr {
+        if (pos >= str.size() || str[pos] != '.')
+          return false;
+
+        ++pos;
+        return true;
+      };
+
+      if (!parse_component() || !consume_dot() ||
+          !parse_component() || !consume_dot() ||
           !parse_component())
         return false;
 
@@ -557,26 +564,6 @@ constexpr bool is_space(char c) noexcept {
   return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\v' || c == '\f';
 }
 
-constexpr bool is_grammar_char(char c) noexcept {
-  return is_identifier_char(c) || is_space(c) || c == '.' || c == '+' || c == '<' || c == '>' || c == '=' || c == '~' || c == '^' || c == '*';
-}
-
-constexpr const char* find_invalid_character(std::string_view str) noexcept {
-  for (std::size_t i = 0; i < str.size(); ++i) {
-    if (str[i] == '!' || str[i] == '|') {
-      const auto second = str[i] == '!' ? '=' : '|';
-      if (i + 1 == str.size() || str[i + 1] != second)
-        return str.data() + i;
-      ++i;
-      continue;
-    }
-
-    if (!is_grammar_char(str[i]))
-      return str.data() + i;
-  }
-  return nullptr;
-}
-
 constexpr std::string_view next_identifier(std::string_view& tag) noexcept {
   const auto dot = tag.find('.');
   const auto id = tag.substr(0, dot);
@@ -624,7 +611,7 @@ struct partial_version {
 
 class version_parser {
 public:
-  explicit SEMVER_CONSTEXPR version_parser(cursor& stream) noexcept : stream{stream} {}
+  explicit SEMVER_CONSTEXPR version_parser(cursor& input) noexcept : stream{input} {}
 
   template <typename I1, typename I2, typename I3>
   SEMVER_CONSTEXPR from_chars_result parse(version<I1, I2, I3>& out) {
@@ -814,12 +801,6 @@ template <typename Parser, typename Output>
   cursor input{str};
   Output tmp;
   const auto result = Parser{input}.parse(tmp);
-  if (!result || !input.at_end()) {
-    // Report lexical errors first.
-    if (const auto* invalid = find_invalid_character(str))
-      return failure(invalid);
-  }
-
   if (!result)
     return result;
 
@@ -1057,7 +1038,7 @@ template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
 // Writes "MAJOR.MINOR.PATCH[-prerelease][+build]" to a narrow stream.
 template <typename Traits, typename I1, typename I2, typename I3>
 std::basic_ostream<char, Traits>& operator<<(std::basic_ostream<char, Traits>& os, const version<I1, I2, I3>& v) {
-  return os << v.to_string().c_str();
+  return os << v.to_string();
 }
 
 // SemVer precedence with a lexicographic build-metadata tie-breaker.
@@ -1100,7 +1081,7 @@ template <typename L1, typename L2, typename L3, typename R1, typename R2, typen
 namespace detail {
   template <typename I1, typename I2, typename I3>
   struct range_comparator {
-    SEMVER_CONSTEXPR range_comparator(const version<I1, I2, I3>& bound, range_operator op, bool include_prerelease_from_zero = false) : bound(bound), op(op), include_prerelease_from_zero(include_prerelease_from_zero) {}
+    SEMVER_CONSTEXPR range_comparator(const version<I1, I2, I3>& value, range_operator operation, bool include_from_zero = false) : bound(value), op(operation), include_prerelease_from_zero(include_from_zero) {}
 
     template <typename J1, typename J2, typename J3>
     SEMVER_CONSTEXPR bool contains(const version<J1, J2, J3>& other, prerelease_policy policy) const noexcept {
@@ -1699,19 +1680,11 @@ namespace std {
 #if defined(__cpp_lib_format) && __cpp_lib_format >= 201907L
 namespace std {
   template <typename I1, typename I2, typename I3>
-  struct formatter<semver::version<I1, I2, I3>> {
-    constexpr auto parse(format_parse_context& ctx) {
-      auto it = ctx.begin();
-      if (it != ctx.end() && *it != '}')
-        throw format_error("semver::version does not support format specs");
-
-      return it;
-    }
-
+  struct formatter<semver::version<I1, I2, I3>> : formatter<string_view> {
     template <typename FormatContext>
     auto format(const semver::version<I1, I2, I3>& v, FormatContext& ctx) const {
       const auto s = v.to_string();
-      return std::copy(s.begin(), s.end(), ctx.out());
+      return formatter<string_view>::format(s, ctx);
     }
   };
 } // namespace std

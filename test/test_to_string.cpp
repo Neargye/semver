@@ -125,9 +125,14 @@ TEST_CASE("std::formatter") {
     REQUIRE(std::format("{}", def) == "0.1.0");
   }
 
-  SUBCASE("format spec throws format_error") {
-    // Use vformat to bypass compile-time format string validation (P2216)
-    CHECK_THROWS_AS((void)std::vformat("{:>20}", std::make_format_args(v)), std::format_error);
+  SUBCASE("standard string format specs") {
+    REQUIRE(std::format("{:>30}", v) == std::format("{:>30}", v.to_string()));
+    REQUIRE(std::format("{:*<30}", v) == std::format("{:*<30}", v.to_string()));
+    REQUIRE(std::format("{:.5}", v) == "1.2.3");
+  }
+
+  SUBCASE("non-string format spec throws") {
+    CHECK_THROWS_AS((void)std::vformat("{:d}", std::make_format_args(v)), std::format_error);
   }
 }
 #endif

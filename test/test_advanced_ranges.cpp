@@ -300,13 +300,17 @@ TEST_CASE("the include policy uses generated prerelease boundaries") {
   }
 
   SUBCASE("partial comparator bounds use prerelease sentinels") {
+    CHECK(in(">=1.2", "1.2.0-0"));
     CHECK(in(">=1.2", "1.2.0-alpha"));
     CHECK(in(">=1.2", "1.2.1-alpha"));
+    CHECK_FALSE(in("<2", "2.0.0-0"));
     CHECK_FALSE(in("<2", "2.0.0-alpha"));
   }
 
   SUBCASE("complete comparators retain normal precedence") {
+    CHECK_FALSE(in(">=1.2.0", "1.2.0-0"));
     CHECK_FALSE(in(">=1.2.0", "1.2.0-alpha"));
+    CHECK(in("<2.0.0", "2.0.0-0"));
     CHECK(in("<2.0.0", "2.0.0-alpha"));
   }
 

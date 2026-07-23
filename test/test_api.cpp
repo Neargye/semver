@@ -265,17 +265,28 @@ TEST_CASE("max_satisfying and min_satisfying with prerelease policy") {
   REQUIRE(parse(">=1.0.0-alpha <=2.0.0", rs));
 
   SUBCASE("exclude policy skips pre-releases") {
-    const auto mx = max_satisfying(vs.begin(), vs.end(), rs,
-                                   prerelease_policy::exclude);
+    const auto mx = max_satisfying(vs.begin(), vs.end(), rs, prerelease_policy::exclude);
     REQUIRE(mx != vs.end());
     REQUIRE(mx->to_string() == "1.0.0");
   }
 
   SUBCASE("include policy includes pre-releases") {
-    const auto mx = max_satisfying(vs.begin(), vs.end(), rs,
-                                   prerelease_policy::include);
+    const auto mx = max_satisfying(vs.begin(), vs.end(), rs, prerelease_policy::include);
     REQUIRE(mx != vs.end());
     REQUIRE(mx->to_string() == "2.0.0-beta");
+  }
+
+  SUBCASE("min_satisfying forwards the prerelease policy") {
+    range_set<> any;
+    REQUIRE(parse("*", any));
+
+    const auto excluded = min_satisfying(vs.begin(), vs.end(), any);
+    REQUIRE(excluded != vs.end());
+    REQUIRE(excluded->to_string() == "1.0.0");
+
+    const auto included = min_satisfying(vs.begin(), vs.end(), any, prerelease_policy::include);
+    REQUIRE(included != vs.end());
+    REQUIRE(included->to_string() == "1.0.0-alpha");
   }
 }
 

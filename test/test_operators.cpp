@@ -816,3 +816,36 @@ TEST_CASE("compare") {
   }
 
 }
+
+TEST_CASE("comparison and hash laws hold for representative versions") {
+  constexpr std::array<std::string_view, 16> texts{{
+    "0.0.0-0", "0.0.0-alpha", "0.0.0", "1.0.0-alpha",
+    "1.0.0-alpha.1", "1.0.0-alpha.beta", "1.0.0-beta",
+    "1.0.0-beta.2", "1.0.0-beta.11", "1.0.0-rc.1", "1.0.0",
+    "1.0.0+build.1", "1.0.0+build.2", "1.0.1", "1.1.0", "2.0.0"
+  }};
+
+  std::array<semver::version<>, texts.size()> versions;
+  for (std::size_t i = 0; i < texts.size(); ++i)
+    REQUIRE(semver::parse(texts[i], versions[i]));
+
+  for (std::size_t i = 0; i < versions.size(); ++i) {
+    for (std::size_t j = 0; j < versions.size(); ++j) {
+      const auto ij = semver::compare(versions[i], versions[j]);
+      const auto ji = semver::compare(versions[j], versions[i]);
+      CAPTURE(texts[i]);
+      CAPTURE(texts[j]);
+      CHECK(ij == -ji);
+      CHECK((ij == 0) == (versions[i] == versions[j]));
+      if (versions[i] == versions[j])
+        CHECK(std::hash<semver::version<>>{}(versions[i]) == std::hash<semver::version<>>{}(versions[j]));
+
+      for (std::size_t k = 0; k < versions.size(); ++k) {
+        if (ij <= 0 && semver::compare(versions[j], versions[k]) <= 0) {
+          CAPTURE(texts[k]);
+          CHECK(semver::compare(versions[i], versions[k]) <= 0);
+        }
+      }
+    }
+  }
+}

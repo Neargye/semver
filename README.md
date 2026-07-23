@@ -1,9 +1,9 @@
-[![Github releases](https://img.shields.io/github/release/Neargye/semver.svg)](https://github.com/Neargye/semver/releases)
-[![Vcpkg package](https://img.shields.io/badge/Vcpkg-package-blueviolet)](https://github.com/microsoft/vcpkg/tree/master/ports/neargye-semver)
+[![GitHub releases](https://img.shields.io/github/release/Neargye/semver.svg)](https://github.com/Neargye/semver/releases)
+[![vcpkg package](https://img.shields.io/badge/vcpkg-package-blueviolet)](https://github.com/microsoft/vcpkg/tree/master/ports/neargye-semver)
 [![Conan package](https://img.shields.io/badge/Conan-package-blueviolet)](https://conan.io/center/recipes/neargye-semver)
 [![License](https://img.shields.io/github/license/Neargye/semver.svg)](LICENSE)
 
-Header-only C++17 library for [Semantic Versioning 2.0.0](https://semver.org). It provides strict version parsing, comparison, formatting, increments, and a documented range syntax for common version constraints. No dependencies.
+Header-only C++17 library for [Semantic Versioning 2.0.0](https://semver.org). It provides version parsing and validation, comparison, formatting, increments, and a documented range syntax for common version constraints. No dependencies.
 
 ```cpp
 #include <cassert>
@@ -23,9 +23,9 @@ int main() {
 
 ## Features
 
-- Strict SemVer 2.0.0 parsing and validation.
+- SemVer 2.0.0 parsing and validation with configurable input limits.
 - Configurable unsigned component types; `version<>` uses `std::uint32_t`.
-- Mixed-component comparison and range matching without narrowing.
+- Mixed-type version comparison and range matching without narrowing.
 - Compact `*`/`x`/`X` wildcard, partial, comparator, tilde, caret, whitespace-AND, and `||` range syntax.
 - Range matching, intersection checks, and minimum-version queries.
 - `from_chars`/`to_chars`, streams, `std::hash`, and optional `std::format` support.
