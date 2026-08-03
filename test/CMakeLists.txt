@@ -19,6 +19,10 @@ else()
 endif()
 
 if(SEMVER_MSVC_FRONTEND)
+    list(APPEND SOURCES test_windows_minmax.cpp)
+endif()
+
+if(SEMVER_MSVC_FRONTEND)
     set(OPTIONS /W4 /WX /FS)
     check_cxx_compiler_flag(/permissive- HAS_PERMISSIVE_FLAG)
     if(HAS_PERMISSIVE_FLAG)

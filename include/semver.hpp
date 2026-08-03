@@ -270,7 +270,7 @@ namespace semver {
 
     template<typename R, typename T>
     constexpr bool number_in_range(T t) noexcept {
-      return !cmp_less(t, std::numeric_limits<R>::min()) && !cmp_less(std::numeric_limits<R>::max(), t);
+      return !cmp_less(t, (std::numeric_limits<R>::min)()) && !cmp_less((std::numeric_limits<R>::max)(), t);
     }
 
     template <typename R1, typename R2, typename R3, typename T1, typename T2, typename T3>
@@ -354,21 +354,21 @@ namespace semver {
 
     // Returns (major+1).0.0, clears qualifiers, and throws on overflow.
     [[nodiscard]] SEMVER_CONSTEXPR version<I1, I2, I3> bump_major() const {
-      if (major_ == std::numeric_limits<I1>::max()) {
+      if (major_ == (std::numeric_limits<I1>::max)()) {
         throw std::overflow_error{"semver: bump_major overflow"};
       }
       return version<I1, I2, I3>{static_cast<I1>(major_ + I1{1}), I2{}, I3{}};
     }
     // Returns major.(minor+1).0, clears qualifiers, and throws on overflow.
     [[nodiscard]] SEMVER_CONSTEXPR version<I1, I2, I3> bump_minor() const {
-      if (minor_ == std::numeric_limits<I2>::max()) {
+      if (minor_ == (std::numeric_limits<I2>::max)()) {
         throw std::overflow_error{"semver: bump_minor overflow"};
       }
       return version<I1, I2, I3>{major_, static_cast<I2>(minor_ + I2{1}), I3{}};
     }
     // Returns major.minor.(patch+1), clears qualifiers, and throws on overflow.
     [[nodiscard]] SEMVER_CONSTEXPR version<I1, I2, I3> bump_patch() const {
-      if (patch_ == std::numeric_limits<I3>::max()) {
+      if (patch_ == (std::numeric_limits<I3>::max)()) {
         throw std::overflow_error{"semver: bump_patch overflow"};
       }
       return version<I1, I2, I3>{major_, minor_, static_cast<I3>(patch_ + I3{1})};
@@ -719,7 +719,7 @@ private:
     while (stream.has() && is_digit(stream.peek())) {
       last_digit_pos = stream.position();
       const auto d = static_cast<std::uint8_t>(stream.advance() - '0');
-      if (result > (std::numeric_limits<std::uint64_t>::max() - d) / 10)
+      if (result > ((std::numeric_limits<std::uint64_t>::max)() - d) / 10)
         return failure(stream.ptr_at(last_digit_pos), std::errc::result_out_of_range);
 
       result = result * 10 + d;
@@ -973,7 +973,7 @@ template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
     out = 0;
     while (p < end && detail::is_digit(*p)) {
       const auto d = static_cast<std::uint64_t>(static_cast<unsigned char>(*p) - '0');
-      if (out > (std::numeric_limits<std::uint64_t>::max() - d) / 10) {
+      if (out > ((std::numeric_limits<std::uint64_t>::max)() - d) / 10) {
         component_overflow = true;
         return false;
       }
@@ -1137,11 +1137,11 @@ namespace detail {
       return false;
 
     if (component == upper_component::patch)
-      return pat < std::numeric_limits<I3>::max() && push_upper<I1, I2, I3>(maj, min_, pat + 1, out);
+      return pat < (std::numeric_limits<I3>::max)() && push_upper<I1, I2, I3>(maj, min_, pat + 1, out);
     if (component == upper_component::minor)
-      return min_ < std::numeric_limits<I2>::max() && push_upper<I1, I2, I3>(maj, min_ + 1, 0, out);
+      return min_ < (std::numeric_limits<I2>::max)() && push_upper<I1, I2, I3>(maj, min_ + 1, 0, out);
 
-    return maj < std::numeric_limits<I1>::max() && push_upper<I1, I2, I3>(maj + 1, 0, 0, out);
+    return maj < (std::numeric_limits<I1>::max)() && push_upper<I1, I2, I3>(maj + 1, 0, 0, out);
   }
 
   template <typename I1, typename I2, typename I3>
@@ -1401,11 +1401,11 @@ namespace detail {
 
   template <typename I1, typename I2, typename I3>
   SEMVER_CONSTEXPR std::optional<version<I1, I2, I3>> next_core(const version<I1, I2, I3>& value) {
-    if (value.patch() < std::numeric_limits<I3>::max())
+    if (value.patch() < (std::numeric_limits<I3>::max)())
       return value.bump_patch();
-    if (value.minor() < std::numeric_limits<I2>::max())
+    if (value.minor() < (std::numeric_limits<I2>::max)())
       return value.bump_minor();
-    if (value.major() < std::numeric_limits<I1>::max())
+    if (value.major() < (std::numeric_limits<I1>::max)())
       return value.bump_major();
 
     return std::nullopt;
@@ -1531,7 +1531,7 @@ template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
   switch (change) {
     case version_change::major:
     case version_change::premajor:
-      if (v.major() == std::numeric_limits<I1>::max())
+      if (v.major() == (std::numeric_limits<I1>::max)())
         return std::nullopt;
 
       base = v.bump_major();
@@ -1540,7 +1540,7 @@ template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
       break;
     case version_change::minor:
     case version_change::preminor:
-      if (v.minor() == std::numeric_limits<I2>::max())
+      if (v.minor() == (std::numeric_limits<I2>::max)())
         return std::nullopt;
 
       base = v.bump_minor();
@@ -1549,7 +1549,7 @@ template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
       break;
     case version_change::patch:
     case version_change::prepatch:
-      if (v.patch() == std::numeric_limits<I3>::max())
+      if (v.patch() == (std::numeric_limits<I3>::max)())
         return std::nullopt;
 
       base = v.bump_patch();
@@ -1558,7 +1558,7 @@ template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
       break;
     case version_change::prerelease:
       if (v.prerelease_tag().empty()) {
-        if (v.patch() == std::numeric_limits<I3>::max())
+        if (v.patch() == (std::numeric_limits<I3>::max)())
           return std::nullopt;
 
         base = v.bump_patch();
