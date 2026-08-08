@@ -9,6 +9,8 @@ jobs:
   build:
     name: CMake package
     runs-on: ubuntu-24.04
+    env:
+      SEMVER_EXPECTED_VERSION: 1.0.0
 
     steps:
     - uses: actions/checkout@v7
@@ -17,16 +19,40 @@ jobs:
       run: |
         cmake -S . -B build-install \
           -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" \
+          -DCMAKE_INSTALL_PREFIX=/usr \
           -DSEMVER_OPT_BUILD_EXAMPLES=OFF \
           -DSEMVER_OPT_BUILD_TESTS=OFF \
           -DSEMVER_OPT_INSTALL=ON
-        cmake --install build-install --config Release
+        cmake --install build-install \
+          --config Release \
+          --prefix "${{ github.workspace }}/install"
+
+    - name: Test installed files
+      run: |
+        test -f "${{ github.workspace }}/install/include/semver.hpp"
+        test -f "${{ github.workspace }}/install/share/semver/LICENSE"
 
     - name: Test installed package
       run: |
         cmake -S test/cmake-consumer -B build-consumer \
           -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_PREFIX_PATH="${{ github.workspace }}/install"
+          -DCMAKE_PREFIX_PATH="${{ github.workspace }}/install" \
+          -DSEMVER_EXPECTED_VERSION="${SEMVER_EXPECTED_VERSION}"
         cmake --build build-consumer --parallel
         ctest --test-dir build-consumer --output-on-failure
+
+    - name: Test build-tree package
+      run: |
+        cmake -S test/cmake-consumer -B build-tree-consumer \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_PREFIX_PATH="${{ github.workspace }}/build-install" \
+          -DSEMVER_EXPECTED_VERSION="${SEMVER_EXPECTED_VERSION}"
+        cmake --build build-tree-consumer --parallel
+        ctest --test-dir build-tree-consumer --output-on-failure
+
+    - name: Test DESTDIR package
+      run: |
+        DESTDIR="${{ github.workspace }}/stage" \
+          cmake --install build-install --config Release
+        test -f "${{ github.workspace }}/stage/usr/include/semver.hpp"
+        test -f "${{ github.workspace }}/stage/usr/share/semver/LICENSE"

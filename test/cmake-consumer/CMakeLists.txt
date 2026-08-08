@@ -4,7 +4,11 @@ project(semver_consumer LANGUAGES CXX)
 
 enable_testing()
 
-find_package(semver 1 CONFIG REQUIRED)
+if(NOT DEFINED SEMVER_EXPECTED_VERSION OR SEMVER_EXPECTED_VERSION STREQUAL "")
+    message(FATAL_ERROR "SEMVER_EXPECTED_VERSION is required")
+endif()
+
+find_package(semver "${SEMVER_EXPECTED_VERSION}" EXACT CONFIG REQUIRED)
 
 add_executable(semver_consumer main.cpp)
 target_link_libraries(semver_consumer PRIVATE semver::semver)
