@@ -5,6 +5,7 @@
 #pragma once
 
 #include <array>
+#include <string_view>
 
 // SEMVER_HAS_CONSTEXPR is defined as 0 or 1 by semver.hpp
 

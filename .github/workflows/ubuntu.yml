@@ -2,7 +2,8 @@ name: ubuntu
 
 on: [push, pull_request]
 
-permissions: read-all
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -17,9 +18,10 @@ jobs:
         - { name: "Clang 18", cc: "clang-18", cxx: "clang++-18", os: "ubuntu-24.04" }
         - { name: "Clang 19", cc: "clang-19", cxx: "clang++-19", os: "ubuntu-24.04" }
         - { name: "Clang 20", cc: "clang-20", cxx: "clang++-20", os: "ubuntu-24.04" }
-        build_type: [Release, Debug]
+        - { name: "Clang 21", cc: "clang-21", cxx: "clang++-21", os: "ubuntu-24.04" }
+        - { name: "Clang 22", cc: "clang-22", cxx: "clang++-22", os: "ubuntu-24.04" }
 
-    name: "${{ matrix.compiler.name }} / ${{ matrix.build_type }}"
+    name: "${{ matrix.compiler.name }}"
     runs-on: ${{ matrix.compiler.os }}
 
     env:
@@ -29,30 +31,41 @@ jobs:
     steps:
     - uses: actions/checkout@v7
 
-    - name: Install compiler
+    - name: Install Clang
+      if: ${{ startsWith(matrix.compiler.cc, 'clang') }}
       run: |
-        if [[ "${{ matrix.compiler.cc }}" == "clang"* ]]; then
-          wget -qO - https://apt.llvm.org/llvm-snapshot.gpg.key | gpg --dearmor | sudo tee /etc/apt/keyrings/llvm-archive-keyring.gpg > /dev/null
-          codename="$(lsb_release -cs)"
-          version="${{ matrix.compiler.cc }}"
-          version="${version#clang-}"
-          echo "deb [signed-by=/etc/apt/keyrings/llvm-archive-keyring.gpg] http://apt.llvm.org/${codename}/ llvm-toolchain-${codename}-${version} main" | sudo tee /etc/apt/sources.list.d/llvm.list
-          sudo apt update
-          sudo apt install -y "${{ matrix.compiler.cc }}"
-        else
-          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
-          sudo apt update
-          sudo apt install -y "${{ matrix.compiler.cxx }}"
-        fi
+        wget -qO - https://apt.llvm.org/llvm-snapshot.gpg.key | gpg --dearmor | sudo tee /etc/apt/keyrings/llvm-archive-keyring.gpg > /dev/null
+        codename="$(lsb_release -cs)"
+        version="${{ matrix.compiler.cc }}"
+        version="${version#clang-}"
+        echo "deb [signed-by=/etc/apt/keyrings/llvm-archive-keyring.gpg] http://apt.llvm.org/${codename}/ llvm-toolchain-${codename}-${version} main" | sudo tee /etc/apt/sources.list.d/llvm.list
+        sudo apt update
+        sudo apt install -y "${{ matrix.compiler.cc }}"
 
-    - name: Configure
-      run: cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+    - name: Install GCC
+      if: ${{ startsWith(matrix.compiler.cc, 'gcc') }}
+      run: |
+        sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+        sudo apt update
+        sudo apt install -y "${{ matrix.compiler.cxx }}"
 
-    - name: Build
-      run: cmake --build build --parallel --config ${{ matrix.build_type }}
+    - name: Configure Release
+      run: cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
 
-    - name: Test
-      run: ctest --test-dir build --output-on-failure -C ${{ matrix.build_type }}
+    - name: Build Release
+      run: cmake --build build-release --parallel --config Release
+
+    - name: Test Release
+      run: ctest --test-dir build-release --output-on-failure -C Release
+
+    - name: Configure Debug
+      run: cmake -S . -B build-debug -DCMAKE_BUILD_TYPE=Debug
+
+    - name: Build Debug
+      run: cmake --build build-debug --parallel --config Debug
+
+    - name: Test Debug
+      run: ctest --test-dir build-debug --output-on-failure -C Debug
 
   sanitizers:
     name: "Clang 20 / ASan + UBSan"

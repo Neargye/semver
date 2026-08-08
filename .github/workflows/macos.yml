@@ -2,14 +2,17 @@ name: macos
 
 on: [push, pull_request]
 
-permissions: read-all
+permissions:
+  contents: read
 
 jobs:
   build:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-14, macos-15]
+        os:
+        - macos-15 # https://github.com/actions/runner-images/blob/main/images/macos/macos-15-arm64-Readme.md#xcode (Apple Silicon)
+        - macos-26 # https://github.com/actions/runner-images/blob/main/images/macos/macos-26-arm64-Readme.md#xcode (Apple Silicon)
         build_type: [Release, Debug]
 
     name: "${{ matrix.os }} / ${{ matrix.build_type }}"
