@@ -49,4 +49,13 @@ Copy [`semver.hpp`](include/semver.hpp), or use a package manager:
 
 More examples are available in [`example/`](example/).
 
+## Compiler compatibility
+
+semver requires C++17 or newer and supports:
+
+- Clang/LLVM >= 6
+- Apple Clang >= 10
+- GCC >= 7
+- Visual Studio >= 2019
+
 ## [MIT License](LICENSE)

@@ -1,8 +1,11 @@
-# semver 1.0.0
+# Changelog
 
-Semantic Versioning library.
+## 1.0.1
 
-## Highlights
+- Fixed compilation after Windows headers define the `min` and `max` macros ([#63](https://github.com/Neargye/semver/issues/63)).
+- CMake installations now include the project license.
+
+## 1.0.0
 
 - SemVer parsing and validation, cleaning and coercion, comparison, serialization, hashing, streams, and optional C++20 formatting.
 - Configurable unsigned component types with checked construction and mixed-type comparison.
