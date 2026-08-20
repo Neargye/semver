@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2018 - 2026 Daniil Goncharov <neargye@gmail.com>.
 
-#include <semver.hpp>
-
 #include <string>
 #include <system_error>
+#include <semver.hpp>
 
 static_assert(semver::max_input_length == 64, "SEMVER_CONFIG_FILE must override defaults before semver.hpp is configured");
 

@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2018 - 2026 Daniil Goncharov <neargye@gmail.com>.
 
-#include <semver.hpp>
 #include <cstdint>
 #include <sstream>
 #include <type_traits>
+#include <semver.hpp>
 
 int main() {
   semver::version direct{1, 2, 3};
