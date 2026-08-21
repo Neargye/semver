@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2018 - 2026 Daniil Goncharov <neargye@gmail.com>.
 
-#include <semver.hpp>
 #include <doctest.h>
 #include <array>
 #include <ostream>
@@ -10,6 +9,7 @@
 #include <string>
 #include <system_error>
 #include <type_traits>
+#include <semver.hpp>
 
 using namespace semver;
 
@@ -934,4 +934,3 @@ TEST_CASE("parse() leaves output unchanged on failure") {
     REQUIRE(v.patch() == 3);
   }
 }
-

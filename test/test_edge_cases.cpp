@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2018 - 2026 Daniil Goncharov <neargye@gmail.com>.
 
-#include <semver.hpp>
 #include <doctest.h>
 #include <string>
 #include <sstream>
 #include <array>
+#include <semver.hpp>
 
 using namespace semver;
 

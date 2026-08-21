@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2018 - 2026 Daniil Goncharov <neargye@gmail.com>.
 
-#include <semver.hpp>
 #include <doctest.h>
 #include <algorithm>
 #include <array>
@@ -13,6 +12,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <semver.hpp>
 
 static void test_parse_and_check(std::string_view range_str, std::string_view ver_str,
   semver::prerelease_policy policy = semver::prerelease_policy::exclude)
@@ -1044,4 +1044,3 @@ TEST_CASE("range utility candidates agree with bounded exhaustive search") {
 
 static_assert(noexcept(std::declval<const semver::range_set<>&>().contains(
   std::declval<const semver::version<std::uint64_t>&>())));
-

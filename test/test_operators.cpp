@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2018 - 2026 Daniil Goncharov <neargye@gmail.com>.
 
-#include <semver.hpp>
 #include <doctest.h>
 #include <algorithm>
 #include <array>
@@ -11,6 +10,7 @@
 #include <type_traits>
 #include <unordered_map>
 #include <vector>
+#include <semver.hpp>
 
 using namespace semver;
 
