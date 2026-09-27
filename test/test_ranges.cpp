@@ -901,6 +901,39 @@ TEST_CASE("intersects checks whether two range sets share a version") {
     REQUIRE(semver::intersects(lhs, rhs));
   }
 
+  SUBCASE("bounded intersections can require a patch wider than stored bounds") {
+    semver::range_set<std::uint8_t> lhs, rhs;
+    REQUIRE(semver::parse(">1.2.255 <1.3.0-0", lhs));
+    REQUIRE(semver::parse("*", rhs));
+    const semver::version<> witness{1, 2, 256};
+    REQUIRE(lhs.contains(witness));
+    REQUIRE(rhs.contains(witness));
+    REQUIRE_FALSE(semver::min_version(lhs).has_value());
+    for (const auto policy : {semver::prerelease_policy::exclude, semver::prerelease_policy::include}) {
+      CHECK(semver::intersects(lhs, rhs, policy));
+      CHECK(semver::intersects(rhs, lhs, policy));
+    }
+
+    REQUIRE(semver::parse("<1.2.255 || >=1.3.0-0", rhs));
+    CHECK_FALSE(semver::intersects(lhs, rhs, semver::prerelease_policy::include));
+  }
+
+  SUBCASE("bounded intersections do not require materializing a uint64 successor") {
+    semver::range_set<std::uint64_t> lhs, rhs;
+    REQUIRE(semver::parse(">1.2.18446744073709551615 <1.3.0-0", lhs));
+    REQUIRE(semver::parse("*", rhs));
+    REQUIRE_FALSE(semver::min_version(lhs).has_value());
+    CHECK(semver::intersects(lhs, rhs));
+    CHECK(semver::intersects(rhs, lhs));
+
+    REQUIRE(semver::parse("<=1.2.18446744073709551615", rhs));
+    CHECK_FALSE(semver::intersects(lhs, rhs));
+    REQUIRE(semver::parse("1.2.18446744073709551615", rhs));
+    CHECK_FALSE(semver::intersects(lhs, rhs));
+    REQUIRE(semver::parse("!=1.2.18446744073709551615", rhs));
+    CHECK(semver::intersects(lhs, rhs));
+  }
+
   SUBCASE("adjacent versions leave no hidden value") {
     semver::range_set<> lhs, rhs;
     REQUIRE(semver::parse(">1.0.0-alpha", lhs));

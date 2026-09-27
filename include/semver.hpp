@@ -1038,7 +1038,7 @@ template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
 // Writes "MAJOR.MINOR.PATCH[-prerelease][+build]" to a narrow stream.
 template <typename Traits, typename I1, typename I2, typename I3>
 std::basic_ostream<char, Traits>& operator<<(std::basic_ostream<char, Traits>& os, const version<I1, I2, I3>& v) {
-  return os << v.to_string();
+  return os << v.to_string().c_str();
 }
 
 // SemVer precedence with a lexicographic build-metadata tie-breaker.
@@ -1091,6 +1091,10 @@ namespace detail {
         if (comparison == 0)
           comparison = other.prerelease_tag().empty() ? 1 : detail::compare_prerelease_tags(other.prerelease_tag(), "0");
       }
+      return matches(comparison);
+    }
+
+    SEMVER_CONSTEXPR bool matches(int comparison) const noexcept {
       switch (op) {
       case range_operator::less:
         return comparison < 0;
@@ -1448,6 +1452,21 @@ namespace detail {
     }
     return false;
   }
+
+  // Test M.m.P with P above all stored patch bounds.
+  template <typename I1, typename I2, typename I3, typename J1, typename J2>
+  SEMVER_CONSTEXPR bool contains_above_patch(const range<I1, I2, I3>& range, J1 major, J2 minor) noexcept {
+    for (const auto& comparator : range.comparators()) {
+      auto comparison = compare_numbers(major, comparator.bound.major());
+      if (comparison == 0)
+        comparison = compare_numbers(minor, comparator.bound.minor());
+      if (comparison == 0)
+        comparison = 1;
+      if (!comparator.matches(comparison))
+        return false;
+    }
+    return true;
+  }
 } // namespace semver::detail
 
 template <typename I1, typename I2, typename I3>
@@ -1510,7 +1529,13 @@ template <typename L1, typename L2, typename L3, typename R1, typename R2, typen
         return true;
 
       const auto matches = [&](const version<I1, I2, I3>& candidate) {
-        return lhs_range.contains(candidate, policy) && rhs_range.contains(candidate, policy);
+        if (lhs_range.contains(candidate, policy) && rhs_range.contains(candidate, policy))
+          return true;
+
+        // The overlap may exceed the stored patch type.
+        return candidate.patch() == (std::numeric_limits<I3>::max)() &&
+               detail::contains_above_patch(lhs_range, candidate.major(), candidate.minor()) &&
+               detail::contains_above_patch(rhs_range, candidate.major(), candidate.minor());
       };
 
       if (matches(version<I1, I2, I3>{I1{}, I2{}, I3{}}) || matches(version<I1, I2, I3>{I1{}, I2{}, I3{}, "0"}) ||

@@ -18,6 +18,8 @@ using namespace semver;
 
 namespace {
 
+struct custom_char_traits : std::char_traits<char> {};
+
 template <typename Stream, typename Value, typename = void>
 inline constexpr bool is_stream_insertable_v = false;
 
@@ -74,6 +76,21 @@ TEST_CASE("operator<<") {
   SUBCASE("insertion is limited to narrow streams") {
     static_assert(is_stream_insertable_v<std::ostringstream, version<>>);
     static_assert(!is_stream_insertable_v<std::wostringstream, version<>>);
+  }
+
+  SUBCASE("custom character traits preserve formatted insertion") {
+    std::basic_ostringstream<char, custom_char_traits> custom;
+    const version<std::uint8_t> v{255, 2, 3, "rc.1", "build"};
+    custom << std::hex << std::showbase;
+    custom.fill('_');
+    custom.width(24);
+    CHECK(&(custom << v) == &custom);
+    CHECK(custom.width() == 0);
+    custom << std::left;
+    custom.width(24);
+    custom << v;
+    const auto text = custom.str();
+    CHECK(std::string_view{text.data(), text.size()} == "______255.2.3-rc.1+build255.2.3-rc.1+build______");
   }
 }
 
