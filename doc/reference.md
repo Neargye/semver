@@ -1,12 +1,12 @@
 # Reference
 
-`semver` is a header-only C++17 library. Include the public header before using any API:
+Include the header to use the library:
 
 ```cpp
 #include <semver.hpp>
 ```
 
-Read the [limitations](limitations.md) for component bounds, input limits, range grammar, feature detection, and system macro behavior.
+The API requires C++17. See [limitations](limitations.md) for input limits and [compile-time support](limitations.md#constexpr-support).
 
 ## Synopsis
 
@@ -25,7 +25,7 @@ template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
 class version;
 ```
 
-The component types must be unqualified unsigned integral types other than `bool`. The three types may differ. `version<>` uses `std::uint32_t` for every component.
+Component types must be unsigned integers without `const` or `volatile`; `bool` is not supported. They may differ. `version<>` uses `std::uint32_t` for all three.
 
 ### Construction
 
@@ -41,7 +41,7 @@ version(T1 major, T2 minor, T3 patch, std::string_view prerelease, std::string_v
 
 The default value is `0.1.0`. Integral constructor arguments are checked before conversion. Negative or unrepresentable components throw `std::out_of_range`; invalid prerelease or build identifiers throw `std::invalid_argument`.
 
-Class template argument deduction uses at least `std::uint32_t` for each component and widens components whose source type is wider:
+Type deduction selects an unsigned type of at least 32 bits for each component, preserving the width of wider arguments:
 
 ```cpp
 semver::version v{1, 2, 3}; // semver::version<std::uint32_t>
@@ -49,9 +49,7 @@ semver::version wide{std::uint64_t{5'000'000'000}, 2, 3};
 // semver::version<std::uint64_t, std::uint32_t, std::uint32_t>
 ```
 
-Every deduced component type is unsigned. A wider signed source therefore selects the corresponding unsigned width, while a negative value is still rejected.
-
-`version` is copyable and movable. Copy and move operations preserve the components, prerelease tag, and build metadata.
+Versions can be copied and moved.
 
 ### Observers
 
@@ -79,7 +77,7 @@ version without_prerelease() const;
 version without_build_metadata() const;
 ```
 
-The functions return a new version and do not modify the source. The bump functions clear prerelease and build metadata, reset lower components as required, and throw `std::overflow_error` when the incremented component is already at its maximum. `without_prerelease` and `without_build_metadata` remove only the selected qualifier and preserve the other one.
+These functions return a new version. Bumps clear both qualifiers, reset lower components to zero, and throw `std::overflow_error` on overflow. Each `without_*` function removes only the named qualifier.
 
 ```cpp
 const semver::version<> current{1, 2, 3, "rc.1", "ci"};
@@ -129,7 +127,15 @@ template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
 bool valid(std::string_view input);
 ```
 
-Strict parsing is bounded by the selected component types and `SEMVER_MAX_INPUT_LENGTH`. `parse` requires the entire string and preserves `output` on failure. `from_chars` follows standard pointer/error and longest-prefix semantics: when no complete SemVer prefix exists, it returns `invalid_argument` with `ptr == first`. It may allocate and propagate allocation failures. `try_parse` returns `std::nullopt`; `from_string` throws `std::system_error`. `valid` returns whether the complete input is a valid SemVer representable by the selected component types and configured input limit.
+All parsing respects the component types and `SEMVER_MAX_INPUT_LENGTH`.
+
+- `parse` requires the whole string to be valid.
+- `from_chars` reads the longest SemVer prefix; `ptr` points past it. If no complete version prefix exists, it returns `invalid_argument` with `ptr == first`.
+- `try_parse` returns `std::nullopt` on a parse error.
+- `from_string` throws `std::system_error` on a parse error.
+- `valid` checks whether the whole string is valid and fits the chosen limits.
+
+`parse` and `from_chars` leave `output` unchanged on failure. Parsing may allocate; allocation errors propagate to the caller.
 
 ```cpp
 semver::version<> v;
@@ -149,7 +155,9 @@ template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
 std::optional<version<I1, I2, I3>> coerce(std::string_view input);
 ```
 
-`clean` removes outer spaces and optional `=` and `v`/`V` prefixes, allowing spaces between them, then parses a complete SemVer string strictly. `coerce` accepts the same wrappers, leading zeros, and missing minor or patch components. It reads from the beginning of the cleaned input, ignores trailing text, and preserves a valid qualifier suffix when possible.
+`clean` removes outer spaces, an optional `=`, and an optional `v`/`V`, in that order. Spaces between prefixes are allowed. It then parses strictly.
+
+`coerce` also accepts leading zeros and fills missing minor or patch components with zero. It reads from the start, ignores trailing text, and keeps prerelease and build metadata if the suffix is valid.
 
 ```cpp
 semver::from_string("1.0"); // throws: strict parsing requires MAJOR.MINOR.PATCH
@@ -178,7 +186,7 @@ int compare(const version<...>& lhs, const version<...>& rhs) noexcept;
 int compare_with_build(const version<...>& lhs, const version<...>& rhs) noexcept;
 ```
 
-`compare` returns `-1`, `0`, or `1`. `compare_with_build` first applies normal SemVer precedence, then compares the complete build metadata lexicographically. It provides deterministic artifact ordering and may distinguish versions that are equivalent under normal SemVer comparison.
+Both functions return `-1`, `0`, or `1`. `compare` uses SemVer precedence. `compare_with_build` also compares build metadata lexicographically when precedence is equal.
 
 ```cpp
 enum class version_change : std::uint8_t {
@@ -195,7 +203,7 @@ enum class version_change : std::uint8_t {
 version_change diff(const version<...>& lhs, const version<...>& rhs) noexcept;
 ```
 
-`version_change` is shared by `diff` and `inc`: it describes the observed or requested version change. `diff` reports the first differing component, returns a `pre*` value when the newer operand has a prerelease tag, and ignores build metadata. Versions with equal SemVer precedence therefore produce `none`.
+`diff` reports the first differing component, using a `pre*` value when the newer version is a prerelease. It ignores build metadata and returns `none` for equal precedence. Use the same enum with `inc` to request a change.
 
 ## Serialization
 
@@ -207,19 +215,19 @@ template <typename Traits, typename I1, typename I2, typename I3>
 std::basic_ostream<char, Traits>& operator<<(std::basic_ostream<char, Traits>& stream, const version<I1, I2, I3>& value);
 ```
 
-`to_chars` performs no allocation. On success, `ptr` points one past the last written byte; no null terminator is added. A null, reversed, or undersized buffer returns `value_too_large` and does not partially serialize the version.
+`to_chars` writes without allocating or adding a null terminator. On success, `ptr` points past the written bytes. A null, reversed, or undersized buffer returns `value_too_large` without writing.
 
 `version::to_string()` returns the canonical `MAJOR.MINOR.PATCH[-prerelease][+build]` form.
 
-Stream insertion supports narrow character streams and writes the canonical version as one value. Numeric base flags do not affect components, and width and alignment apply to the complete version.
+`operator<<` writes to narrow character streams. Numeric base flags are ignored; width and alignment apply to the whole version.
 
-When `<format>` support is available, `std::formatter<semver::version<...>>` enables `std::format("{}", value)` and supports the standard string format specifications, including width, fill, alignment, and precision.
+When available, `std::format("{}", value)` accepts standard string format options, including width, fill, alignment, and precision.
 
-`std::hash<semver::version<...>>` is provided. It follows equality and therefore excludes build metadata.
+`std::hash<semver::version<...>>` ignores build metadata, just like equality.
 
 ## Ranges
 
-Range syntax is defined by this library and is not part of the SemVer 2.0.0 specification. This section is the normative range contract.
+This library defines the following range syntax; SemVer 2.0.0 does not define ranges.
 
 ```cpp
 template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
@@ -236,40 +244,27 @@ template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
 std::optional<range_set<I1, I2, I3>> try_parse_range(std::string_view input);
 ```
 
-`range_set` component types control the representable explicit and generated bounds. Candidate versions may use different component types and are compared without conversion or narrowing. A default-constructed `range_set` contains nothing. `*`, `x`, and `X` are the any range. Empty and whitespace-only inputs are invalid.
+Range bounds must fit the `range_set` component types. Versions tested against a range may use different or wider types and are compared without narrowing. A default-constructed `range_set` contains nothing; use `*`, `x`, or `X` to match any release.
 
-Range parsing is transactional: failure preserves `output`. The result pointer addresses the original input, the raw input-length limit is checked before whitespace handling, and an unrepresentable stored bound reports `std::errc::result_out_of_range`. `try_parse_range` returns `std::nullopt` on any parse error; use `parse` when the error code or position is needed.
+`parse` leaves `output` unchanged on failure and reports the error code and position in the input. A bound that does not fit returns `std::errc::result_out_of_range`. `try_parse_range` returns `std::nullopt` on a parse error.
 
-The grammar is intentionally compact:
+Separate constraints with whitespace to require all of them (AND). Join branches with `||` to accept either (OR). All ASCII whitespace is accepted around ranges, between constraints, and after operators. Empty input and empty `||` branches are invalid.
 
-```text
-range-set    = intersection ("||" intersection)*
-intersection = term (whitespace term)*
-term         = wildcard-any | selector | comparator | tilde | caret
-selector     = version | partial | wildcard
-comparator   = (">=" | "<") (version | partial)
-             | (">" | "<=" | "=" | "!=") version
-tilde        = "~" (version | partial)
-caret        = "^" (version | partial)
-version      = M "." m "." p ["-" prerelease]
-partial      = M | M "." m
-wildcard-any = "*" | "x" | "X"
-wildcard     = M "." wildcard-any | M "." m "." wildcard-any
-```
+- Use a complete version (`1.2.3`) or a partial version (`1` or `1.2`). Components are decimal integers without leading zeros.
+- `>=`, `<`, `~`, and `^` accept complete or partial versions. `>`, `<=`, `=`, and `!=` require complete versions.
+- `*`, `x`, and `X` work alone or as the last component (`1.x`, `1.2.*`), without an operator.
+- Prerelease tags require a complete version. Build metadata is not accepted in range bounds.
 
-`M`, `m`, and `p` are decimal components without leading zeros. Prerelease qualifiers require a complete version. Build metadata is not accepted in range boundaries because it does not affect SemVer precedence.
-
-Spaces are optional after range operators. All six ASCII whitespace characters are accepted around the range and between intersection terms. Empty input, empty `||` branches, wildcard operands for `~`, `^`, or comparators, and partial operands for `>`, `<=`, `=`, or `!=` are invalid.
-
-The table summarizes release bounds. With `prerelease_policy::include`, some generated boundaries use `-0` sentinels as described in [Prerelease matching](#prerelease-matching).
+The table shows bounds for the default policy. See [Prerelease matching](#prerelease-matching) for `prerelease_policy::include`.
 
 | Form | Expansion or effect |
 | --- | --- |
 | `*`, `x`, or `X` | no bounds |
+| `1.2.3` | `=1.2.3` |
 | `1`, `1.*`, or `1.x` | `>=1.0.0 <2.0.0-0` |
 | `1.2`, `1.2.*`, or `1.2.x` | `>=1.2.0 <1.3.0-0` |
 | `>=1.2` | `>=1.2.0` |
-| `<2` | `<2.0.0` |
+| `<2` | `<2.0.0-0` |
 | `!=1.2.3` | excludes `1.2.3` by SemVer precedence; does not enable prerelease matching |
 | `~1` | `>=1.0.0 <2.0.0-0` |
 | `~1.2` | `>=1.2.0 <1.3.0-0` |
@@ -294,13 +289,20 @@ enum class prerelease_policy : std::uint8_t {
 };
 ```
 
-By default, a prerelease candidate matches only when a non-exclusion comparator in the same intersection explicitly contains a prerelease with the same major, minor, and patch tuple. A `!=` comparator does not enable prerelease matching by itself.
+By default, a prerelease must satisfy all constraints in a branch that explicitly names a prerelease with the same major, minor, and patch. A `!=` constraint does not enable prerelease matching.
 
-Consequently, `*`, `x`, and `X` match every release by default and every version with `prerelease_policy::include`.
+For example, `>=1.2.3-alpha <2` can match `1.2.3-beta`, but not `1.3.0-beta`.
 
-For the supported grammar, `prerelease_policy::include` uses explicit generated prerelease boundaries. Partial ranges and partial `>=` comparators use a generated `-0` lower bound, and partial `<` comparators use a `-0` upper boundary. Caret ranges use a `-0` lower bound when components are omitted or the complete major version is zero. Tilde ranges, complete comparators, and complete caret ranges with a nonzero major retain their ordinary release lower bound. An explicitly written prerelease remains the exact boundary.
+`prerelease_policy::include` removes this filter; `*`, `x`, and `X` then match every version. Shorthand bounds work as follows:
 
-Generated upper bounds use the next version line with prerelease `0`. This keeps the next line and all of its prereleases outside partial, tilde, and caret ranges. For example, `1.2` has the upper bound `<1.3.0-0`.
+- Partial ranges and partial `>=` constraints start at `-0`; for example, `>=1.2` starts at `1.2.0-0`.
+- Partial `<` constraints end at `-0`; `<2` means `<2.0.0-0`.
+- Caret ranges start at `-0` when components are omitted or the major version is zero.
+- Tilde ranges, complete comparators, and complete caret ranges with a nonzero major keep their release lower bound.
+
+An explicit prerelease tag always remains the exact bound.
+
+Partial, tilde, and caret ranges exclude the next version line and its prereleases. For example, `1.2` ends at `<1.3.0-0`.
 
 ### Range utilities
 
@@ -316,11 +318,11 @@ std::optional<version<...>> min_version(const range_set<...>& range, prerelease_
 bool intersects(const range_set<...>& lhs, const range_set<...>& rhs, prerelease_policy policy = prerelease_policy::exclude);
 ```
 
-The string `satisfies` overload parses into the candidate's component types and returns `false` for invalid input. For a pre-parsed range, use `range.contains(value, policy)`. `min_satisfying` and `max_satisfying` return `last` when no element matches.
+`satisfies` parses the range using the version's component types and returns `false` on a parse error. To reuse a parsed range, call `range.contains(value, policy)`. `min_satisfying` and `max_satisfying` return `last` when no element matches.
 
-`min_version` returns the lowest matching version representable by the component types of the `range_set`. It returns `std::nullopt` for an empty set or when the mathematical minimum cannot be represented, such as `>255.255.255` in `range_set<std::uint8_t>`.
+`min_version` returns the lowest matching version that fits the range's component types, or `std::nullopt` if none does. For `range_set<std::uint8_t>`, `>1.2.255` has minimum `1.3.0`, while `>255.255.255` has no representable match.
 
-`intersects` accepts independently typed range sets and returns whether any semantic version can satisfy both. Each range applies its own prerelease filter. Unlike `min_version`, the result is not limited by the component type needed to return a concrete version, so two unbounded `>255.255.255` ranges intersect even when stored with `std::uint8_t` components.
+`intersects` checks whether two ranges share any version. Their component types may differ, and each range applies its own prerelease filter. The shared version need not fit the stored types: two `range_set<std::uint8_t>` values parsed from `>255.255.255` still intersect.
 
 ## Incrementing
 
@@ -334,11 +336,11 @@ const semver::version<> current{1, 2, 3};
 const auto next = semver::inc(current, semver::version_change::patch);
 ```
 
-`inc` returns `std::nullopt` for `version_change::none`, an unsupported change, component overflow, an invalid prerelease argument, or any prerelease argument supplied with `major`, `minor`, or `patch`. When accepted, the argument is the complete prerelease tag, not an identifier prefix, and does not receive an automatic `.0` suffix.
+For `major`, `minor`, and `patch`, the prerelease argument must be empty. Other changes accept a complete prerelease tag without adding a `.0` suffix. Invalid tags, unsupported changes (including `none`), and component overflow return `std::nullopt`.
 
-For `major`, `minor`, and `patch`, `inc` has the same arithmetic behavior as the corresponding `bump_*` member and clears existing qualifiers. In particular, incrementing `1.2.3-rc.1` as `patch` produces `1.2.4`, not `1.2.3`.
+`major`, `minor`, and `patch` work like the corresponding `bump_*` member and clear both qualifiers. For example, a patch increment of `1.2.3-rc.1` produces `1.2.4`.
 
-Without an explicit tag, `premajor`, `preminor`, and `prepatch` use `0`. `prerelease` increments a final numeric identifier as arbitrary-length decimal text, appends `.0` to a final non-numeric identifier, or bumps patch and adds `-0` when the source is a release.
+Without an explicit tag, `premajor`, `preminor`, and `prepatch` use `0`. `prerelease` increments the last identifier if it is numeric (`alpha.9` becomes `alpha.10`), or appends `.0` otherwise. For a release, it bumps patch and adds `-0`.
 
 ## Literals
 

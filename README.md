@@ -3,7 +3,7 @@
 [![Conan package](https://img.shields.io/badge/Conan-package-blueviolet)](https://conan.io/center/recipes/neargye-semver)
 [![License](https://img.shields.io/github/license/Neargye/semver.svg)](LICENSE)
 
-Header-only C++17 library for [Semantic Versioning 2.0.0](https://semver.org). It provides version parsing and validation, comparison, formatting, increments, and a documented range syntax for common version constraints. No dependencies.
+Header-only C++17 library for [Semantic Versioning 2.0.0](https://semver.org). Parse, validate, compare, format, and increment versions, or match them against version ranges. No dependencies.
 
 ```cpp
 #include <cassert>
@@ -25,8 +25,8 @@ int main() {
 
 - SemVer 2.0.0 parsing and validation with configurable input limits.
 - Configurable unsigned component types; `version<>` uses `std::uint32_t`.
-- Mixed-type version comparison and range matching without narrowing.
-- Compact `*`/`x`/`X` wildcard, partial, comparator, tilde, caret, whitespace-AND, and `||` range syntax.
+- Compare versions and match ranges across different component types.
+- Wildcard, partial, comparator, tilde (`~`), and caret (`^`) ranges. Combine constraints with spaces (AND) or `||` (OR).
 - Range matching, intersection checks, and minimum-version queries.
 - `from_chars`/`to_chars`, streams, `std::hash`, and optional `std::format` support.
 - Compile-time parsing where the compiler and standard library support it.
