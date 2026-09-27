@@ -354,7 +354,7 @@ TEST_CASE("swap(version&, version&) correctness") {
     CHECK(b == b_orig);
   }
 
-#if SEMVER_HAS_CONSTEXPR
+#if SEMVER_HAS_CONSTEXPR_CORE
   // Under C++20 with constexpr std::string, swap must be constexpr.
   static_assert([]() constexpr {
     version<> a{1, 0, 0};
@@ -362,7 +362,7 @@ TEST_CASE("swap(version&, version&) correctness") {
     using std::swap;
     swap(a, b);
     return a.major() == 2 && b.major() == 1;
-  }(), "swap must be constexpr when SEMVER_HAS_CONSTEXPR is set");
+  }(), "swap must be constexpr when core support is enabled");
 #endif
 }
 
@@ -406,14 +406,14 @@ TEST_CASE("to_chars covers all tag paths") {
     CHECK(std::string_view{buf, static_cast<std::size_t>(r.ptr - buf)} == v.to_string());
   }
 
-#if SEMVER_HAS_CONSTEXPR
+#if SEMVER_HAS_CONSTEXPR_CORE
   // C++20 with constexpr std::string must evaluate prerelease serialization at compile time.
   static_assert([]() constexpr {
     const version<> v{1, 2, 3, "rc.1"};
     std::array<char, 32> buf = {};
     const auto r = to_chars(buf.data(), buf.data() + buf.size(), v);
     return r.ec == std::errc{} && buf[0] == '1' && buf[1] == '.' && buf[2] == '2' && buf[3] == '.' && buf[4] == '3' && buf[5] == '-' && buf[6] == 'r' && buf[7] == 'c';
-  }(), "to_chars with prerelease must be constexpr when SEMVER_HAS_CONSTEXPR is set");
+  }(), "to_chars must be constexpr when core support is enabled");
 #endif
 }
 

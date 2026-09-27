@@ -61,12 +61,15 @@ This changes preprocessor state for the including translation unit. Include or r
 
 ## `constexpr` support
 
-The runtime API requires only C++17. Compile-time parsing and the literal depend on the compiler and standard library's C++20 constexpr container support; this ordinary toolchain variation does not affect the runtime API.
+Compile-time use requires C++20 and depends on the compiler and standard library. Check these flags (`0` or `1`):
 
-- `SEMVER_HAS_CONSTEXPR` reports whether the full parsing and range path is constexpr-enabled.
-- `SEMVER_HAS_CONSTEVAL_LITERAL` reports whether `"..."_semver` is available.
+- `SEMVER_HAS_CONSTEXPR_CORE`: basic version operations.
+- `SEMVER_HAS_CONSTEXPR_OPTIONAL`: `try_parse`, `clean`, `coerce`, and `inc`.
+- `SEMVER_HAS_CONSTEXPR_RANGES`: range operations.
+- `SEMVER_HAS_CONSTEXPR`: same as `SEMVER_HAS_CONSTEXPR_RANGES`.
+- `SEMVER_HAS_CONSTEVAL_LITERAL`: the `"..."_semver` literal.
 
-Use the feature macros rather than compiler-version assumptions.
+Runtime use requires only C++17.
 
 ## SemVer precedence
 

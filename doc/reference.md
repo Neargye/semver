@@ -8,8 +8,6 @@
 
 Read the [limitations](limitations.md) for component bounds, input limits, range grammar, feature detection, and system macro behavior.
 
-Functions marked `SEMVER_CONSTEXPR` in the header are `constexpr` when `SEMVER_HAS_CONSTEXPR == 1` and otherwise remain inline runtime APIs. The signatures below show `noexcept` wherever it is guaranteed.
-
 ## Synopsis
 
 - [`version`](#version) represents and transforms a semantic version.
@@ -361,6 +359,9 @@ Invalid literals fail constant evaluation.
 #define SEMVER_VERSION_PATCH ...
 #define SEMVER_MAX_INPUT_LENGTH 512 // configurable
 #define SEMVER_HAS_CONSTEXPR 0-or-1
+#define SEMVER_HAS_CONSTEXPR_CORE 0-or-1
+#define SEMVER_HAS_CONSTEXPR_OPTIONAL 0-or-1
+#define SEMVER_HAS_CONSTEXPR_RANGES 0-or-1
 #define SEMVER_HAS_CONSTEVAL_LITERAL 0-or-1
 
 inline constexpr std::size_t max_input_length;

@@ -44,22 +44,24 @@ function(make_test target std)
     add_test(NAME ${target} COMMAND ${target})
 endfunction()
 
-function(make_config_test target)
+function(make_config_test target std)
     add_executable(${target} test_config.cpp)
-    target_compile_definitions(${target} PRIVATE SEMVER_CONFIG_FILE=\"semver_test_config.hpp\")
+    target_compile_definitions(${target} PRIVATE SEMVER_CONFIG_FILE=\"semver_test_config.hpp\" ${ARGN})
     target_compile_options(${target} PRIVATE ${OPTIONS})
     target_include_directories(${target} PRIVATE config)
     target_link_libraries(${target} PRIVATE ${PROJECT_NAME})
-    target_compile_features(${target} PRIVATE cxx_std_17)
+    target_compile_features(${target} PRIVATE cxx_std_${std})
     set_target_properties(${target} PROPERTIES CXX_EXTENSIONS OFF)
     add_test(NAME ${target} COMMAND ${target})
 endfunction()
 
 make_test(${PROJECT_NAME}-cpp17.t 17)
-make_config_test(${PROJECT_NAME}-config-cpp17.t)
+make_config_test(${PROJECT_NAME}-config-cpp17.t 17)
 
 if("cxx_std_20" IN_LIST CMAKE_CXX_COMPILE_FEATURES)
     make_test(${PROJECT_NAME}-cpp20.t 20)
+
+    make_config_test(${PROJECT_NAME}-config-cpp20.t 20 SEMVER_TEST_LEGACY_OPTIONAL)
 endif()
 
 set(SEMVER_TEST_HIGH_STANDARDS_SUPPORTED ON)

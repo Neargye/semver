@@ -14,7 +14,7 @@
 using namespace semver;
 
 TEST_CASE("validation") {
-#if SEMVER_HAS_CONSTEXPR
+#if SEMVER_HAS_CONSTEXPR_CORE
   SUBCASE("constexpr valid") {
     constexpr std::string_view v1 = "0.0.1";
     static_assert(valid(v1));
@@ -259,7 +259,22 @@ TEST_CASE("re-parsing into same object resets state") {
   REQUIRE(v.build_metadata().empty());
 }
 
-#if SEMVER_HAS_CONSTEXPR
+#if SEMVER_HAS_CONSTEXPR_OPTIONAL
+TEST_CASE("constexpr optional version APIs") {
+  static_assert([] {
+    const auto parsed = semver::try_parse("1.2.3-alpha+build");
+    const auto coerced = semver::coerce("v1.2");
+    const auto cleaned = semver::clean(" v1.2.3 ");
+    const auto next = semver::inc(semver::version<>{1, 2, 3}, semver::version_change::patch);
+    return parsed && parsed->to_string() == "1.2.3-alpha+build" &&
+           coerced && coerced->to_string() == "1.2.0" &&
+           cleaned && cleaned->to_string() == "1.2.3" &&
+           next && next->to_string() == "1.2.4";
+  }());
+}
+#endif
+
+#if SEMVER_HAS_CONSTEXPR_CORE
 TEST_CASE("constexpr parse and accessors") {
   static_assert([] {
     constexpr std::string_view input = "1.2.3-alpha.01";
@@ -372,6 +387,9 @@ TEST_CASE("constexpr valid/invalid detection") {
   static_assert(!semver::valid("9.8.7+meta+meta")); // double +
 }
 
+#endif
+
+#if SEMVER_HAS_CONSTEXPR_RANGES
 TEST_CASE("constexpr range_set") {
   static_assert([] {
     const auto rs = semver::try_parse_range("1.x");
@@ -453,6 +471,9 @@ TEST_CASE("constexpr range_set") {
   }());
 }
 
+#endif
+
+#if SEMVER_HAS_CONSTEXPR_CORE
 TEST_CASE("constexpr version constructor") {
   static_assert([] {
     semver::version<> v{1, 2, 3};
