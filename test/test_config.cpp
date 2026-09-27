@@ -6,7 +6,9 @@
 #include <optional>
 #include <string>
 #include <vector>
+#if defined(__has_include) && __has_include(<version>)
 #include <version>
+#endif
 #undef __cpp_lib_optional
 #define __cpp_lib_optional 201606L
 #endif

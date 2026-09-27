@@ -239,7 +239,7 @@ TEST_CASE("hash") {
     std::unordered_map<semver::version<>, std::string> map;
     semver::version v;
     REQUIRE(semver::parse("1.0.0", v));
-    map[v] = "stable";
+    map.emplace(v, "stable");
     REQUIRE(map.at(v) == "stable");
   }
 }

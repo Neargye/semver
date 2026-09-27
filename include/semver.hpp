@@ -111,9 +111,8 @@
 
 #define SEMVER_HAS_CONSTEXPR SEMVER_HAS_CONSTEXPR_RANGES
 
-// MSVC cannot return version<> from a consteval literal.
-// GCC with libstdc++ < 14 cannot propagate consteval parse failures.
-#if defined(__cpp_consteval) && __cpp_consteval >= 201811L && SEMVER_HAS_CONSTEXPR_CORE && !defined(_MSC_VER) && !(defined(__GLIBCXX__) && !defined(__clang__) && (!defined(__GNUC__) || __GNUC__ < 14 || !defined(_GLIBCXX_RELEASE) || _GLIBCXX_RELEASE < 14))
+// Native MSVC and older GCC/libstdc++ have consteval return limitations.
+#if defined(__cpp_consteval) && __cpp_consteval >= 201811L && SEMVER_HAS_CONSTEXPR_CORE && (!defined(_MSC_VER) || defined(__clang__)) && !(defined(__GLIBCXX__) && !defined(__clang__) && (!defined(__GNUC__) || __GNUC__ < 14 || !defined(_GLIBCXX_RELEASE) || _GLIBCXX_RELEASE < 14))
 #  define SEMVER_HAS_CONSTEVAL_LITERAL 1
 #else
 #  define SEMVER_HAS_CONSTEVAL_LITERAL 0
@@ -420,7 +419,8 @@ namespace semver {
 
     // Serializes to "MAJOR.MINOR.PATCH[-prerelease][+build]".
     [[nodiscard]] SEMVER_CONSTEXPR_CORE std::string to_string() const {
-      std::string result(detail::serialized_length(major_, minor_, patch_, prerelease_tag_, build_metadata_), '\0');
+      std::string result;
+      result.resize(detail::serialized_length(major_, minor_, patch_, prerelease_tag_, build_metadata_));
       (void)to_chars(result.data(), result.data() + result.size(), *this);
       return result;
     }
