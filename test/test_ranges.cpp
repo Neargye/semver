@@ -793,6 +793,24 @@ TEST_CASE("range matching supports mixed component types") {
 }
 
 TEST_CASE("min_version returns the lowest representable match") {
+  SUBCASE("union branches retain their own prerelease filters") {
+    for (const auto text : {
+      "* || >=0.0.0-alpha <0.0.0",
+      ">=0.0.0-alpha <0.0.0 || *",
+      ">3.0.0 <2 || * || >=0.0.0-alpha <0.0.0"
+    }) {
+      CAPTURE(text);
+      const auto rs = semver::try_parse_range(text);
+      REQUIRE(rs);
+      const auto excluded = semver::min_version(*rs);
+      const auto included = semver::min_version(*rs, semver::prerelease_policy::include);
+      REQUIRE(excluded);
+      REQUIRE(included);
+      CHECK(excluded->to_string() == "0.0.0-alpha");
+      CHECK(included->to_string() == "0.0.0-0");
+    }
+  }
+
   SUBCASE("any range follows prerelease policy") {
     semver::range_set<> rs;
     REQUIRE(semver::parse("*", rs));

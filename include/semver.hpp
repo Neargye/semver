@@ -205,17 +205,17 @@ namespace semver {
       return validate_identifiers(tag, false);
     }
 
-    // Syntax-only check used when a component does not fit the destination type.
-    constexpr bool validate_version_syntax(std::string_view str) noexcept {
+    // Longest valid prefix, ignoring numeric overflow.
+    constexpr std::size_t version_prefix_length(std::string_view str) noexcept {
       std::size_t pos = 0;
       const auto parse_component = [&]() constexpr {
         if (pos >= str.size() || !is_digit(str[pos]))
           return false;
 
-        if (str[pos] == '0' && pos + 1 < str.size() && is_digit(str[pos + 1]))
-          return false;
-
-        do { ++pos; } while (pos < str.size() && is_digit(str[pos]));
+        if (str[pos++] != '0') {
+          while (pos < str.size() && is_digit(str[pos]))
+            ++pos;
+        }
         return true;
       };
 
@@ -230,27 +230,39 @@ namespace semver {
       if (!parse_component() || !consume_dot() ||
           !parse_component() || !consume_dot() ||
           !parse_component())
-        return false;
+        return 0;
 
-      if (pos == str.size())
+      auto valid_end = pos;
+      const auto parse_tag = [&](bool reject_numeric_leading_zero) constexpr {
+        do {
+          const auto start = pos;
+          while (pos < str.size() && is_identifier_char(str[pos]))
+            ++pos;
+          if (pos == start)
+            return false;
+
+          const auto id = str.substr(start, pos - start);
+          if (reject_numeric_leading_zero && id.size() > 1 && id.front() == '0' && is_numeric_identifier(id)) {
+            valid_end = start + 1; // Keep only the leading zero.
+            return false;
+          }
+          valid_end = pos;
+        } while (consume_dot());
         return true;
+      };
 
-      if (str[pos] == '-') {
-        const auto start = ++pos;
-        while (pos < str.size() && str[pos] != '+')
-          ++pos;
-        if (pos == start || !validate_prerelease_tag(str.substr(start, pos - start)))
-          return false;
+      if (pos < str.size() && str[pos] == '-') {
+        ++pos;
+        if (!parse_tag(true))
+          return valid_end;
       }
 
       if (pos < str.size() && str[pos] == '+') {
-        const auto start = ++pos;
-        if (pos == str.size() || !validate_build_metadata(str.substr(start)))
-          return false;
-        pos = str.size();
+        ++pos;
+        (void)parse_tag(false);
       }
 
-      return pos == str.size();
+      return valid_end;
     }
 
     template<class T, class U>
@@ -871,12 +883,10 @@ template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
   version<I1, I2, I3> tmp;
   const auto res = detail::version_parser{input}.parse(tmp);
   if (!res) {
-    // Find the longest valid SemVer prefix.
-    for (auto prefix_len = len; prefix_len > 0; --prefix_len) {
+    // Recover the longest valid prefix in one pass.
+    const auto prefix_len = detail::version_prefix_length(std::string_view{first, len});
+    if (prefix_len != 0) {
       const auto prefix_str = std::string_view{first, prefix_len};
-      if (!detail::validate_version_syntax(prefix_str))
-        continue;
-
       version<I1, I2, I3> prefix;
       const auto prefix_result = parse(prefix_str, prefix);
       if (prefix_result) {
@@ -1496,21 +1506,18 @@ template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
 // Returns the lowest representable version satisfying rs, or nullopt if none exists.
 template <typename I1, typename I2, typename I3>
 [[nodiscard]] SEMVER_CONSTEXPR std::optional<version<I1, I2, I3>> min_version(const range_set<I1, I2, I3>& rs, prerelease_policy policy = prerelease_policy::exclude) {
-  const auto& ranges = detail::range_set_access::ranges(rs);
-  if (ranges.empty())
-    return std::nullopt;
-
   std::optional<version<I1, I2, I3>> result;
-  const auto consider = [&](const version<I1, I2, I3>& candidate) {
-    if (rs.contains(candidate, policy) && (!result || candidate < *result))
-      result = candidate;
-    return false;
-  };
+  for (const auto& range : detail::range_set_access::ranges(rs)) {
+    const auto consider = [&](const version<I1, I2, I3>& candidate) {
+      if ((!result || candidate < *result) && range.contains(candidate, policy))
+        result = candidate;
+      return false;
+    };
 
-  consider(version<I1, I2, I3>{I1{}, I2{}, I3{}});
-  consider(version<I1, I2, I3>{I1{}, I2{}, I3{}, "0"});
-  for (const auto& range : ranges)
+    consider(version<I1, I2, I3>{I1{}, I2{}, I3{}});
+    consider(version<I1, I2, I3>{I1{}, I2{}, I3{}, "0"});
     detail::visit_range_candidates<I1, I2, I3>(range, consider);
+  }
 
   return result;
 }

@@ -262,6 +262,13 @@ TEST_CASE("re-parsing into same object resets state") {
 #if SEMVER_HAS_CONSTEXPR
 TEST_CASE("constexpr parse and accessors") {
   static_assert([] {
+    constexpr std::string_view input = "1.2.3-alpha.01";
+    semver::version<> v;
+    const auto result = semver::from_chars(input.data(), input.data() + input.size(), v);
+    return result && result.ptr == input.data() + input.size() - 1 && v.to_string() == "1.2.3-alpha.0";
+  }());
+
+  static_assert([] {
     semver::version<> v;
     (void)semver::parse("10.20.30", v);
     return v.major() == 10 && v.minor() == 20 && v.patch() == 30;

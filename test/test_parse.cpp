@@ -705,6 +705,51 @@ TEST_CASE("from_chars partial parse semantics") {
   }
 }
 
+TEST_CASE("from_chars agrees with strict parsing of the longest prefix") {
+  const std::string_view cores[] = {"0.0.0", "1.2.3", "1.2.03", "01.2.3", "1.02.3", "256.0.0", "1.256.0", "1.2.256"};
+  const std::string_view suffixes[] = {
+    "", " ", ".", "+", "-", "-0", "-00", "-01.alpha", "-01a", "-01a.",
+    "-alpha.01", "-alpha..beta", "-alpha.0+", "-alpha.0+build.01", "-alpha.0+build..1",
+    "-alpha.+build", "+01", "+build.", "+build..1", "+build+meta", "-alpha_1"
+  };
+  for (const auto core : cores) {
+    for (const auto suffix : suffixes) {
+      auto input = std::string{core} + std::string{suffix};
+      // Include embedded NUL and trailing garbage in the pointer range.
+      input.push_back('\0');
+      input += "trailing";
+      CAPTURE(input);
+      auto prefix_len = input.size();
+      while (prefix_len > 0 && !semver::valid<std::uint64_t>(std::string_view{input}.substr(0, prefix_len)))
+        --prefix_len;
+
+      version<std::uint8_t> actual{7, 8, 9, "original", "metadata"};
+      const auto result = semver::from_chars(input.data(), input.data() + input.size(), actual);
+      CHECK(result.ptr == input.data() + prefix_len);
+      if (prefix_len == 0) {
+        CHECK(result.ec == std::errc::invalid_argument);
+        CHECK(actual.to_string() == "7.8.9-original+metadata");
+      } else {
+        version<std::uint8_t> expected{7, 8, 9, "original", "metadata"};
+        const auto strict = semver::parse(std::string_view{input}.substr(0, prefix_len), expected);
+        CHECK(result.ec == strict.ec);
+        CHECK(actual.to_string() == expected.to_string());
+      }
+    }
+  }
+}
+
+TEST_CASE("from_chars handles a long malformed numeric prerelease") {
+  constexpr std::string_view prefix = "1.2.3-alpha.0";
+  std::string input{prefix};
+  input.append(SEMVER_MAX_INPUT_LENGTH - input.size(), '1');
+  version<> v;
+  const auto result = semver::from_chars(input.data(), input.data() + input.size(), v);
+  REQUIRE(result);
+  CHECK(result.ptr == input.data() + prefix.size());
+  CHECK(v.to_string() == prefix);
+}
+
 TEST_CASE("try_parse") {
   SUBCASE("valid string returns engaged optional with correct values") {
     const auto v = semver::try_parse("1.2.3");
