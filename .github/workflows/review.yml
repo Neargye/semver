@@ -1,0 +1,94 @@
+# Review-only workflow: configurations missing from the review container and probes.
+# Lives only on the review branch; not for merging.
+name: review
+
+on:
+  push:
+    branches: [claude/inspiring-albattani-ynu35i]
+    paths-ignore: [review-report.md]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: review-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  posix:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        # Keep only the jobs the review needs (at most 8 jobs in total).
+        - { id: macos-appleclang, os: macos-15,     cxx: clang++,    flags: "" }
+        - { id: clang-libcxx,     os: ubuntu-24.04, cxx: clang++-20, flags: "-stdlib=libc++ -fsanitize=address,undefined -fno-sanitize-recover=all" }
+        - { id: gcc-latest,       os: ubuntu-24.04, cxx: g++-14,     flags: "" }
+        - { id: gcc-m32,          os: ubuntu-24.04, cxx: g++,        flags: "-m32" }
+
+    name: "${{ matrix.id }}"
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Clang 20 and libc++ (apt.llvm.org)
+      if: matrix.id == 'clang-libcxx'
+      run: |
+        wget -q https://apt.llvm.org/llvm.sh
+        sudo bash llvm.sh 20
+        sudo apt-get install -y libc++-20-dev libc++abi-20-dev libclang-rt-20-dev
+
+    - name: Install multilib
+      if: matrix.id == 'gcc-m32'
+      run: sudo apt-get update && sudo apt-get install -y g++-multilib
+
+    # Replace Configure/Build/Test for projects that do not use CMake.
+    - name: Configure
+      run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} "-DCMAKE_CXX_FLAGS=${{ matrix.flags }}" "-DCMAKE_EXE_LINKER_FLAGS=${{ matrix.flags }}"
+
+    - name: Build
+      run: cmake --build build --parallel
+
+    - name: Test
+      run: ctest --test-dir build --output-on-failure
+
+    - name: Probes
+      if: always()
+      run: python3 review/probes/run.py --job ${{ matrix.id }} --style gcc --cxx ${{ matrix.cxx }} "--flags=${{ matrix.flags }}"
+
+  windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - { id: msvc-x64, arch: x64,   toolset: "",      vcvars: x64, cxx: cl }
+        - { id: msvc-x86, arch: Win32, toolset: "",      vcvars: x86, cxx: cl }
+        - { id: clangcl,  arch: x64,   toolset: ClangCL, vcvars: x64, cxx: clang-cl }
+
+    name: "${{ matrix.id }}"
+    runs-on: windows-2022
+    timeout-minutes: 20
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Configure
+      run: cmake -S . -B build -A ${{ matrix.arch }} ${{ matrix.toolset && format('-T {0}', matrix.toolset) || '' }}
+
+    - name: Build
+      run: cmake --build build --parallel --config Debug
+
+    - name: Test
+      run: ctest --test-dir build --output-on-failure -C Debug
+
+    - name: Probes
+      if: always()
+      shell: cmd
+      run: |
+        for /f "usebackq delims=" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath`) do set "VSDIR=%%i"
+        call "%VSDIR%\VC\Auxiliary\Build\vcvarsall.bat" ${{ matrix.vcvars }}
+        set "PATH=%VSDIR%\VC\Tools\Llvm\x64\bin;%PATH%"
+        python review\probes\run.py --job ${{ matrix.id }} --style msvc --cxx ${{ matrix.cxx }}
