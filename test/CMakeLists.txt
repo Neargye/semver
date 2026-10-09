@@ -56,6 +56,17 @@ function(make_config_test target std)
     add_test(NAME ${target} COMMAND ${target})
 endfunction()
 
+function(make_constexpr_test target std)
+    add_executable(${target} test.cpp test_constexpr.cpp)
+    target_compile_definitions(${target} PRIVATE DOCTEST_CONFIG_USE_STD_HEADERS ${ARGN})
+    target_compile_options(${target} PRIVATE ${OPTIONS})
+    target_include_directories(${target} SYSTEM PRIVATE 3rdparty/doctest)
+    target_link_libraries(${target} PRIVATE ${PROJECT_NAME})
+    set_target_properties(${target} PROPERTIES CXX_EXTENSIONS OFF)
+    target_compile_features(${target} PRIVATE cxx_std_${std})
+    add_test(NAME ${target} COMMAND ${target})
+endfunction()
+
 make_test(${PROJECT_NAME}-cpp17.t 17)
 make_config_test(${PROJECT_NAME}-config-cpp17.t 17)
 
@@ -63,6 +74,10 @@ if("cxx_std_20" IN_LIST CMAKE_CXX_COMPILE_FEATURES)
     make_test(${PROJECT_NAME}-cpp20.t 20)
 
     make_config_test(${PROJECT_NAME}-config-cpp20.t 20 SEMVER_TEST_LEGACY_OPTIONAL)
+
+    if(NOT SEMVER_MSVC_FRONTEND)
+        make_constexpr_test(${PROJECT_NAME}-glibcxx-debug-cpp20.t 20 _GLIBCXX_DEBUG)
+    endif()
 endif()
 
 if("cxx_std_23" IN_LIST CMAKE_CXX_COMPILE_FEATURES)

@@ -101,7 +101,8 @@
 #  define SEMVER_CONSTEXPR_OPTIONAL inline
 #endif
 
-#if SEMVER_HAS_CONSTEXPR_OPTIONAL && defined(__cpp_lib_constexpr_vector) && __cpp_lib_constexpr_vector >= 201907L
+// libstdc++ before 14 advertises constexpr vector in debug mode, but its debug vector is not constexpr.
+#if SEMVER_HAS_CONSTEXPR_OPTIONAL && defined(__cpp_lib_constexpr_vector) && __cpp_lib_constexpr_vector >= 201907L && !(defined(_GLIBCXX_DEBUG) && (!defined(_GLIBCXX_RELEASE) || _GLIBCXX_RELEASE < 14))
 #  define SEMVER_HAS_CONSTEXPR_RANGES 1
 #  define SEMVER_CONSTEXPR_RANGES constexpr
 #else
