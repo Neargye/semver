@@ -636,6 +636,41 @@ struct partial_version {
 };
 
 class version_parser {
+  // Defined before parse_partial, otherwise Clang cannot constant-evaluate its first use.
+  template <typename Int>
+  SEMVER_CONSTEXPR_CORE from_chars_result parse_number(Int& out) {
+    if (!stream.has() || !is_digit(stream.peek()))
+      return failure(stream.ptr());
+
+    auto last_digit_pos = stream.position();
+    const auto first_digit = static_cast<std::uint8_t>(stream.advance() - '0');
+    std::uint64_t result = first_digit;
+
+    if (first_digit == 0) {
+      if (stream.has() && is_digit(stream.peek()))
+        return failure(stream.ptr()); // leading zero in numeric version component
+
+      out = static_cast<Int>(0);
+      return success(stream.ptr());
+    }
+
+    while (stream.has() && is_digit(stream.peek())) {
+      last_digit_pos = stream.position();
+      const auto d = static_cast<std::uint8_t>(stream.advance() - '0');
+      if (result > ((std::numeric_limits<std::uint64_t>::max)() - d) / 10)
+        return failure(stream.ptr_at(last_digit_pos), std::errc::result_out_of_range);
+
+      result = result * 10 + d;
+    }
+
+    if (detail::number_in_range<Int>(result)) {
+      out = static_cast<Int>(result);
+      return success(stream.ptr());
+    }
+
+    return failure(stream.ptr_at(last_digit_pos), std::errc::result_out_of_range);
+  }
+
 public:
   explicit SEMVER_CONSTEXPR_CORE version_parser(cursor& input) noexcept : stream{input} {}
 
@@ -723,40 +758,6 @@ private:
 
   SEMVER_CONSTEXPR_CORE bool consume_wildcard() noexcept {
     return stream.consume('*') || stream.consume('x') || stream.consume('X');
-  }
-
-  template <typename Int>
-  SEMVER_CONSTEXPR_CORE from_chars_result parse_number(Int& out) {
-    if (!stream.has() || !is_digit(stream.peek()))
-      return failure(stream.ptr());
-
-    auto last_digit_pos = stream.position();
-    const auto first_digit = static_cast<std::uint8_t>(stream.advance() - '0');
-    std::uint64_t result = first_digit;
-
-    if (first_digit == 0) {
-      if (stream.has() && is_digit(stream.peek()))
-        return failure(stream.ptr()); // leading zero in numeric version component
-
-      out = static_cast<Int>(0);
-      return success(stream.ptr());
-    }
-
-    while (stream.has() && is_digit(stream.peek())) {
-      last_digit_pos = stream.position();
-      const auto d = static_cast<std::uint8_t>(stream.advance() - '0');
-      if (result > ((std::numeric_limits<std::uint64_t>::max)() - d) / 10)
-        return failure(stream.ptr_at(last_digit_pos), std::errc::result_out_of_range);
-
-      result = result * 10 + d;
-    }
-
-    if (detail::number_in_range<Int>(result)) {
-      out = static_cast<Int>(result);
-      return success(stream.ptr());
-    }
-
-    return failure(stream.ptr_at(last_digit_pos), std::errc::result_out_of_range);
   }
 
   SEMVER_CONSTEXPR_CORE from_chars_result parse_tag(std::string& out, bool check_leading_zeros) {
@@ -1453,7 +1454,9 @@ namespace detail {
         if (visitor(version<O1, O2, O3>{bound.major(), bound.minor(), bound.patch()}))
           return true;
 
-        auto prerelease = std::string{bound.prerelease_tag()};
+        // Clang with libstdc++ 13 cannot constant-evaluate std::string{string_view}.
+        std::string prerelease;
+        prerelease.assign(bound.prerelease_tag());
         prerelease += ".0";
         if (visitor(version<O1, O2, O3>{bound.major(), bound.minor(), bound.patch(), prerelease}))
           return true;
@@ -1625,7 +1628,9 @@ template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
   if (change != version_change::prerelease || v.prerelease_tag().empty())
     return version<I1, I2, I3>{base.major(), base.minor(), base.patch(), "0"};
 
-  auto tag = std::string{v.prerelease_tag()};
+  // Clang with libstdc++ 13 cannot constant-evaluate std::string{string_view}.
+  std::string tag;
+  tag.assign(v.prerelease_tag());
   const auto dot_pos = tag.rfind('.');
   const auto last_start = (dot_pos == std::string::npos) ? 0 : dot_pos + 1;
   const auto last_id = std::string_view{tag}.substr(last_start);

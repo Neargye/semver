@@ -10,6 +10,7 @@ set(SOURCES
     test_api.cpp
     test_advanced_ranges.cpp
     test_edge_cases.cpp
+    test_constexpr.cpp
 )
 
 if(MSVC OR CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
