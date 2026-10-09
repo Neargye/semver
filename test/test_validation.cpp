@@ -518,4 +518,26 @@ TEST_CASE("consteval _semver literal") {
     }());
   }
 }
+
+// A constexpr std::string variable needs a library that keeps short strings inline during constant evaluation.
+#if defined(__GLIBCXX__)
+namespace literal_test {
+  using namespace semver::literals;
+  constexpr auto namespace_scope = "1.2.3-alpha"_semver; // example from doc/reference.md
+} // namespace literal_test
+#endif
+
+TEST_CASE("_semver literal outside constant expressions") {
+  using namespace semver::literals;
+
+#if defined(__GLIBCXX__)
+  CHECK(literal_test::namespace_scope == version<>{1, 2, 3, "alpha"});
+#endif
+  CHECK("1.2.3"_semver.major() == 1);
+
+  const auto v = "1.2.3-averyveryverylong.prerelease.tag+build"_semver;
+  CHECK(v.prerelease_tag() == "averyveryverylong.prerelease.tag");
+  CHECK(v.build_metadata() == "build");
+  CHECK(v == version<>{1, 2, 3, "averyveryverylong.prerelease.tag"});
+}
 #endif

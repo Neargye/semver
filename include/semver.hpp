@@ -113,7 +113,8 @@
 #define SEMVER_HAS_CONSTEXPR SEMVER_HAS_CONSTEXPR_RANGES
 
 // Native MSVC and older GCC/libstdc++ have consteval return limitations.
-#if defined(__cpp_consteval) && __cpp_consteval >= 201811L && SEMVER_HAS_CONSTEXPR_CORE && (!defined(_MSC_VER) || defined(__clang__)) && !(defined(__GLIBCXX__) && !defined(__clang__) && (!defined(__GNUC__) || __GNUC__ < 14 || !defined(_GLIBCXX_RELEASE) || _GLIBCXX_RELEASE < 14))
+// The literal needs class-type template parameters; Clang supports them without raising __cpp_nontype_template_args.
+#if defined(__cpp_consteval) && __cpp_consteval >= 201811L && SEMVER_HAS_CONSTEXPR_CORE && ((defined(__cpp_nontype_template_args) && __cpp_nontype_template_args >= 201911L) || defined(__clang__)) && (!defined(_MSC_VER) || defined(__clang__)) && !(defined(__GLIBCXX__) && !defined(__clang__) && (!defined(__GNUC__) || __GNUC__ < 14 || !defined(_GLIBCXX_RELEASE) || _GLIBCXX_RELEASE < 14))
 #  define SEMVER_HAS_CONSTEVAL_LITERAL 1
 #else
 #  define SEMVER_HAS_CONSTEVAL_LITERAL 0
@@ -1690,13 +1691,30 @@ template <typename I1 = std::uint32_t, typename I2 = I1, typename I3 = I1>
 inline const version<> library_version{SEMVER_VERSION_MAJOR, SEMVER_VERSION_MINOR, SEMVER_VERSION_PATCH};
 
 #if SEMVER_HAS_CONSTEVAL_LITERAL
-namespace literals {
-  consteval version<> operator""_semver(const char* str, std::size_t len) {
-    version<> v;
-    const auto result = parse(std::string_view{str, len}, v);
-    if (!result) {
-      throw "invalid semver literal";
+namespace detail {
+  template <std::size_t N>
+  struct literal_string {
+    char data[N]{};
+
+    constexpr literal_string(const char (&str)[N]) noexcept {
+      for (std::size_t i = 0; i < N; ++i)
+        data[i] = str[i];
     }
+
+    constexpr std::string_view view() const noexcept { return {data, N - 1}; }
+  };
+
+  template <std::size_t N>
+  literal_string(const char (&)[N]) -> literal_string<N>;
+} // namespace semver::detail
+
+namespace literals {
+  // Validated at compile time; the result is an ordinary version, also usable outside constant expressions.
+  template <detail::literal_string S>
+  constexpr version<> operator""_semver() {
+    static_assert(valid(S.view()), "invalid semver literal");
+    version<> v;
+    (void)parse(S.view(), v);
     return v;
   }
 } // namespace literals
