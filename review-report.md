@@ -88,9 +88,44 @@ On HEAD of the fix/proposal commits (step 3 matrix, re-run by the orchestrator a
 | T2 g++-13 `-O3` c++17 / `-O2 -DNDEBUG` c++23 with ASan/UBSan; clang++-18 c++2c `-O2 -DNDEBUG` | 92/92, 103/103, 105/105 |
 | Strict warnings on semver.hpp | identical to base |
 
-Not verified in the container: GCC 14/15, other Clang versions, AppleClang/libc++, MSVC, ClangCL, -m32, Clang ASan/libFuzzer (runtimes missing). Existing CI after push and review CI cover these (see "Review CI" when present).
+Not verified in the container: GCC 14/15, other Clang versions, AppleClang/libc++, MSVC, ClangCL, -m32, Clang ASan/libFuzzer (runtimes missing). Existing CI after push and review CI covered all of these except old compilers and Clang libFuzzer (see "Review CI").
 
 CI extension proposal (no workflow changed): a Linux Clang + libc++ job (`-stdlib=libc++`, apt.llvm.org `libc++-20-dev libc++abi-20-dev`), and a windows.yml ClangCL job (`-T ClangCL`, x64). Optionally a `-m32` GCC job.
+
+## Review CI
+
+Run: https://github.com/Neargye/semver/actions/runs/37914469758 (head b6e877c, 7 jobs, all green, ~4 min). The project build and tests pass in every new configuration; probes run against the branch HEAD (fixes and proposal applied), so their predictions, written for the base header, read as "does the fix hold here".
+Existing CI on the same head: ubuntu (GCC 13/14/15, Clang 17–22, Clang 20 ASan+UBSan), macos (macos-15/26), windows (VS 2022/2026, x64/Win32, Release/Debug), install — all green.
+
+| job | project tests | probes (prediction / actual) |
+|---|---|---|
+| gcc-latest (g++-14, libstdc++ 14) | pass | H1 build-fail→**build-ok** (proposed literal usable at run time on GCC 14); R1b build-fail→**build-ok** (debug vector constexpr on libstdc++ 14: the `< 14` bound in 2655b75 is right); H7, R1c held (CONSTEVAL_LITERAL=1) |
+| clang-libcxx (Clang 20, libc++, ASan+UBSan) | pass | H1b held; R1 build-fail→**build-ok** (N1 fix holds with libc++ c++20/23); H7 held; H1c see below |
+| macos-appleclang (macos-15) | pass | H1b held; R1 c++20 n/a (RANGES=0), c++23 **build-ok** (N1 fix holds); H7 held; H1c see below |
+| gcc-m32 | pass | R1c held; R5 held (`sizeof(size_t)=4 failures=0`) |
+| msvc-x64 | pass | H12 held (`49.50.51`), H7, R1c, R5 held (64-bit control) |
+| msvc-x86 | pass | H12, H7, R1c held; R5 held (`sizeof(size_t)=4 failures=0`) |
+| clangcl (x64) | pass (first ClangCL run of the suite) | H8 held (`CORE=1 OPTIONAL=0 RANGES=0 CONSTEVAL_LITERAL=1`, every enabled path usable); H12, H1b, H7 held |
+
+H1c is a probe defect: its literal `1.2.3-averyveryverylong.prerelease.tag.0123456789` is invalid SemVer (numeric identifier with a leading zero), and the proposed literal correctly rejects it at compile time (`static assertion failed ... invalid semver literal`) on libc++, AppleClang and clang-cl. The intended case (run-time literal with a tag longer than every SSO buffer) is covered by test_validation.cpp, which passes on macos (AppleClang/libc++), clang-libcxx and clangcl.
+
+CI verdicts:
+
+| ID | verdict | evidence |
+|---|---|---|
+| H1 | CONFIRMED on base (container); proposal 3735575 works on GCC 14/15, Clang 17–22, Clang 20 + libc++, AppleClang, clang-cl | gcc-latest H1 build-ok; existing CI green with the new literal test; H1b/test suite on libc++ and clang-cl |
+| H7 | REJECTED for current libraries (libstdc++ 14, libc++ 20, AppleClang, MSVC STL, clang-cl); pre-LWG 3636 libraries (VS 2019, old libc++) remain unverified | H7 run-ok on 6 jobs |
+| H8 | REJECTED: ClangCL guard paths are consistent and the whole test suite passes | clangcl job |
+| H12 | CONFIRMED on Windows too (`wchar_t` accepted) | H12 on msvc-x64/x86, clangcl |
+| N1 fix (86b21ba) | holds on Clang 20 + libc++ and AppleClang | R1 build-ok; existing Clang 17–22 green with test_constexpr.cpp |
+| P-2 fix (2655b75) | bound correct: libstdc++ 14 debug vector is constexpr | R1b build-ok on g++-14 |
+| R1 (feature guards) | correct on g++-14, gcc -m32, MSVC x64/x86 | R1c run-ok |
+| R5 (32-bit) | no defect | R5 run-ok on gcc-m32, msvc-x86 |
+| H5, H6 | UNCLEAR: old compilers / old libstdc++ have no job in the fixed job list | owner question Q8 |
+
+Packages installed on runners: clang-20 (apt.llvm.org llvm.sh), libc++-20-dev, libc++abi-20-dev, libclang-rt-20-dev (apt.llvm.org), g++-multilib (Ubuntu archive).
+
+Permanent CI extension proposed (owner): add the clangcl and clang-libcxx configurations to windows.yml/ubuntu.yml (both found nothing now, but they are the only coverage of the ClangCL guard paths and Linux libc++); optionally gcc -m32.
 
 ## Decisions
 
@@ -122,6 +157,7 @@ Rows D1–D8 are documented owner decisions taken from `doc/limitations.md` / `d
 | D21 | A block-scope `constexpr` `version<>` (also from the literal) does not compile with libstdc++ (`pointer to subobject of 'v'`) | left as is: property of `std::string` in constant expressions; namespace-scope `constexpr`, `static constexpr` and run-time use work after the literal proposal | report, [proposal] commit for H1 |
 | D22 | `SEMVER_HAS_CONSTEVAL_LITERAL` stays 0 on GCC < 14 and native MSVC; the name is kept although the proposed literal is a constexpr operator template | awaiting owner: the template literal compiles on g++-13, but enabling it there adds API where it is absent today | report Q7 |
 | D23 | Hypotheses H4, H14, H20, H21, H22 rejected; H5-H8 unclear (old compilers, old libstdc++, pre-LWG 3636 `<format>`, clang-cl) | no change; H5-H8 are for review CI / the owner (README compatibility claim) | evidence.md "Hypothesis verdicts"; report Q8 |
+| D24 | Review CI 2026-10-09: no new defects; H7, H8 rejected on current toolchains; H5/H6 (old compilers, old libstdc++) not covered by review CI | left to the owner (Q8); propose permanent ClangCL and Linux libc++ jobs | review-report.md "Review CI", run 37914469758 |
 
 ## Evidence (empirical checks and hypothesis verdicts)
 
